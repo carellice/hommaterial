@@ -1,0 +1,145 @@
+package app.hommaterial.data
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+
+private const val DEVICES_QUERY = """query Endpoints { endpoints { items {
+  friendlyName
+  displayCategories { primary { value } }
+  legacyAppliance { applianceId entityId isEnabled capabilities }
+} } }"""
+
+// Echo and Fire TV devices also report a power capability but are not home devices.
+private const val VOICE_DEVICE_CATEGORY = "ALEXA_VOICE_ENABLED"
+
+class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
+
+    private suspend fun call(method: String, path: String, body: JSONObject? = null): JSONObject =
+        withContext(Dispatchers.IO) {
+            val market = auth.marketplace
+            val host = market.alexaHost
+            var session = auth.session()
+            repeat(2) { attempt ->
+                val request = Request.Builder()
+                    .url("https://$host$path")
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept", "application/json; charset=utf-8")
+                    .header("Accept-Language", market.locale)
+                    .header("Referer", "https://$host/spa/index.html")
+                    .header("Origin", "https://$host")
+                    .header("csrf", session.csrf)
+                    .header("Cookie", session.cookie)
+                    .method(method, body?.toString()?.toRequestBody("application/json; charset=utf-8".toMediaType()))
+                    .build()
+                http.newCall(request).execute().use { response ->
+                    val text = response.body?.string().orEmpty()
+                    when {
+                        // The web session lasts a few days; the first 401 just means it needs renewing.
+                        response.code == 401 && attempt == 0 -> session = auth.session(forceRefresh = true)
+                        response.code == 401 -> throw NotLoggedInException("Accesso scaduto, entra di nuovo")
+                        !response.isSuccessful -> throw Exception("Alexa ha risposto con errore ${response.code}")
+                        else -> return@withContext if (text.isBlank()) JSONObject() else JSONObject(text)
+                    }
+                }
+            }
+            error("unreachable")
+        }
+
+    /** Controllable devices and sensors, each tagged with its Alexa room. */
+    suspend fun devices(): List<Device> = coroutineScope {
+        val endpoints = async { call("POST", "/nexus/v1/graphql", JSONObject().put("query", DEVICES_QUERY)) }
+        val groups = async { call("GET", "/api/phoenix/group") }
+
+        val roomOf = HashMap<String, String>()
+        groups.await().optJSONArray("applianceGroups")?.mapObjects { group ->
+            val ids = group.optJSONArray("applianceIds") ?: JSONArray()
+            for (i in 0 until ids.length()) roomOf.putIfAbsent(ids.getString(i), group.getString("name"))
+        }
+
+        val items = endpoints.await().optJSONObject("data")?.optJSONObject("endpoints")?.optJSONArray("items")
+            ?: throw Exception("Risposta inattesa da Alexa")
+        items.mapObjects { item ->
+            val appliance = item.optJSONObject("legacyAppliance") ?: return@mapObjects null
+            val applianceId = appliance.optString("applianceId")
+            if (applianceId.isEmpty() || !appliance.optBoolean("isEnabled", true)) return@mapObjects null
+
+            val interfaces = appliance.optJSONArray("capabilities")
+                ?.mapObjects { it.optString("interfaceName") }?.toSet().orEmpty()
+            val category = item.optJSONObject("displayCategories")?.optJSONObject("primary")?.optString("value")
+                ?.ifEmpty { null } ?: "OTHER"
+            val device = Device(
+                applianceId = applianceId,
+                entityId = appliance.optString("entityId"),
+                name = item.optString("friendlyName"),
+                category = category,
+                room = roomOf[applianceId],
+                hasPower = "Alexa.PowerController" in interfaces,
+                hasBrightness = "Alexa.BrightnessController" in interfaces,
+                isSensor = "Alexa.TemperatureSensor" in interfaces,
+            )
+            device.takeIf { category != VOICE_DEVICE_CATEGORY && (it.hasPower || it.isSensor) }
+        }.filterNotNull().sortedBy { it.name.lowercase() }
+    }
+
+    /** Current state of every given device, keyed by applianceId. */
+    suspend fun states(devices: List<Device>): Map<String, DeviceState> {
+        if (devices.isEmpty()) return emptyMap()
+        val requests = JSONArray(
+            devices.map { JSONObject().put("entityId", it.applianceId).put("entityType", "APPLIANCE") },
+        )
+        val response = call("POST", "/api/phoenix/state", JSONObject().put("stateRequests", requests))
+
+        val result = HashMap<String, DeviceState>()
+        response.optJSONArray("deviceStates")?.mapObjects { entry ->
+            var state = DeviceState()
+            val capabilities = entry.optJSONArray("capabilityStates") ?: JSONArray()
+            for (i in 0 until capabilities.length()) {
+                // Each capability arrives as a JSON document encoded inside a string.
+                val cap = JSONObject(capabilities.getString(i))
+                state = when (cap.optString("name")) {
+                    "powerState" -> state.copy(power = cap.optString("value") == "ON")
+                    "brightness" -> state.copy(brightness = cap.optInt("value"))
+                    "temperature" -> state.copy(temperature = cap.optJSONObject("value")?.optDouble("value"))
+                    "relativeHumidity" -> state.copy(humidity = cap.optInt("value"))
+                    else -> state
+                }
+            }
+            result[entry.getJSONObject("entity").getString("entityId")] = state
+        }
+        response.optJSONArray("errors")?.mapObjects { error ->
+            error.optJSONObject("entity")?.optString("entityId")?.let { result[it] = DeviceState(reachable = false) }
+        }
+        return result
+    }
+
+    suspend fun setPower(device: Device, on: Boolean) =
+        control(device, JSONObject().put("action", if (on) "turnOn" else "turnOff"))
+
+    suspend fun setBrightness(device: Device, percent: Int) =
+        control(device, JSONObject().put("action", "setBrightness").put("brightness", percent))
+
+    private suspend fun control(device: Device, parameters: JSONObject) {
+        val request = JSONObject()
+            .put("entityId", device.entityId)
+            .put("entityType", "APPLIANCE")
+            .put("parameters", parameters)
+        val response = call("PUT", "/api/phoenix/state", JSONObject().put("controlRequests", JSONArray().put(request)))
+        val error = response.optJSONArray("errors")?.optJSONObject(0)
+        if (error != null) {
+            throw Exception(
+                when (error.optString("code")) {
+                    "ENDPOINT_UNREACHABLE", "NO_SUCH_ENDPOINT" -> "${device.name} non è raggiungibile"
+                    else -> "${device.name}: comando rifiutato (${error.optString("code")})"
+                },
+            )
+        }
+    }
+}
