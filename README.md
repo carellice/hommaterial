@@ -1,4 +1,12 @@
-# Hommaterial
+<p align="center">
+  <img src="docs/icon.png" alt="Icona di Hommaterial" width="128" height="128">
+</p>
+
+<h1 align="center">Hommaterial</h1>
+
+<p align="center"><b>Comanda la tua smart home Alexa, senza fronzoli.</b></p>
+
+<p align="center">App Android · Gratuita · Open source · Solo italiano</p>
 
 Un'app Android nativa, veloce e minimale per comandare i dispositivi smart home
 collegati al proprio account Alexa.
