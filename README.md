@@ -55,6 +55,8 @@ collegati al proprio account Alexa.
 - Un tocco accende o spegne.
 - Tenendo premuto si apre il pannello con accensione, spegnimento esplicito,
   timer di spegnimento, luminosità e colore per le luci che li supportano.
+- I timer in corso stanno in una sezione in cima alla lista, con il conto
+  alla rovescia, ordinati dal più vicino allo spegnimento.
 - I preferiti stanno in cima alla lista, in un widget per la schermata Home e
   sotto l'icona dell'app, tenendola premuta.
 - Fino a cinque dispositivi a scelta si comandano dalle Impostazioni rapide di

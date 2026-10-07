@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CleaningServices
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DevicesOther
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Mic
@@ -157,6 +158,17 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // Running timers come first, the one closest to switching off at the top.
+                val timers = state.timers.entries.sortedBy { it.value }
+                    .mapNotNull { (id, at) -> state.placed.find { it.applianceId == id }?.let { it to at } }
+                if (timers.isNotEmpty()) {
+                    item(key = "timers", span = { GridItemSpan(maxLineSpan) }) {
+                        SectionHeader(str(R.string.s_timers))
+                    }
+                    items(timers, key = { "timer:${it.first.applianceId}" }, span = { GridItemSpan(maxLineSpan) }) {
+                        TimerRow(it.first, it.second) { vm.cancelTimer(it.first) }
+                    }
+                }
                 // Favorites are repeated at the top and stay in their rooms too.
                 val favorites = visible.filter { it.applianceId in state.favorites }.sortedBy { it.name.lowercase() }
                 if (favorites.isNotEmpty()) {
@@ -236,6 +248,54 @@ private fun DeviceTile(device: Device, state: UiState, vm: HomeViewModel) {
         alert = state.alerts[device.applianceId] ?: Alert(),
         vm = vm,
     )
+}
+
+/** A device with a switch-off timer and the time left, counted down second by second. */
+@Composable
+private fun TimerRow(device: Device, at: Long, onCancel: () -> Unit) {
+    val now by produceState(System.currentTimeMillis(), at) {
+        while (true) {
+            value = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(20.dp)) {
+        Row(
+            Modifier.padding(start = 14.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(iconFor(device), contentDescription = null, modifier = Modifier.size(26.dp))
+            Column(Modifier.padding(start = 14.dp).weight(1f)) {
+                Text(
+                    device.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    str(R.string.turns_off_at, clock(at)),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.alpha(0.75f),
+                )
+            }
+            // Digits of equal width keep the countdown from jittering as it ticks.
+            Text(
+                countdown(at - now),
+                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+            )
+            IconButton(onClick = onCancel) {
+                Icon(Icons.Outlined.Close, contentDescription = str(R.string.cancel_timer))
+            }
+        }
+    }
+}
+
+/** Time left as 1:05:09 or 05:09; a timer that is late, waiting for the network, stays at zero. */
+private fun countdown(millis: Long): String {
+    val seconds = millis.coerceAtLeast(0) / 1000
+    val (h, m, s) = Triple(seconds / 3600, seconds / 60 % 60, seconds % 60)
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
 }
 
 @Composable
