@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.DevicesOther
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Power
+import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.Tv
@@ -111,7 +112,18 @@ fun HomeScreen(state: UiState, vm: HomeViewModel) {
                     items(favorites, key = { "favorite:${it.applianceId}" }) { DeviceTile(it, state, vm) }
                 }
                 for ((room, devices) in rooms) {
-                    item(key = "room:$room", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(room) }
+                    item(key = "room:$room", span = { GridItemSpan(maxLineSpan) }) {
+                        // "Altro" gathers unrelated devices: switching them together makes no sense.
+                        // Hidden devices stay out of it even while they are being shown.
+                        val switchable = if (room == NO_ROOM) emptyList() else {
+                            devices.filter { it.hasPower && it.applianceId !in state.hidden }
+                        }
+                        if (switchable.size > 1) {
+                            SectionHeader(room) { on -> vm.setRoomPower(switchable, on) }
+                        } else {
+                            SectionHeader(room)
+                        }
+                    }
                     items(devices, key = { it.applianceId }) { DeviceTile(it, state, vm) }
                 }
             }
@@ -120,13 +132,34 @@ fun HomeScreen(state: UiState, vm: HomeViewModel) {
 }
 
 @Composable
-private fun SectionHeader(name: String) {
-    Text(
-        name,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 12.dp),
-    )
+private fun SectionHeader(name: String, onPower: ((Boolean) -> Unit)? = null) {
+    // The fixed height keeps headers aligned whether or not they carry the power button.
+    Row(Modifier.padding(top = 4.dp).height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            name,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        if (onPower != null) {
+            // A menu rather than a toggle: a whole room should not switch on a stray tap.
+            var open by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { open = true }, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.Outlined.PowerSettingsNew,
+                        contentDescription = "Accendi o spegni $name",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                    DropdownMenuItem(text = { Text("Accendi tutto") }, onClick = { open = false; onPower(true) })
+                    DropdownMenuItem(text = { Text("Spegni tutto") }, onClick = { open = false; onPower(false) })
+                }
+            }
+        }
+    }
 }
 
 @Composable

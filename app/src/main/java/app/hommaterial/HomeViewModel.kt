@@ -185,6 +185,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         api.setBrightness(device, percent)
     }
 
+    /** Switches every device of a room that is not already in the requested state. */
+    fun setRoomPower(devices: List<Device>, on: Boolean) {
+        val s = _state.value
+        devices
+            .filter { it.hasPower && it.applianceId !in s.busy && s.states[it.applianceId]?.power != on }
+            .forEach { setPower(it, on) }
+    }
+
     /** Applies [optimistic] right away and rolls it back if Alexa refuses the command. */
     private fun command(device: Device, optimistic: (DeviceState) -> DeviceState, send: suspend () -> Unit) {
         val id = device.applianceId
