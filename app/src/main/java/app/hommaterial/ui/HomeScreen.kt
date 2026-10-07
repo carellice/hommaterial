@@ -50,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -64,6 +65,7 @@ import app.hommaterial.HomeViewModel
 import app.hommaterial.UiState
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 private const val NO_ROOM = "Altro"
@@ -76,7 +78,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel) {
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Hommaterial") }, actions = { OverflowMenu(state, vm) }) },
+        topBar = { TopAppBar(title = { Title(state.updatedAt) }, actions = { OverflowMenu(state, vm) }) },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         val visible = state.devices.filter { state.showHidden || it.applianceId !in state.hidden }
@@ -122,6 +124,39 @@ fun HomeScreen(state: UiState, vm: HomeViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun Title(updatedAt: Long?) {
+    Column {
+        Text("Hommaterial")
+        if (updatedAt != null) {
+            // Recomputed every half minute so that the age keeps growing while the screen stays open.
+            val now by produceState(System.currentTimeMillis(), updatedAt) {
+                while (true) {
+                    value = System.currentTimeMillis()
+                    delay(30_000)
+                }
+            }
+            Text(
+                ageText(updatedAt, now),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun ageText(updatedAt: Long, now: Long): String {
+    val minutes = (now - updatedAt) / 60_000
+    return when {
+        minutes < 1 -> "Aggiornato adesso"
+        minutes == 1L -> "Aggiornato 1 minuto fa"
+        minutes < 60 -> "Aggiornato $minutes minuti fa"
+        minutes < 120 -> "Aggiornato 1 ora fa"
+        minutes < 24 * 60 -> "Aggiornato ${minutes / 60} ore fa"
+        else -> "Aggiornato più di un giorno fa"
     }
 }
 

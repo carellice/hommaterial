@@ -44,6 +44,8 @@ data class UiState(
     val hidden: Set<String> = emptySet(),
     val showHidden: Boolean = false,
     val refreshing: Boolean = false,
+    /** When the states were last fetched from Alexa, in epoch milliseconds. */
+    val updatedAt: Long? = null,
     /** A newer release found on GitHub, while it is being offered or downloaded. */
     val update: Update? = null,
     /** Download progress from 0 to 1, null when no download is running. */
@@ -90,6 +92,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             marketplace = auth.marketplace,
             devices = devices,
             states = states,
+            updatedAt = cache.getLong("updatedAt", 0).takeIf { it > 0 },
             hidden = cache.getStringSet("hidden", emptySet())!!.toSet(),
         )
     }
@@ -154,7 +157,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     val missing = queryable(devices).filter { it.applianceId !in states }
                     if (missing.isNotEmpty()) states += api.states(missing)
                     // Devices with a command in flight keep their optimistic state.
-                    _state.update { s -> s.copy(states = s.states + states.filterKeys { it !in s.busy }) }
+                    val now = System.currentTimeMillis()
+                    _state.update { s ->
+                        s.copy(states = s.states + states.filterKeys { it !in s.busy }, updatedAt = now)
+                    }
+                    cache.edit().putLong("updatedAt", now).apply()
                     saveCache()
                 }
             }
