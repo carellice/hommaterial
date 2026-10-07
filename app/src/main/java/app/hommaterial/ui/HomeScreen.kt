@@ -2,6 +2,7 @@ package app.hommaterial.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.Tv
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -68,11 +71,14 @@ import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.statusText
 import kotlinx.coroutines.delay
+import java.text.DateFormat
+import java.util.Date
 import kotlin.math.roundToInt
 
 private const val NO_ROOM = "Altro"
 private const val FAVORITES = "Preferiti"
 private val TILE_HEIGHT = 116.dp
+private val TIMER_CHOICES = listOf("15 min" to 15, "30 min" to 30, "1 ora" to 60, "2 ore" to 120)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -172,6 +178,7 @@ private fun DeviceTile(device: Device, state: UiState, vm: HomeViewModel) {
         hidden = device.applianceId in state.hidden,
         favorite = device.applianceId in state.favorites,
         onTile = device.applianceId == state.tileDevice,
+        timer = state.timers[device.applianceId]?.takeIf { it > System.currentTimeMillis() },
         vm = vm,
     )
 }
@@ -238,6 +245,7 @@ private fun DeviceTile(
     hidden: Boolean,
     favorite: Boolean,
     onTile: Boolean,
+    timer: Long?,
     vm: HomeViewModel,
 ) {
     val on = state?.power == true
@@ -281,7 +289,7 @@ private fun DeviceTile(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                statusText(device, state),
+                statusText(device, state) + (timer?.let { " · fino alle ${clockTime(it)}" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -290,10 +298,10 @@ private fun DeviceTile(
         }
     }
 
-    if (details) DeviceSheet(device, state, hidden, favorite, onTile, vm, onDismiss = { details = false })
+    if (details) DeviceSheet(device, state, hidden, favorite, onTile, timer, vm, onDismiss = { details = false })
 }
 
-/** Everything beyond the tap-to-toggle: explicit on/off, brightness, favorites, hiding. */
+/** Everything beyond the tap-to-toggle: explicit on/off, timer, brightness, favorites, tile, hiding. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DeviceSheet(
@@ -302,6 +310,7 @@ private fun DeviceSheet(
     hidden: Boolean,
     favorite: Boolean,
     onTile: Boolean,
+    timer: Long?,
     vm: HomeViewModel,
     onDismiss: () -> Unit,
 ) {
@@ -326,6 +335,29 @@ private fun DeviceSheet(
                     }
                     FilledTonalButton(onClick = { vm.setPower(device, false) }, modifier = Modifier.weight(1f)) {
                         Text("Spegni")
+                    }
+                }
+            }
+
+            if (device.hasPower) {
+                Text(
+                    "Spegni tra",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 20.dp),
+                )
+                if (timer != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Si spegne alle ${clockTime(timer)}", modifier = Modifier.weight(1f))
+                        TextButton(onClick = { vm.cancelTimer(device) }) { Text("Annulla timer") }
+                    }
+                } else {
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        for ((label, minutes) in TIMER_CHOICES) {
+                            AssistChip(onClick = { vm.setTimer(device, minutes) }, label = { Text(label) })
+                        }
                     }
                 }
             }
@@ -368,6 +400,8 @@ private fun BrightnessSlider(brightness: Int, onChange: (Int) -> Unit) {
         valueRange = 1f..100f,
     )
 }
+
+private fun clockTime(at: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(at))
 
 private fun iconFor(device: Device): ImageVector = when (device.category) {
     "LIGHT" -> Icons.Outlined.Lightbulb

@@ -15,6 +15,7 @@ import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
 import app.hommaterial.quick.PowerTileService
 import app.hommaterial.quick.Quick
+import app.hommaterial.quick.Timers
 import app.hommaterial.data.toJsonArray
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -44,6 +45,8 @@ data class UiState(
     val favorites: Set<String> = emptySet(),
     /** applianceId of the device driven by the quick settings tile. */
     val tileDevice: String? = null,
+    /** Switch-off time of each device with a timer, in epoch milliseconds. */
+    val timers: Map<String, Long> = emptyMap(),
     val refreshing: Boolean = false,
     /** When the states were last fetched from Alexa, in epoch milliseconds. */
     val updatedAt: Long? = null,
@@ -74,6 +77,20 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private var refreshJob: Job? = null
     private var updateJob: Job? = null
 
+    init {
+        // The tile, the widget, the shortcuts and the timers act while the app is open too.
+        viewModelScope.launch {
+            Quick.changes.collect {
+                _state.update { s ->
+                    s.copy(
+                        states = s.states + local.states().filterKeys { it !in s.busy },
+                        timers = Timers.all(getApplication()),
+                    )
+                }
+            }
+        }
+    }
+
     val installedVersion: String get() = updater.installedVersion
 
     // The last known devices and states are shown instantly while the network catches up.
@@ -88,6 +105,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             hidden = local.hidden(),
             favorites = local.favorites(),
             tileDevice = local.tileDevice(),
+            timers = Timers.all(getApplication()),
         )
     }
 
@@ -128,6 +146,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun logout() {
         refreshJob?.cancel()
         auth.logout()
+        Timers.cancelAll(getApplication())
         cache.edit().clear().apply()
         Quick.refresh(getApplication())
         _state.update { UiState(onboarded = true, loggedIn = false, marketplace = auth.marketplace, update = it.update, updateProgress = it.updateProgress) }
@@ -167,8 +186,21 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         return if (s.showHidden) devices else devices.filter { it.applianceId !in s.hidden }
     }
 
-    fun setPower(device: Device, on: Boolean) = command(device, { it.copy(power = on) }) {
-        api.setPower(device, on)
+    fun setPower(device: Device, on: Boolean) {
+        // A device switched off by hand no longer needs its timer.
+        if (!on) cancelTimer(device)
+        command(device, { it.copy(power = on) }) { api.setPower(device, on) }
+    }
+
+    /** Switches [device] off in [minutes] minutes. */
+    fun setTimer(device: Device, minutes: Int) {
+        Timers.set(getApplication(), device.applianceId, System.currentTimeMillis() + minutes * 60_000L)
+        _state.update { it.copy(timers = Timers.all(getApplication())) }
+    }
+
+    fun cancelTimer(device: Device) {
+        Timers.cancel(getApplication(), device.applianceId)
+        _state.update { it.copy(timers = Timers.all(getApplication())) }
     }
 
     fun setBrightness(device: Device, percent: Int) = command(device, { it.copy(brightness = percent) }) {
