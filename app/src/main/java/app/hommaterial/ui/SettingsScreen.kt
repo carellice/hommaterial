@@ -10,6 +10,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -88,6 +91,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     var editingGroup by remember { mutableStateOf<Group?>(null) }
     var creatingGroup by remember { mutableStateOf(false) }
     var choosingShortcuts by remember { mutableStateOf(false) }
+    var choosingWidget by remember { mutableStateOf(false) }
     val placed = state.placed
     val noRoom = str(R.string.room_none)
     val rooms = (placed.mapNotNull { it.room } + state.roomList).distinct().sortedBy { it.lowercase() }
@@ -130,13 +134,26 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
         )
     }
     if (choosingShortcuts) {
-        ShortcutsDialog(
+        PicksDialog(
+            title = str(R.string.shortcuts_choose),
             picks = state.groups.map { Pick(SHORTCUT_GROUP + it.id, it.name, str(R.string.group_edit_title)) } +
                 switchable.map { Pick(SHORTCUT_DEVICE + it.applianceId, it.name, it.room ?: noRoom) },
             initial = state.shortcuts.orEmpty(),
             limit = MAX_SHORTCUTS,
             onSave = { vm.setShortcuts(it); choosingShortcuts = false },
             onDismiss = { choosingShortcuts = false },
+        )
+    }
+    if (choosingWidget) {
+        val shown = placed.filter { it.applianceId !in state.hidden }
+        PicksDialog(
+            title = str(R.string.widget_items),
+            picks = state.groups.map { Pick(SHORTCUT_GROUP + it.id, it.name, str(R.string.group_edit_title)) } +
+                shown.map { Pick(SHORTCUT_DEVICE + it.applianceId, it.name, it.room ?: noRoom) },
+            initial = state.widget.items.orEmpty(),
+            limit = null,
+            onSave = { vm.setWidget(state.widget.copy(items = it)); choosingWidget = false },
+            onDismiss = { choosingWidget = false },
         )
     }
     if (confirmRooms) {
@@ -318,6 +335,56 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 }
             }
 
+            if (state.devices.isNotEmpty()) {
+                val widget = state.widget
+                item { Section(R.string.s_widget, R.string.widget_text) }
+                item {
+                    val names = widget.items?.mapNotNull { key ->
+                        val id = key.substringAfter(':')
+                        if (key.startsWith(SHORTCUT_GROUP)) {
+                            state.groups.find { it.id == id }?.name
+                        } else {
+                            placed.find { it.applianceId == id }?.name
+                        }
+                    }
+                    Setting(
+                        title = str(R.string.widget_items),
+                        text = when {
+                            names == null -> str(R.string.widget_items_default)
+                            names.isEmpty() -> str(R.string.widget_items_none)
+                            else -> names.joinToString(", ")
+                        },
+                        onClick = { choosingWidget = true },
+                    )
+                }
+                item {
+                    Chips(R.string.widget_columns, (1..4).map { it to it.toString() }, widget.columns) {
+                        vm.setWidget(widget.copy(columns = it))
+                    }
+                }
+                item {
+                    val sizes = listOf(R.string.widget_compact, R.string.widget_normal, R.string.widget_large)
+                    Chips(R.string.widget_size, sizes.mapIndexed { i, label -> i to str(label) }, widget.size) {
+                        vm.setWidget(widget.copy(size = it))
+                    }
+                }
+                item {
+                    Toggle(R.string.widget_status, R.string.widget_status_text, widget.status) {
+                        vm.setWidget(widget.copy(status = it))
+                    }
+                }
+                item {
+                    Toggle(R.string.widget_header, R.string.widget_header_text, widget.header) {
+                        vm.setWidget(widget.copy(header = it))
+                    }
+                }
+                item {
+                    Toggle(R.string.widget_transparent, R.string.widget_transparent_text, widget.transparent) {
+                        vm.setWidget(widget.copy(transparent = it))
+                    }
+                }
+            }
+
             item { Section(R.string.s_tiles, R.string.tiles_text) }
             items(state.tileDevices.size) { slot ->
                 val name = names[state.tileDevices[slot]]
@@ -394,6 +461,29 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             }
         }
     }
+}
+
+/** A setting with a handful of values, all in sight. */
+@Composable
+private fun Chips(@StringRes title: Int, choices: List<Pair<Int, String>>, selected: Int, onSelect: (Int) -> Unit) {
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(str(title), style = MaterialTheme.typography.bodyLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((value, label) in choices) {
+                FilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(label) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun Toggle(@StringRes title: Int, @StringRes text: Int, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Setting(
+        title = str(title),
+        text = str(text),
+        onClick = { onChange(!checked) },
+        trailing = { Switch(checked = checked, onCheckedChange = onChange) },
+    )
 }
 
 @Composable

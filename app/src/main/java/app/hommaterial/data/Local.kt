@@ -83,6 +83,12 @@ class Cache(context: Context) {
         editor.apply()
     }
 
+    fun widget(): WidgetConfig = runCatching {
+        WidgetConfig.fromJson(JSONObject(prefs.getString("widget", "{}")!!))
+    }.getOrDefault(WidgetConfig())
+
+    fun putWidget(config: WidgetConfig) = prefs.edit().putString("widget", config.toJson().toString()).apply()
+
     private fun strings(key: String): List<String> = runCatching {
         val json = JSONArray(prefs.getString(key, "[]"))
         (0 until json.length()).map { json.getString(it) }

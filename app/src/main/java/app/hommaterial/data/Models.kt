@@ -95,6 +95,43 @@ data class Group(val id: String, val name: String, val devices: Set<String>) {
     }
 }
 
+/**
+ * How the home screen widget looks. [items] lists what it shows, in order, as "device:" or
+ * "group:" followed by an id; null shows the favorites. [size] goes from 0, compact, to 2, large.
+ */
+data class WidgetConfig(
+    val items: List<String>? = null,
+    val columns: Int = 2,
+    val size: Int = 1,
+    /** Whether each tile says the state of its device under the name. */
+    val status: Boolean = true,
+    /** Whether a first row shows the app name, the time of the last update and a refresh button. */
+    val header: Boolean = false,
+    val transparent: Boolean = false,
+) {
+    fun toJson(): JSONObject = JSONObject()
+        .put("items", items?.let { JSONArray(it) } ?: JSONObject.NULL)
+        .put("columns", columns)
+        .put("size", size)
+        .put("status", status)
+        .put("header", header)
+        .put("transparent", transparent)
+
+    companion object {
+        fun fromJson(o: JSONObject): WidgetConfig {
+            val items = o.optJSONArray("items")
+            return WidgetConfig(
+                items = items?.let { a -> (0 until a.length()).map { a.getString(it) } },
+                columns = o.optInt("columns", 2).coerceIn(1, 4),
+                size = o.optInt("size", 1).coerceIn(0, 2),
+                status = o.optBoolean("status", true),
+                header = o.optBoolean("header", false),
+                transparent = o.optBoolean("transparent", false),
+            )
+        }
+    }
+}
+
 /** The line shown under a device name, in the app and in the widget. */
 fun statusText(device: Device, state: DeviceState?): String = when {
     state == null -> "…"

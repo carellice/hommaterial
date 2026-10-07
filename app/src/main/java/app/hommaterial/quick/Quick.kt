@@ -118,14 +118,20 @@ object Quick {
             Outcome(false, e.message ?: str(R.string.something_wrong))
         }
 
-    /** Fetches the current state of favorites and sensors, for the widget; failures leave things as they are. */
+    /** Fetches the current state of what the widget shows and of the sensors; failures leave things as they are. */
     suspend fun fetchFavorites(context: Context) {
         val cache = Cache(context)
         val hidden = cache.hidden()
         val favorites = cache.favorites()
-        // Sensors come along whether favorite or not, to keep their history going.
+        val groups = cache.groups().associateBy { it.id }
+        // What the widget was set to show, with the devices of its groups.
+        val shown = cache.widget().items.orEmpty().flatMap { key ->
+            val id = key.substringAfter(':')
+            if (key.startsWith(SHORTCUT_GROUP)) groups[id]?.devices.orEmpty() else listOf(id)
+        }.toSet()
+        // Sensors come along whether shown or not, to keep their history going.
         val devices = cache.devices().filter {
-            it.applianceId !in hidden && (it.applianceId in favorites || it.isSensor)
+            it.applianceId !in hidden && (it.applianceId in favorites || it.applianceId in shown || it.isSensor)
         }
         if (devices.isEmpty()) return
         val fresh = try {
@@ -136,6 +142,7 @@ object Quick {
             return
         }
         cache.putStates(cache.states() + fresh)
+        cache.prefs.edit().putLong("widgetUpdatedAt", System.currentTimeMillis()).apply()
         History(context).record(fresh)
         Alerts.check(context, fresh)
         refresh(context)

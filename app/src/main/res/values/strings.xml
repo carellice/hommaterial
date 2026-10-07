@@ -54,7 +54,7 @@
     <string name="quick_off">%1$s: off</string>
     <string name="shortcut_long">Turn %1$s on or off</string>
     <string name="tile_choose">Choose a device</string>
-    <string name="widget_empty">Add some favorites from the app</string>
+    <string name="widget_empty">Nothing to show: choose in the app settings</string>
     <string name="voice_on">Turn on %1$s</string>
     <string name="voice_off">Turn off %1$s</string>
     <string name="voice_room_on">Turn on everything in %1$s</string>
@@ -180,7 +180,7 @@
     <string name="s_alerts">Temperature alerts</string>
     <string name="alert_remove">Remove the alerts</string>
     <string name="s_backup" translatable="false">Backup</string>
-    <string name="backup_text">Favorites, hidden devices, rooms, groups, shortcuts, tiles, alerts and settings. The Amazon sign-in, the timers and the sensor history are not included.</string>
+    <string name="backup_text">Favorites, hidden devices, rooms, groups, shortcuts, widget, tiles, alerts and settings. The Amazon sign-in, the timers and the sensor history are not included.</string>
     <string name="backup_export">Export to a file</string>
     <string name="backup_import">Import from a file</string>
     <string name="backup_exported">Backup saved</string>
@@ -232,6 +232,22 @@
     <string name="shortcuts_none">Now: none</string>
     <string name="shortcuts_count">%1$d of %2$d chosen</string>
     <string name="shortcuts_use_favorites">Use the favorites</string>
+    <string name="s_widget">Home screen widget</string>
+    <string name="widget_text">These choices apply to every Hommaterial widget on the home screen.</string>
+    <string name="widget_items">What to show</string>
+    <string name="widget_items_default">Now: the favorites</string>
+    <string name="widget_items_none">Now: nothing</string>
+    <string name="widget_columns">Columns</string>
+    <string name="widget_size">Tile size</string>
+    <string name="widget_compact">Compact</string>
+    <string name="widget_normal">Normal</string>
+    <string name="widget_large">Large</string>
+    <string name="widget_status">Show the state</string>
+    <string name="widget_status_text">On, off or temperature under each name</string>
+    <string name="widget_header">Show the header</string>
+    <string name="widget_header_text">App name, time of the last update and a refresh button</string>
+    <string name="widget_transparent">Transparent background</string>
+    <string name="widget_transparent_text">Only the tiles are drawn, over the wallpaper</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

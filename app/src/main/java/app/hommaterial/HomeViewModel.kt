@@ -22,6 +22,7 @@ import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Reading
 import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
+import app.hommaterial.data.WidgetConfig
 import app.hommaterial.data.mapObjects
 import app.hommaterial.data.toJsonArray
 import app.hommaterial.quick.Alert
@@ -68,6 +69,7 @@ data class UiState(
     val groups: List<Group> = emptyList(),
     /** What is listed under the app icon, or null for the favorites. See [Cache.shortcuts]. */
     val shortcuts: List<String>? = null,
+    val widget: WidgetConfig = WidgetConfig(),
     val showHidden: Boolean = false,
     /** applianceIds repeated in the section at the top of the list. */
     val favorites: Set<String> = emptySet(),
@@ -153,6 +155,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             roomList = local.roomList(),
             groups = local.groups(),
             shortcuts = local.shortcuts(),
+            widget = local.widget(),
             favorites = local.favorites(),
             tileDevices = local.tileDevices(),
             timers = Timers.all(getApplication()),
@@ -456,6 +459,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         setRoomPower(devices, on = devices.none { s.states[it.applianceId]?.power == true })
     }
 
+    fun setWidget(config: WidgetConfig) {
+        local.putWidget(config)
+        _state.update { it.copy(widget = config) }
+        Quick.refresh(getApplication())
+    }
+
     /** Chooses what is listed under the app icon; null goes back to the favorites. */
     fun setShortcuts(shortcuts: List<String>?) {
         local.putShortcuts(shortcuts)
@@ -497,6 +506,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("roomList", JSONArray(s.roomList))
             .put("groups", JSONArray(s.groups.map { it.toJson() }))
             .put("shortcuts", s.shortcuts?.let { JSONArray(it) } ?: JSONObject.NULL)
+            .put("widget", s.widget.toJson())
             .put("tiles", JSONArray(s.tileDevices.map { it ?: JSONObject.NULL }))
             .put("alerts", alerts)
             .put("autoUpdate", s.autoUpdate)
@@ -538,6 +548,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             local.putRoomList(list("roomList").orEmpty())
             local.putGroups(backup.optJSONArray("groups")?.mapObjects(Group::fromJson).orEmpty())
             local.putShortcuts(list("shortcuts"))
+            local.putWidget(backup.optJSONObject("widget")?.let(WidgetConfig::fromJson) ?: WidgetConfig())
             val tiles = backup.optJSONArray("tiles")
             for (slot in 0 until PowerTile.SLOTS) {
                 local.putTileDevice(slot, tiles?.optString(slot)?.takeIf { it.isNotEmpty() && !tiles.isNull(slot) })
@@ -564,6 +575,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     roomList = local.roomList(),
                     groups = local.groups(),
                     shortcuts = local.shortcuts(),
+                    widget = local.widget(),
                     tileDevices = local.tileDevices(),
                     alerts = Alerts.all(app),
                     autoUpdate = settings.getBoolean("autoUpdate", true),

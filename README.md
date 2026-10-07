@@ -57,7 +57,10 @@ collegati al proprio account Alexa.
   timer di spegnimento, luminosità e colore per le luci che li supportano.
 - I timer in corso stanno in una sezione in cima alla lista, con il conto
   alla rovescia, ordinati dal più vicino allo spegnimento.
-- I preferiti stanno in cima alla lista e in un widget per la schermata Home.
+- I preferiti stanno in cima alla lista.
+- Il widget per la schermata Home mostra i dispositivi e i gruppi scelti
+  nelle Impostazioni, dove si regolano anche colonne, dimensione dei riquadri,
+  intestazione e sfondo.
 - Fino a cinque dispositivi a scelta si comandano dalle Impostazioni rapide di
   Android, ognuno con il suo riquadro.
 - Dall'intestazione di una stanza si accende o spegne tutto in una volta.

@@ -143,32 +143,35 @@ fun MembersDialog(
 }
 
 /**
- * Chooses what is listed under the app icon, [limit] entries at most, in the order they are
- * ticked. [onSave] receives null when the user goes back to the favorites.
+ * Chooses among the [picks], in the order they are ticked and no more than [limit] when there is
+ * one. [onSave] receives null when the user goes back to the favorites.
  */
 @Composable
-fun ShortcutsDialog(
+fun PicksDialog(
+    title: String,
     picks: List<Pick>,
     initial: List<String>,
-    limit: Int,
+    limit: Int?,
     onSave: (List<String>?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var chosen by remember { mutableStateOf(initial.filter { key -> picks.any { it.key == key } }) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(str(R.string.shortcuts_choose)) },
+        title = { Text(title) },
         text = {
             Column {
-                Text(
-                    str(R.string.shortcuts_count, chosen.size, limit),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
+                if (limit != null) {
+                    Text(
+                        str(R.string.shortcuts_count, chosen.size, limit),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
                 Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
                     for (pick in picks) {
                         val checked = pick.key in chosen
-                        Check(pick, checked, enabled = checked || chosen.size < limit) {
+                        Check(pick, checked, enabled = checked || limit == null || chosen.size < limit) {
                             chosen = if (it) chosen + pick.key else chosen - pick.key
                         }
                     }
