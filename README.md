@@ -73,6 +73,9 @@ collegati al proprio account Alexa.
 - Controlla una volta al giorno se su GitHub c'è una versione più recente e,
   se confermi, la scarica e la installa. Il controllo si può anche avviare a
   mano da "Controlla aggiornamenti" nel menu.
+- Dal menu si aprono le Impostazioni: notifiche, lingua, aggiornamenti,
+  preferiti e dispositivi nascosti, riquadri, timer e avvisi attivi, e il
+  backup su file delle proprie scelte.
 
 Non fa altro, di proposito: niente routine, niente assistente sempre in
 ascolto, niente musica. La voce la trascrive il riconoscimento vocale del

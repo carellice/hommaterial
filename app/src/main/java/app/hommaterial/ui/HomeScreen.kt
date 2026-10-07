@@ -116,7 +116,7 @@ private val TIMER_CHOICES =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(state: UiState, vm: HomeViewModel) {
+fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
 
@@ -128,7 +128,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel) {
                 title = { Title(state.updatedAt) },
                 actions = {
                     VoiceButton(vm)
-                    OverflowMenu(state, vm)
+                    OverflowMenu(state, vm, onSettings)
                 },
             )
         },
@@ -317,7 +317,7 @@ private fun VoiceDialog(ask: VoiceResult.Ask, vm: HomeViewModel) {
 }
 
 @Composable
-private fun OverflowMenu(state: UiState, vm: HomeViewModel) {
+private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) { Icon(Icons.Filled.MoreVert, contentDescription = str(R.string.menu)) }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
@@ -332,6 +332,7 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel) {
             text = { Text(str(R.string.check_updates)) },
             onClick = { open = false; vm.checkForUpdate(manual = true) },
         )
+        DropdownMenuItem(text = { Text(str(R.string.settings)) }, onClick = { open = false; onSettings() })
         DropdownMenuItem(text = { Text(str(R.string.sign_out)) }, onClick = { open = false; vm.logout() })
     }
 }

@@ -13,6 +13,9 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -21,6 +24,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.hommaterial.ui.HomeScreen
 import app.hommaterial.ui.LoginScreen
 import app.hommaterial.ui.OnboardingScreen
+import app.hommaterial.ui.SettingsScreen
 import app.hommaterial.ui.UpdateDialog
 
 class MainActivity : ComponentActivity() {
@@ -36,9 +40,13 @@ class MainActivity : ComponentActivity() {
                     vm.refresh()
                     vm.checkForUpdate(manual = false)
                 }
+                var settings by rememberSaveable { mutableStateOf(false) }
+                // A new sign-in starts from the list, not from where the previous one left.
+                if (!state.loggedIn) settings = false
                 when {
                     !state.onboarded -> OnboardingScreen(onAccept = vm::acceptOnboarding)
-                    state.loggedIn -> HomeScreen(state, vm)
+                    state.loggedIn && settings -> SettingsScreen(state, vm, onBack = { settings = false })
+                    state.loggedIn -> HomeScreen(state, vm, onSettings = { settings = true })
                     else -> LoginScreen(state, vm)
                 }
                 UpdateDialog(state, vm)

@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -31,6 +32,7 @@ import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
 import app.hommaterial.voice.parseVoice
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -40,6 +42,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class UiState(
     /** False until the first-run notice has been accepted. */
@@ -62,6 +67,8 @@ data class UiState(
     val timers: Map<String, Long> = emptyMap(),
     /** Temperature thresholds each sensor notifies about. */
     val alerts: Map<String, Alert> = emptyMap(),
+    /** Whether the app looks for a newer release by itself, once a day. */
+    val autoUpdate: Boolean = true,
     val refreshing: Boolean = false,
     /** A spoken command understood only in part, waiting for the user to pick what was meant. */
     val voice: VoiceResult.Ask? = null,
@@ -73,6 +80,7 @@ data class UiState(
     val updateProgress: Float? = null,
 )
 
+private const val BACKUP_APP = "hommaterial"
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
@@ -127,6 +135,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             tileDevices = local.tileDevices(),
             timers = Timers.all(getApplication()),
             alerts = Alerts.all(getApplication()),
+            autoUpdate = settings.getBoolean("autoUpdate", true),
         )
     }
 
@@ -177,6 +186,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 onboarded = true,
                 loggedIn = false,
                 marketplace = auth.marketplace,
+                autoUpdate = it.autoUpdate,
                 update = it.update,
                 updateProgress = it.updateProgress,
             )
@@ -241,8 +251,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(timers = Timers.all(getApplication())) }
     }
 
-    fun cancelTimer(device: Device) {
-        Timers.cancel(getApplication(), device.applianceId)
+    fun cancelTimer(device: Device) = cancelTimer(device.applianceId)
+
+    fun cancelTimer(applianceId: String) {
+        Timers.cancel(getApplication(), applianceId)
         _state.update { it.copy(timers = Timers.all(getApplication())) }
     }
 
@@ -346,9 +358,109 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setAlert(device: Device, alert: Alert) {
-        Alerts.set(getApplication(), device.applianceId, alert)
+    fun setAlert(device: Device, alert: Alert) = setAlert(device.applianceId, alert)
+
+    fun clearAlert(applianceId: String) = setAlert(applianceId, Alert())
+
+    private fun setAlert(applianceId: String, alert: Alert) {
+        Alerts.set(getApplication(), applianceId, alert)
         _state.update { it.copy(alerts = Alerts.all(getApplication())) }
+    }
+
+    fun clearTile(slot: Int) {
+        local.putTileDevice(slot, null)
+        _state.update { it.copy(tileDevices = local.tileDevices()) }
+    }
+
+    fun setAutoUpdate(on: Boolean) {
+        settings.edit().putBoolean("autoUpdate", on).apply()
+        _state.update { it.copy(autoUpdate = on) }
+    }
+
+    fun clearHistory() {
+        history.clear()
+        _messages.tryEmit(str(R.string.history_cleared))
+    }
+
+    /** Writes the choices made in the app to the file the user picked. */
+    fun exportBackup(uri: Uri) {
+        val s = _state.value
+        val alerts = JSONObject()
+        for ((id, alert) in s.alerts) {
+            alerts.put(
+                id,
+                JSONObject().put("above", alert.above ?: JSONObject.NULL).put("below", alert.below ?: JSONObject.NULL),
+            )
+        }
+        val backup = JSONObject()
+            .put("app", BACKUP_APP)
+            .put("version", 1)
+            .put("favorites", JSONArray(s.favorites))
+            .put("hidden", JSONArray(s.hidden))
+            .put("tiles", JSONArray(s.tileDevices.map { it ?: JSONObject.NULL }))
+            .put("alerts", alerts)
+            .put("autoUpdate", s.autoUpdate)
+        viewModelScope.launch {
+            val saved = runCatching {
+                withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openOutputStream(uri, "wt")!!.use {
+                        it.write(backup.toString(2).toByteArray())
+                    }
+                }
+            }.isSuccess
+            _messages.tryEmit(str(if (saved) R.string.backup_exported else R.string.backup_failed))
+        }
+    }
+
+    /** Replaces the choices made in the app with those of a file written by [exportBackup]. */
+    fun importBackup(uri: Uri) {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            val backup = runCatching {
+                withContext(Dispatchers.IO) {
+                    JSONObject(app.contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() })
+                }
+            }.getOrNull()
+            if (backup == null || backup.optString("app") != BACKUP_APP) {
+                _messages.tryEmit(str(if (backup == null) R.string.backup_failed else R.string.backup_invalid))
+                return@launch
+            }
+            fun strings(name: String) =
+                backup.optJSONArray(name)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty().toSet()
+            cache.edit()
+                .putStringSet("favorites", strings("favorites"))
+                .putStringSet("hidden", strings("hidden"))
+                .apply()
+            val tiles = backup.optJSONArray("tiles")
+            for (slot in 0 until PowerTile.SLOTS) {
+                local.putTileDevice(slot, tiles?.optString(slot)?.takeIf { it.isNotEmpty() && !tiles.isNull(slot) })
+            }
+            val alerts = backup.optJSONObject("alerts") ?: JSONObject()
+            for (id in Alerts.all(app).keys) Alerts.set(app, id, Alert())
+            for (id in alerts.keys()) {
+                val o = alerts.getJSONObject(id)
+                Alerts.set(
+                    app,
+                    id,
+                    Alert(
+                        above = if (o.isNull("above")) null else o.optDouble("above"),
+                        below = if (o.isNull("below")) null else o.optDouble("below"),
+                    ),
+                )
+            }
+            settings.edit().putBoolean("autoUpdate", backup.optBoolean("autoUpdate", true)).apply()
+            _state.update {
+                it.copy(
+                    favorites = local.favorites(),
+                    hidden = local.hidden(),
+                    tileDevices = local.tileDevices(),
+                    alerts = Alerts.all(app),
+                    autoUpdate = settings.getBoolean("autoUpdate", true),
+                )
+            }
+            Quick.refresh(app)
+            _messages.tryEmit(str(R.string.backup_imported))
+        }
     }
 
     fun readings(device: Device): List<Reading> = history.readings(device.applianceId)
@@ -366,7 +478,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         if (updateJob?.isActive == true || !_state.value.onboarded) return
         val now = System.currentTimeMillis()
         val last = settings.getLong("updateCheckedAt", 0)
-        if (!manual && now - last in 0 until UPDATE_CHECK_INTERVAL_MS) return
+        if (!manual && (!_state.value.autoUpdate || now - last in 0 until UPDATE_CHECK_INTERVAL_MS)) return
         updateJob = viewModelScope.launch {
             try {
                 val update = updater.check()
