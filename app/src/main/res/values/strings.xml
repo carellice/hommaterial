@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Hommaterial</string>
+    <string name="widget_name">Preferiti</string>
+    <string name="widget_description">I dispositivi preferiti: un tocco li accende o spegne.</string>
 </resources>

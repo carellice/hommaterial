@@ -64,6 +64,18 @@ data class DeviceState(
     }
 }
 
+/** The line shown under a device name, in the app and in the widget. */
+fun statusText(device: Device, state: DeviceState?): String = when {
+    state == null -> "…"
+    !state.reachable -> "Non raggiungibile"
+    device.isSensor && state.temperature != null && !state.temperature.isNaN() ->
+        "%.1f°".format(state.temperature) + (state.humidity?.let { " · $it%" } ?: "")
+    state.power == true && device.hasBrightness && state.brightness != null -> "Acceso · ${state.brightness}%"
+    state.power == true -> "Acceso"
+    state.power == false -> "Spento"
+    else -> "Stato sconosciuto"
+}
+
 fun List<Device>.toJsonArray(): JSONArray = JSONArray().also { arr -> forEach { arr.put(it.toJson()) } }
 
 inline fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> =

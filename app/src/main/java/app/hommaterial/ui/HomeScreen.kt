@@ -66,6 +66,7 @@ import app.hommaterial.HomeViewModel
 import app.hommaterial.UiState
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
+import app.hommaterial.data.statusText
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -366,17 +367,6 @@ private fun BrightnessSlider(brightness: Int, onChange: (Int) -> Unit) {
         onValueChangeFinished = { onChange(value.roundToInt().coerceIn(1, 100)) },
         valueRange = 1f..100f,
     )
-}
-
-private fun statusText(device: Device, state: DeviceState?): String = when {
-    state == null -> "…"
-    !state.reachable -> "Non raggiungibile"
-    device.isSensor && state.temperature != null && !state.temperature.isNaN() ->
-        "%.1f°".format(state.temperature) + (state.humidity?.let { " · $it%" } ?: "")
-    state.power == true && device.hasBrightness && state.brightness != null -> "Acceso · ${state.brightness}%"
-    state.power == true -> "Acceso"
-    state.power == false -> "Spento"
-    else -> "Stato sconosciuto"
 }
 
 private fun iconFor(device: Device): ImageVector = when (device.category) {

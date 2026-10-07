@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.glance.appwidget.updateAll
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
 import app.hommaterial.data.Device
@@ -13,6 +14,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.IOException
 
@@ -21,10 +25,15 @@ internal const val EXTRA_APPLIANCE_ID = "applianceId"
 /** How a command sent from outside the app ended, with the sentence to show for it. */
 class Outcome(val ok: Boolean, val message: String, val noConnection: Boolean = false)
 
-/** Commands for the surfaces that live outside the app: launcher shortcuts and the like. */
+/** Commands for the surfaces that live outside the app: shortcuts, quick settings tile, widget. */
 object Quick {
     /** Outlives the short-lived components that start the work. */
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    private val _changes = MutableStateFlow(0)
+
+    /** Ticks whenever what is remembered on the phone changes. */
+    val changes = _changes.asStateFlow()
 
     /** Inverts the power of a device, asking Alexa for its real state first. */
     suspend fun toggle(context: Context, applianceId: String): Outcome = command(context, applianceId) { device ->
@@ -65,9 +74,29 @@ object Quick {
         }
     }
 
+    /** Fetches the current state of the favorites, for the widget; failures leave things as they are. */
+    suspend fun fetchFavorites(context: Context) {
+        val cache = Cache(context)
+        val chosen = cache.favorites() - cache.hidden()
+        val devices = cache.devices().filter { it.applianceId in chosen }
+        if (devices.isEmpty()) return
+        val fresh = try {
+            Alexa.get(context).api.states(devices)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return
+        }
+        cache.putStates(cache.states() + fresh)
+        refresh(context)
+    }
+
     /** Brings the surfaces outside the app in line with what is remembered on the phone. */
     fun refresh(context: Context) {
-        publishShortcuts(context.applicationContext)
+        val app = context.applicationContext
+        _changes.update { it + 1 }
+        publishShortcuts(app)
+        scope.launch { runCatching { HomeWidget().updateAll(app) } }
     }
 }
 
