@@ -79,8 +79,9 @@ ascolto, niente musica. La voce la trascrive il riconoscimento vocale del
 telefono, non l'app.
 
 Il timer di spegnimento lo fa scattare il telefono: all'ora stabilita deve
-essere acceso e connesso. Se non c'è rete riprova per dieci minuti, poi
-rinuncia e lo segnala con una notifica.
+essere acceso e connesso. Una notifica dice com'è andata: dispositivo spento,
+oppure timer non riuscito. Se non c'è rete riprova per dieci minuti prima di
+rinunciare.
 
 Gli avvisi di temperatura li controlla il telefono, circa ogni 15 minuti e
 più di rado quando è fermo da un po': non sono un allarme in tempo reale.

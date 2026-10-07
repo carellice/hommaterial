@@ -94,7 +94,9 @@ class TimerReceiver : BroadcastReceiver() {
                 if (offline && System.currentTimeMillis() - due < RETRY_WINDOW_MS) {
                     Timers.retry(app, id)
                 } else {
-                    if (outcome?.ok != true) {
+                    if (outcome?.ok == true) {
+                        Alerts.timerDone(app, id)
+                    } else {
                         Alerts.timerFailed(app, id, outcome?.message ?: str(R.string.no_connection))
                     }
                     Timers.cancel(app, id)

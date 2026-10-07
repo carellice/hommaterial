@@ -19,6 +19,8 @@ import app.hommaterial.data.Cache
 import app.hommaterial.data.DeviceState
 import app.hommaterial.str
 import org.json.JSONObject
+import java.text.DateFormat
+import java.util.Date
 import java.util.concurrent.TimeUnit
 
 private const val CHANNEL = "alerts"
@@ -31,7 +33,7 @@ private const val HYSTERESIS = 0.3
 /** Temperatures a sensor should notify about when it goes [above] or [below]; null for no alert. */
 data class Alert(val above: Double? = null, val below: Double? = null)
 
-/** Notifications: temperature thresholds of the sensors and timers that could not switch off. */
+/** Notifications: temperature thresholds of the sensors and how switch-off timers ended. */
 object Alerts {
     fun all(context: Context): Map<String, Alert> = runCatching {
         val json = JSONObject(Cache(context).prefs.getString("alerts", "{}")!!)
@@ -106,6 +108,16 @@ object Alerts {
         cache.prefs.edit().putStringSet("alertsTripped", tripped).apply()
     }
 
+    fun timerDone(context: Context, applianceId: String) {
+        val name = Cache(context).devices().find { it.applianceId == applianceId }?.name ?: return
+        notify(
+            context,
+            "$applianceId|timer".hashCode(),
+            str(R.string.timer_done_title, name),
+            str(R.string.timer_done_text, clock(System.currentTimeMillis())),
+        )
+    }
+
     fun timerFailed(context: Context, applianceId: String, reason: String) {
         val name = Cache(context).devices().find { it.applianceId == applianceId }?.name ?: return
         notify(
@@ -144,6 +156,8 @@ object Alerts {
         manager.notify(id, notification)
     }
 }
+
+fun clock(at: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(at))
 
 fun degrees(temperature: Double): String = "%.1f°".format(temperature)
 

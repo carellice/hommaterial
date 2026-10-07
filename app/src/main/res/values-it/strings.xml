@@ -144,6 +144,8 @@
     <string name="alerts_disabled">Le notifiche di Hommaterial sono disattivate nelle impostazioni del telefono.</string>
     <string name="alert_notification_above">Sopra la soglia di %1$s</string>
     <string name="alert_notification_below">Sotto la soglia di %1$s</string>
+    <string name="timer_done_title">%1$s spento</string>
+    <string name="timer_done_text">Spento dal timer alle %1$s</string>
     <string name="timer_failed_title">%1$s non è stato spento</string>
     <string name="timer_failed_text">Il timer non è riuscito a spegnerlo: %1$s</string>
     <plurals name="devices">

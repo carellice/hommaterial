@@ -103,11 +103,10 @@ import app.hommaterial.label
 import app.hommaterial.plural
 import app.hommaterial.quick.Alert
 import app.hommaterial.quick.Alerts
+import app.hommaterial.quick.clock
 import app.hommaterial.quick.degrees
 import app.hommaterial.str
 import app.hommaterial.voice.VoiceResult
-import java.text.DateFormat
-import java.util.Date
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
@@ -393,7 +392,7 @@ private fun DeviceTile(
             )
             Text(
                 statusText(device, state).let { status ->
-                    if (timer == null) status else str(R.string.status_until, status, clockTime(timer))
+                    if (timer == null) status else str(R.string.status_until, status, clock(timer))
                 },
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
@@ -469,7 +468,7 @@ private fun DeviceSheet(
                 )
                 if (timer != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(str(R.string.turns_off_at, clockTime(timer)), modifier = Modifier.weight(1f))
+                        Text(str(R.string.turns_off_at, clock(timer)), modifier = Modifier.weight(1f))
                         TextButton(onClick = { vm.cancelTimer(device) }) { Text(str(R.string.cancel_timer)) }
                     }
                 } else {
@@ -639,8 +638,6 @@ private fun BrightnessSlider(brightness: Int, onChange: (Int) -> Unit) {
         valueRange = 1f..100f,
     )
 }
-
-private fun clockTime(at: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(at))
 
 private fun iconFor(device: Device): ImageVector = when (device.category) {
     "LIGHT" -> Icons.Outlined.Lightbulb
