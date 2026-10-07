@@ -92,6 +92,8 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
                 hasPower = "Alexa.PowerController" in interfaces,
                 hasBrightness = "Alexa.BrightnessController" in interfaces,
                 isSensor = "Alexa.TemperatureSensor" in interfaces,
+                hasColor = "Alexa.ColorController" in interfaces,
+                hasColorTemperature = "Alexa.ColorTemperatureController" in interfaces,
             )
             device.takeIf { category != VOICE_DEVICE_CATEGORY && (it.hasPower || it.isSensor) }
         }.filterNotNull().sortedBy { it.name.lowercase() }
@@ -117,6 +119,8 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
                     "brightness" -> state.copy(brightness = cap.optInt("value"))
                     "temperature" -> state.copy(temperature = cap.optJSONObject("value")?.optDouble("value"))
                     "relativeHumidity" -> state.copy(humidity = cap.optInt("value"))
+                    "colorProperties" ->
+                        state.copy(colorName = cap.optJSONObject("value")?.optString("name")?.ifEmpty { null })
                     else -> state
                 }
             }
@@ -172,6 +176,14 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
 
     suspend fun setBrightness(device: Device, percent: Int) =
         control(device, JSONObject().put("action", "setBrightness").put("brightness", percent))
+
+    /** [colorName] is one of the names Alexa gives to colors, such as "red" or "sky_blue". */
+    suspend fun setColor(device: Device, colorName: String) =
+        control(device, JSONObject().put("action", "setColor").put("colorName", colorName))
+
+    /** [whiteName] is one of the names Alexa gives to shades of white, such as "warm_white". */
+    suspend fun setColorTemperature(device: Device, whiteName: String) =
+        control(device, JSONObject().put("action", "setColorTemperature").put("colorTemperatureName", whiteName))
 
     private suspend fun control(device: Device, parameters: JSONObject) {
         val request = JSONObject()

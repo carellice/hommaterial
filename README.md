@@ -54,7 +54,7 @@ collegati al proprio account Alexa.
 - Mostra i dispositivi raggruppati per stanza, come configurati in Alexa.
 - Un tocco accende o spegne.
 - Tenendo premuto si apre il pannello con accensione, spegnimento esplicito,
-  timer di spegnimento e luminosità per le luci dimmerabili.
+  timer di spegnimento, luminosità e colore per le luci che li supportano.
 - I preferiti stanno in cima alla lista, in un widget per la schermata Home e
   sotto l'icona dell'app, tenendola premuta.
 - Fino a cinque dispositivi a scelta si comandano dalle Impostazioni rapide di
@@ -86,9 +86,9 @@ rinuncia.
 - È stata provata solo con un account **amazon.it**. Alla schermata di accesso
   si possono scegliere altri marketplace (amazon.de, .fr, .es, .co.uk, .com),
   ma **non sono stati verificati**.
-- Sono gestiti solo accensione/spegnimento, luminosità e sensori di
-  temperatura. Colore delle luci, termostati, tapparelle e scene non sono
-  ancora supportati.
+- Sono gestiti accensione/spegnimento, luminosità, colore delle luci (da un
+  elenco fisso di colori e bianchi) e sensori di temperatura. Termostati,
+  tapparelle e scene non sono ancora supportati.
 - Richiede Android 8.0 o successivo.
 
 ## Dati e privacy

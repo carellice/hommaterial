@@ -7,6 +7,9 @@ import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -70,14 +74,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.hommaterial.HomeViewModel
 import app.hommaterial.UiState
+import app.hommaterial.data.COLOR_CHOICES
+import app.hommaterial.data.ColorChoice
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
+import app.hommaterial.data.WHITE_CHOICES
 import app.hommaterial.data.statusText
 import app.hommaterial.voice.VoiceResult
 import kotlinx.coroutines.delay
@@ -368,7 +378,7 @@ private fun DeviceTile(
     if (details) DeviceSheet(device, state, hidden, favorite, tile, tilesFull, timer, vm, onDismiss = { details = false })
 }
 
-/** Everything beyond the tap-to-toggle: explicit on/off, timer, brightness, favorites, tile, hiding. */
+/** Everything beyond the tap-to-toggle: explicit on/off, timer, brightness, color, favorites, tile, hiding. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun DeviceSheet(
@@ -453,6 +463,26 @@ private fun DeviceSheet(
                 BrightnessSlider(state?.brightness ?: 100) { vm.setBrightness(device, it) }
             }
 
+            val choices = (if (device.hasColorTemperature) WHITE_CHOICES else emptyList()) +
+                (if (device.hasColor) COLOR_CHOICES else emptyList())
+            if (choices.isNotEmpty()) {
+                Text(
+                    "Colore",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
+                )
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    for (choice in choices) {
+                        ColorSwatch(choice, selected = state?.colorName == choice.alexaName) {
+                            vm.setColor(device, choice)
+                        }
+                    }
+                }
+            }
+
             TextButton(
                 onClick = { vm.setFavorite(device, !favorite) },
                 modifier = Modifier.padding(top = 12.dp),
@@ -475,6 +505,22 @@ private fun DeviceSheet(
             }
         }
     }
+}
+
+@Composable
+private fun ColorSwatch(choice: ColorChoice, selected: Boolean, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .clickable(onClickLabel = choice.label, onClick = onClick)
+            // The ring marks the color the lamp is on; the thin outline keeps pale whites visible.
+            .border(if (selected) 3.dp else 1.dp, if (selected) colors.primary else colors.outlineVariant, CircleShape)
+            .padding(if (selected) 6.dp else 0.dp)
+            .background(Color(choice.rgb), CircleShape)
+            .semantics { contentDescription = choice.label },
+    )
 }
 
 @Composable

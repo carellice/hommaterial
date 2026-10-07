@@ -9,6 +9,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
+import app.hommaterial.data.ColorChoice
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.History
@@ -206,6 +207,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         if (!on) cancelTimer(device)
         command(device, { it.copy(power = on) }) { api.setPower(device, on) }
     }
+
+    /** Sets a color or a shade of white, by the name Alexa gives it. Lamps switch on when asked for one. */
+    fun setColor(device: Device, choice: ColorChoice) =
+        command(device, { it.copy(colorName = choice.alexaName, power = true) }) {
+            if (choice.white) {
+                api.setColorTemperature(device, choice.alexaName)
+            } else {
+                api.setColor(device, choice.alexaName)
+            }
+        }
 
     /** Switches [device] off in [minutes] minutes. */
     fun setTimer(device: Device, minutes: Int) {
