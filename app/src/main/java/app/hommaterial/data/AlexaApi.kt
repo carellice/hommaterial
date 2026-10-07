@@ -1,5 +1,6 @@
 package app.hommaterial.data
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -15,6 +16,13 @@ private const val DEVICES_QUERY = """query Endpoints { endpoints { items {
   friendlyName
   displayCategories { primary { value } }
   legacyAppliance { applianceId entityId isEnabled capabilities }
+} } }"""
+
+// Asks for more than the app uses, to see what a kind of device not yet supported has to offer.
+private const val DIAGNOSTICS_QUERY = """query Endpoints { endpoints { items {
+  friendlyName
+  displayCategories { primary { value } }
+  legacyAppliance { applianceId entityId isEnabled applianceTypes manufacturerName modelName actions capabilities }
 } } }"""
 
 // Echo and Fire TV devices also report a power capability but are not home devices.
@@ -118,6 +126,45 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
             error.optJSONObject("entity")?.optString("entityId")?.let { result[it] = DeviceState(reachable = false) }
         }
         return result
+    }
+
+    /**
+     * Everything Alexa says about [device], as readable JSON: what it can do and its current state.
+     * Meant to be copied out of the app when support for a new kind of device is being written.
+     */
+    suspend fun diagnostics(device: Device): String {
+        fun find(response: JSONObject) =
+            response.optJSONObject("data")?.optJSONObject("endpoints")?.optJSONArray("items")
+                ?.mapObjects { it }
+                ?.find { it.optJSONObject("legacyAppliance")?.optString("applianceId") == device.applianceId }
+        // Should Alexa refuse a field of the wider query, the one the app normally uses still answers.
+        val wide = try {
+            find(call("POST", "/nexus/v1/graphql", JSONObject().put("query", DIAGNOSTICS_QUERY)))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: NotLoggedInException) {
+            throw e
+        } catch (e: java.io.IOException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        val description = wide ?: find(call("POST", "/nexus/v1/graphql", JSONObject().put("query", DEVICES_QUERY)))
+        val request = JSONObject().put("entityId", device.applianceId).put("entityType", "APPLIANCE")
+        val state = call("POST", "/api/phoenix/state", JSONObject().put("stateRequests", JSONArray().put(request)))
+        // Each capability state arrives as JSON inside a string: unpacked, it can be read.
+        state.optJSONArray("deviceStates")?.mapObjects { entry ->
+            val capabilities = entry.optJSONArray("capabilityStates") ?: return@mapObjects
+            entry.put(
+                "capabilityStates",
+                JSONArray(
+                    (0 until capabilities.length()).map { i ->
+                        runCatching { JSONObject(capabilities.getString(i)) }.getOrElse { capabilities.get(i) }
+                    },
+                ),
+            )
+        }
+        return JSONObject().put("device", description ?: JSONObject.NULL).put("state", state).toString(2)
     }
 
     suspend fun setPower(device: Device, on: Boolean) =

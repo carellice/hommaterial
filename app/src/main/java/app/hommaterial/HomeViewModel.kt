@@ -1,7 +1,10 @@
 package app.hommaterial
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.hommaterial.data.Alexa
@@ -296,6 +299,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun speechUnavailable() {
         _messages.tryEmit("Riconoscimento vocale non disponibile su questo telefono")
+    }
+
+    /** Copies to the clipboard everything Alexa says about [device], for writing support for it. */
+    fun copyDiagnostics(device: Device) {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            val copied = guarded {
+                val text = api.diagnostics(device)
+                app.getSystemService(ClipboardManager::class.java)
+                    .setPrimaryClip(ClipData.newPlainText("Hommaterial: ${device.name}", text))
+            }
+            if (copied) Toast.makeText(app, "Dati tecnici copiati negli appunti", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun readings(device: Device): List<Reading> = history.readings(device.applianceId)

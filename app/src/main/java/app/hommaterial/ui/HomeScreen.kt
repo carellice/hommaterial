@@ -369,7 +369,7 @@ private fun DeviceTile(
 }
 
 /** Everything beyond the tap-to-toggle: explicit on/off, timer, brightness, favorites, tile, hiding. */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun DeviceSheet(
     device: Device,
@@ -389,7 +389,17 @@ private fun DeviceSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(iconFor(device), contentDescription = null, modifier = Modifier.size(28.dp))
                 Column(Modifier.padding(start = 16.dp)) {
-                    Text(device.name, style = MaterialTheme.typography.titleLarge)
+                    // Hidden on purpose: holding the name copies the technical data of the device.
+                    Text(
+                        device.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.combinedClickable(
+                            interactionSource = null,
+                            indication = null,
+                            onClick = {},
+                            onLongClick = { vm.copyDiagnostics(device) },
+                        ),
+                    )
                     Text(
                         statusText(device, state),
                         style = MaterialTheme.typography.bodyMedium,
