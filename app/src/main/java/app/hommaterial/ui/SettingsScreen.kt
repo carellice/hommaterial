@@ -53,6 +53,7 @@ import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.UiState
 import app.hommaterial.data.Device
+import app.hommaterial.plural
 import app.hommaterial.quick.Alerts
 import app.hommaterial.quick.clock
 import app.hommaterial.quick.degrees
@@ -75,6 +76,32 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     LaunchedEffect(Unit) { vm.checkForUpdate(manual = true, quiet = true) }
     var confirmSignOut by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    var confirmRooms by remember { mutableStateOf(false) }
+    var moving by remember { mutableStateOf<Device?>(null) }
+    var renaming by remember { mutableStateOf<String?>(null) }
+    val placed = state.placed
+    val rooms = placed.mapNotNull { it.room }.distinct().sortedBy { it.lowercase() }
+    moving?.let { device ->
+        RoomPicker(
+            device = device,
+            current = state.rooms[device.applianceId],
+            rooms = rooms,
+            onPick = { vm.setRoom(device, it); moving = null },
+            onDismiss = { moving = null },
+        )
+    }
+    renaming?.let { room ->
+        RoomRename(room, onRename = { vm.renameRoom(room, it); renaming = null }, onDismiss = { renaming = null })
+    }
+    if (confirmRooms) {
+        ConfirmDialog(
+            title = str(R.string.rooms_reset_title),
+            text = str(R.string.rooms_reset_text),
+            confirm = str(R.string.rooms_reset_confirm),
+            onConfirm = vm::resetRooms,
+            onDismiss = { confirmRooms = false },
+        )
+    }
     if (confirmSignOut) SignOutDialog(onConfirm = vm::logout, onDismiss = { confirmSignOut = false })
     if (confirmClear) {
         ConfirmDialog(
@@ -183,8 +210,24 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             }
 
             if (state.devices.isNotEmpty()) {
+                item { Section(R.string.s_rooms, R.string.rooms_text) }
+                items(rooms, key = { "room:$it" }) { room ->
+                    Setting(
+                        title = room,
+                        text = plural(R.plurals.devices, placed.count { it.room == room }),
+                        onClick = { renaming = room },
+                    )
+                }
+                if (state.rooms.isNotEmpty()) {
+                    item { Setting(title = str(R.string.rooms_reset), onClick = { confirmRooms = true }) }
+                }
+
                 item { Section(R.string.s_devices, R.string.devices_text) }
-                items(state.devices, key = { it.applianceId }) { device -> DeviceRow(device, state, vm) }
+                // Listed in their rooms as shown in the app, but moved as the devices Alexa knows.
+                items(state.devices, key = { it.applianceId }) { device ->
+                    val room = placed.first { it.applianceId == device.applianceId }.room
+                    DeviceRow(device, room, state, vm, onClick = { moving = device })
+                }
             }
 
             item { Section(R.string.s_tiles, R.string.tiles_text) }
@@ -300,13 +343,14 @@ private fun Setting(
 
 /** A device with its two choices: among the favorites or not, shown in the list or hidden. */
 @Composable
-private fun DeviceRow(device: Device, state: UiState, vm: HomeViewModel) {
+private fun DeviceRow(device: Device, room: String?, state: UiState, vm: HomeViewModel, onClick: () -> Unit) {
     val favorite = device.applianceId in state.favorites
     val hidden = device.applianceId in state.hidden
     val colors = MaterialTheme.colorScheme
     ListItem(
         headlineContent = { Text(device.name) },
-        supportingContent = device.room?.let { { Text(it) } },
+        supportingContent = { Text(room ?: str(R.string.room_none)) },
+        modifier = Modifier.clickable(onClick = onClick),
         trailingContent = {
             Row {
                 IconButton(onClick = { vm.setFavorite(device, !favorite) }) {

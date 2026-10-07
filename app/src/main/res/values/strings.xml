@@ -170,7 +170,7 @@
     <string name="auto_update_text">Once a day, on GitHub</string>
     <string name="installed_version">Installed version: %1$s</string>
     <string name="s_devices">Devices</string>
-    <string name="devices_text">The star puts a device among the favorites, the eye hides it from the list.</string>
+    <string name="devices_text">Tap a device to move it to another room. The star puts it among the favorites, the eye hides it from the list.</string>
     <string name="s_tiles">Quick Settings tiles</string>
     <string name="tiles_text">To assign a device, press and hold it in the list and use its panel.</string>
     <string name="tile_slot">Tile %1$d</string>
@@ -180,7 +180,7 @@
     <string name="s_alerts">Temperature alerts</string>
     <string name="alert_remove">Remove the alerts</string>
     <string name="s_backup" translatable="false">Backup</string>
-    <string name="backup_text">Favorites, hidden devices, tiles, alerts and settings. The Amazon sign-in, the timers and the sensor history are not included.</string>
+    <string name="backup_text">Favorites, hidden devices, rooms, tiles, alerts and settings. The Amazon sign-in, the timers and the sensor history are not included.</string>
     <string name="backup_export">Export to a file</string>
     <string name="backup_import">Import from a file</string>
     <string name="backup_exported">Backup saved</string>
@@ -195,11 +195,25 @@
     <string name="s_about">About</string>
     <string name="about_source">Source code on GitHub</string>
     <string name="sign_out_title">Sign out?</string>
-    <string name="sign_out_text">Favorites, hidden devices, tiles, timers, alerts and the sensor history are deleted from this phone. Export a backup first if you want to keep your choices.</string>
+    <string name="sign_out_text">Favorites, hidden devices, rooms, tiles, timers, alerts and the sensor history are deleted from this phone. Export a backup first if you want to keep your choices.</string>
     <string name="history_clear_title">Clear the history?</string>
     <string name="history_clear_text">The temperature and humidity readings collected so far are deleted and the charts start again from scratch.</string>
     <string name="history_clear_confirm">Clear</string>
     <string name="update_to">Update to Hommaterial %1$s</string>
+    <string name="s_rooms">Rooms</string>
+    <string name="rooms_text">The rooms set here are only for this app and change nothing in Alexa. Tap a room to rename it; to move a device, tap it in the list below.</string>
+    <string name="rooms_reset">Go back to the Alexa rooms</string>
+    <string name="rooms_reset_title">Go back to the Alexa rooms?</string>
+    <string name="rooms_reset_text">Every device returns to the room it has in Alexa, and the rooms created here disappear.</string>
+    <string name="rooms_reset_confirm">Go back</string>
+    <string name="room_pick_title">Room for %1$s</string>
+    <string name="room_as_alexa">As in Alexa: %1$s</string>
+    <string name="room_none">No room</string>
+    <string name="room_new">New room</string>
+    <string name="room_create">Create</string>
+    <string name="room_rename_title">Rename %1$s</string>
+    <string name="room_name">Name</string>
+    <string name="room_rename">Rename</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

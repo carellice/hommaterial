@@ -58,6 +58,8 @@ data class UiState(
     /** applianceIds with a command in flight. */
     val busy: Set<String> = emptySet(),
     val hidden: Set<String> = emptySet(),
+    /** The room the user moved each device to: a name, or an empty text for no room. */
+    val rooms: Map<String, String> = emptyMap(),
     val showHidden: Boolean = false,
     /** applianceIds repeated in the section at the top of the list. */
     val favorites: Set<String> = emptySet(),
@@ -80,7 +82,13 @@ data class UiState(
     val updatePrompt: Boolean = false,
     /** Download progress from 0 to 1, null when no download is running. */
     val updateProgress: Float? = null,
-)
+) {
+    /** The devices in the rooms the user put them in, which are those of Alexa unless moved. */
+    val placed: List<Device>
+        get() = devices.map { device ->
+            rooms[device.applianceId]?.let { device.copy(room = it.ifEmpty { null }) } ?: device
+        }
+}
 
 private const val BACKUP_APP = "hommaterial"
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
@@ -133,6 +141,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             states = local.states(),
             updatedAt = cache.getLong("updatedAt", 0).takeIf { it > 0 },
             hidden = local.hidden(),
+            rooms = local.rooms(),
             favorites = local.favorites(),
             tileDevices = local.tileDevices(),
             timers = Timers.all(getApplication()),
@@ -319,7 +328,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     /** Acts on what the speech recognizer [heard], its guesses best first. */
     fun onSpeech(heard: List<String>) {
         val s = _state.value
-        when (val result = parseVoice(heard, s.devices.filter { it.applianceId !in s.hidden })) {
+        when (val result = parseVoice(heard, s.placed.filter { it.applianceId !in s.hidden })) {
             is VoiceResult.Run -> runVoice(result.command)
             is VoiceResult.Ask -> _state.update { it.copy(voice = result) }
             is VoiceResult.Unknown -> _messages.tryEmit(
@@ -370,6 +379,25 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(alerts = Alerts.all(getApplication())) }
     }
 
+    /** Moves a device to [room]: a name, an empty text for no room, or null to follow Alexa again. */
+    fun setRoom(device: Device, room: String?) {
+        val rooms = _state.value.rooms
+        saveRooms(if (room == null) rooms - device.applianceId else rooms + (device.applianceId to room))
+    }
+
+    /** Gives another name to a room, moving there all the devices that are in it. */
+    fun renameRoom(room: String, name: String) {
+        val s = _state.value
+        saveRooms(s.rooms + s.placed.filter { it.room == room }.associate { it.applianceId to name })
+    }
+
+    fun resetRooms() = saveRooms(emptyMap())
+
+    private fun saveRooms(rooms: Map<String, String>) {
+        local.putRooms(rooms)
+        _state.update { it.copy(rooms = rooms) }
+    }
+
     fun clearTile(slot: Int) {
         local.putTileDevice(slot, null)
         _state.update { it.copy(tileDevices = local.tileDevices()) }
@@ -400,6 +428,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("version", 1)
             .put("favorites", JSONArray(s.favorites))
             .put("hidden", JSONArray(s.hidden))
+            .put("rooms", JSONObject(s.rooms))
             .put("tiles", JSONArray(s.tileDevices.map { it ?: JSONObject.NULL }))
             .put("alerts", alerts)
             .put("autoUpdate", s.autoUpdate)
@@ -434,6 +463,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 .putStringSet("favorites", strings("favorites"))
                 .putStringSet("hidden", strings("hidden"))
                 .apply()
+            val rooms = backup.optJSONObject("rooms") ?: JSONObject()
+            local.putRooms(rooms.keys().asSequence().associateWith { rooms.getString(it) })
             val tiles = backup.optJSONArray("tiles")
             for (slot in 0 until PowerTile.SLOTS) {
                 local.putTileDevice(slot, tiles?.optString(slot)?.takeIf { it.isNotEmpty() && !tiles.isNull(slot) })
@@ -456,6 +487,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(
                     favorites = local.favorites(),
                     hidden = local.hidden(),
+                    rooms = local.rooms(),
                     tileDevices = local.tileDevices(),
                     alerts = Alerts.all(app),
                     autoUpdate = settings.getBoolean("autoUpdate", true),

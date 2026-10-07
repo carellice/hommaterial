@@ -44,6 +44,17 @@ class Cache(context: Context) {
 
     fun favorites(): Set<String> = prefs.getStringSet("favorites", emptySet())!!.toSet()
 
+    /**
+     * The room the user moved each device to, by applianceId: a name, or an empty text for no room.
+     * Devices that are not here stay in their Alexa room.
+     */
+    fun rooms(): Map<String, String> = runCatching {
+        val json = JSONObject(prefs.getString("rooms", "{}")!!)
+        json.keys().asSequence().associateWith { json.getString(it) }
+    }.getOrDefault(emptyMap())
+
+    fun putRooms(rooms: Map<String, String>) = prefs.edit().putString("rooms", JSONObject(rooms).toString()).apply()
+
     /** applianceId of the device driven by each quick settings tile, null for the free ones. */
     fun tileDevices(): List<String?> = List(PowerTile.SLOTS) { prefs.getString("tileDevice$it", null) }
 

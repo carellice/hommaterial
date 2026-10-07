@@ -134,7 +134,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        val visible = state.devices.filter { state.showHidden || it.applianceId !in state.hidden }
+        val visible = state.placed.filter { state.showHidden || it.applianceId !in state.hidden }
         // Named rooms first, alphabetically; devices without a room close the list.
         val noRoom = str(R.string.no_room)
         val rooms = visible.groupBy { it.room ?: noRoom }

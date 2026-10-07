@@ -74,8 +74,10 @@ collegati al proprio account Alexa.
   se confermi, la scarica e la installa. Il controllo si può anche avviare a
   mano da "Controlla aggiornamenti" nel menu.
 - Dal menu si aprono le Impostazioni: notifiche, lingua, aggiornamenti,
-  preferiti e dispositivi nascosti, riquadri, timer e avvisi attivi, e il
-  backup su file delle proprie scelte.
+  stanze, preferiti e dispositivi nascosti, riquadri, timer e avvisi attivi,
+  e il backup su file delle proprie scelte.
+- Le stanze si possono riorganizzare dentro l'app, spostando i dispositivi,
+  creandone di nuove o rinominandole, senza cambiare niente in Alexa.
 
 Non fa altro, di proposito: niente routine, niente assistente sempre in
 ascolto, niente musica. La voce la trascrive il riconoscimento vocale del
