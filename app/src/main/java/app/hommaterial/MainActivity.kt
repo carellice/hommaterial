@@ -21,6 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.hommaterial.ui.HomeScreen
 import app.hommaterial.ui.LoginScreen
 import app.hommaterial.ui.OnboardingScreen
+import app.hommaterial.ui.UpdateDialog
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,12 +32,16 @@ class MainActivity : ComponentActivity() {
                 val vm: HomeViewModel = viewModel()
                 val state by vm.state.collectAsStateWithLifecycle()
                 // Every return to the app shows fresh states.
-                LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refresh() }
+                LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+                    vm.refresh()
+                    vm.checkForUpdate(manual = false)
+                }
                 when {
                     !state.onboarded -> OnboardingScreen(onAccept = vm::acceptOnboarding)
                     state.loggedIn -> HomeScreen(state, vm)
                     else -> LoginScreen(state, vm)
                 }
+                UpdateDialog(state, vm)
             }
         }
     }

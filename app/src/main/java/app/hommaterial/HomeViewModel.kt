@@ -11,6 +11,8 @@ import app.hommaterial.data.DeviceState
 import app.hommaterial.data.LoginAttempt
 import app.hommaterial.data.Marketplace
 import app.hommaterial.data.NotLoggedInException
+import app.hommaterial.data.Update
+import app.hommaterial.data.Updater
 import app.hommaterial.data.mapObjects
 import app.hommaterial.data.toJsonArray
 import kotlinx.coroutines.CancellationException
@@ -42,7 +44,13 @@ data class UiState(
     val hidden: Set<String> = emptySet(),
     val showHidden: Boolean = false,
     val refreshing: Boolean = false,
+    /** A newer release found on GitHub, while it is being offered or downloaded. */
+    val update: Update? = null,
+    /** Download progress from 0 to 1, null when no download is running. */
+    val updateProgress: Float? = null,
 )
+
+private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val http = OkHttpClient.Builder()
@@ -51,6 +59,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         .build()
     private val auth = AlexaAuth(app, http)
     private val api = AlexaApi(auth, http)
+    private val updater = Updater(app, http)
     private val cache = app.getSharedPreferences("cache", Context.MODE_PRIVATE)
     // Kept apart from the cache so that signing out does not bring the first-run notice back.
     private val settings = app.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -62,6 +71,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val messages = _messages.asSharedFlow()
 
     private var refreshJob: Job? = null
+    private var updateJob: Job? = null
+
+    val installedVersion: String get() = updater.installedVersion
 
     // The last known devices and states are shown instantly while the network catches up.
     private fun loadCached(): UiState {
@@ -122,7 +134,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         refreshJob?.cancel()
         auth.logout()
         cache.edit().clear().apply()
-        _state.value = UiState(onboarded = true, loggedIn = false, marketplace = auth.marketplace)
+        _state.update { UiState(onboarded = true, loggedIn = false, marketplace = auth.marketplace, update = it.update, updateProgress = it.updateProgress) }
     }
 
     fun refresh() {
@@ -190,6 +202,59 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleShowHidden() {
         _state.update { it.copy(showHidden = !it.showHidden) }
         if (_state.value.showHidden) refresh()
+    }
+
+    /**
+     * Looks for a newer release on GitHub. The automatic check runs at most once a day and stays
+     * silent unless it finds something; the [manual] one always reports its outcome.
+     */
+    fun checkForUpdate(manual: Boolean) {
+        if (updateJob?.isActive == true || !_state.value.onboarded) return
+        val now = System.currentTimeMillis()
+        val last = settings.getLong("updateCheckedAt", 0)
+        if (!manual && now - last in 0 until UPDATE_CHECK_INTERVAL_MS) return
+        updateJob = viewModelScope.launch {
+            try {
+                val update = updater.check()
+                settings.edit().putLong("updateCheckedAt", now).apply()
+                if (update != null) {
+                    _state.update { it.copy(update = update) }
+                } else if (manual) {
+                    _messages.tryEmit("Hai già l'ultima versione (${updater.installedVersion})")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: java.io.IOException) {
+                if (manual) _messages.tryEmit("Nessuna connessione")
+            } catch (e: Exception) {
+                if (manual) _messages.tryEmit(e.message ?: "Controllo degli aggiornamenti non riuscito")
+            }
+        }
+    }
+
+    fun installUpdate() {
+        val update = _state.value.update ?: return
+        if (updateJob?.isActive == true) return
+        _state.update { it.copy(updateProgress = 0f) }
+        updateJob = viewModelScope.launch {
+            try {
+                val apk = updater.download(update) { p -> _state.update { it.copy(updateProgress = p) } }
+                updater.install(apk)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: java.io.IOException) {
+                _messages.tryEmit("Download non riuscito, controlla la connessione")
+            } catch (e: Exception) {
+                _messages.tryEmit(e.message ?: "Aggiornamento non riuscito")
+            }
+            _state.update { it.copy(update = null, updateProgress = null) }
+        }
+    }
+
+    /** Closes the offer, cancelling the download if one is running. */
+    fun dismissUpdate() {
+        updateJob?.cancel()
+        _state.update { it.copy(update = null, updateProgress = null) }
     }
 
     /** Runs [block], turning failures into a message or a return to the sign-in screen. */

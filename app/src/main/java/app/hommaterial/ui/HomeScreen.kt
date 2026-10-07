@@ -137,6 +137,10 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel) {
                 onClick = { open = false; vm.toggleShowHidden() },
             )
         }
+        DropdownMenuItem(
+            text = { Text("Controlla aggiornamenti") },
+            onClick = { open = false; vm.checkForUpdate(manual = true) },
+        )
         DropdownMenuItem(text = { Text("Esci") }, onClick = { open = false; vm.logout() })
     }
 }

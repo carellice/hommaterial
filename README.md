@@ -58,6 +58,9 @@ collegati al proprio account Alexa.
 - Mostra temperatura e umidità dei sensori.
 - Permette di nascondere i dispositivi che non interessano.
 - All'apertura mostra subito l'ultimo stato noto e lo aggiorna in sottofondo.
+- Controlla una volta al giorno se su GitHub c'è una versione più recente e,
+  se confermi, la scarica e la installa. Il controllo si può anche avviare a
+  mano da "Controlla aggiornamenti" nel menu.
 
 Non fa altro, di proposito: niente routine, niente comandi vocali, niente
 musica.
@@ -75,8 +78,9 @@ musica.
 
 ## Dati e privacy
 
-- L'app parla solo con i server di Amazon. Non ci sono server intermedi,
-  statistiche né pubblicità.
+- L'app parla con i server di Amazon e, solo per cercare e scaricare gli
+  aggiornamenti, con GitHub, a cui non invia alcun dato dell'account. Non ci
+  sono server intermedi, statistiche né pubblicità.
 - La password viene inserita nella pagina di Amazon e non viene letta né
   salvata dall'app.
 - Sul telefono, nell'area privata dell'app, restano il token di accesso,
