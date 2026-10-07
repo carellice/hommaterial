@@ -4,8 +4,8 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import app.hommaterial.data.AlexaApi
-import app.hommaterial.data.AlexaAuth
+import app.hommaterial.data.Alexa
+import app.hommaterial.data.Cache
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.LoginAttempt
@@ -13,7 +13,7 @@ import app.hommaterial.data.Marketplace
 import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
-import app.hommaterial.data.mapObjects
+import app.hommaterial.quick.Quick
 import app.hommaterial.data.toJsonArray
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -25,10 +25,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import org.json.JSONArray
-import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 data class UiState(
     /** False until the first-run notice has been accepted. */
@@ -57,14 +53,12 @@ data class UiState(
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
-    private val http = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
-    private val auth = AlexaAuth(app, http)
-    private val api = AlexaApi(auth, http)
-    private val updater = Updater(app, http)
-    private val cache = app.getSharedPreferences("cache", Context.MODE_PRIVATE)
+    private val alexa = Alexa.get(app)
+    private val auth = alexa.auth
+    private val api = alexa.api
+    private val updater = Updater(app, alexa.http)
+    private val local = Cache(app)
+    private val cache = local.prefs
     // Kept apart from the cache so that signing out does not bring the first-run notice back.
     private val settings = app.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
@@ -81,32 +75,23 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     // The last known devices and states are shown instantly while the network catches up.
     private fun loadCached(): UiState {
-        val devices = runCatching {
-            JSONArray(cache.getString("devices", "[]")).mapObjects(Device::fromJson)
-        }.getOrDefault(emptyList())
-        val states = runCatching {
-            val json = JSONObject(cache.getString("states", "{}")!!)
-            json.keys().asSequence().associateWith { DeviceState.fromJson(json.getJSONObject(it)) }
-        }.getOrDefault(emptyMap())
         return UiState(
             onboarded = settings.getBoolean("onboarded", false),
             loggedIn = auth.isLoggedIn,
             marketplace = auth.marketplace,
-            devices = devices,
-            states = states,
+            devices = local.devices(),
+            states = local.states(),
             updatedAt = cache.getLong("updatedAt", 0).takeIf { it > 0 },
-            hidden = cache.getStringSet("hidden", emptySet())!!.toSet(),
-            favorites = cache.getStringSet("favorites", emptySet())!!.toSet(),
+            hidden = local.hidden(),
+            favorites = local.favorites(),
         )
     }
 
     private fun saveCache() {
         val s = _state.value
-        val states = JSONObject().also { json -> s.states.forEach { (id, st) -> json.put(id, st.toJson()) } }
-        cache.edit()
-            .putString("devices", s.devices.toJsonArray().toString())
-            .putString("states", states.toString())
-            .apply()
+        cache.edit().putString("devices", s.devices.toJsonArray().toString()).apply()
+        local.putStates(s.states)
+        Quick.refresh(getApplication())
     }
 
     fun acceptOnboarding() {
@@ -140,6 +125,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         refreshJob?.cancel()
         auth.logout()
         cache.edit().clear().apply()
+        Quick.refresh(getApplication())
         _state.update { UiState(onboarded = true, loggedIn = false, marketplace = auth.marketplace, update = it.update, updateProgress = it.updateProgress) }
     }
 
@@ -215,6 +201,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(hidden = if (hidden) it.hidden + device.applianceId else it.hidden - device.applianceId)
         }
         cache.edit().putStringSet("hidden", _state.value.hidden).apply()
+        Quick.refresh(getApplication())
     }
 
     fun setFavorite(device: Device, favorite: Boolean) {
@@ -222,6 +209,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(favorites = if (favorite) it.favorites + device.applianceId else it.favorites - device.applianceId)
         }
         cache.edit().putStringSet("favorites", _state.value.favorites).apply()
+        Quick.refresh(getApplication())
     }
 
     fun toggleShowHidden() {

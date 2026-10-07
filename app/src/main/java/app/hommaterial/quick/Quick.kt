@@ -1,0 +1,88 @@
+package app.hommaterial.quick
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
+import app.hommaterial.data.Alexa
+import app.hommaterial.data.Cache
+import app.hommaterial.data.Device
+import app.hommaterial.data.DeviceState
+import app.hommaterial.data.NotLoggedInException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import java.io.IOException
+
+internal const val EXTRA_APPLIANCE_ID = "applianceId"
+
+/** How a command sent from outside the app ended, with the sentence to show for it. */
+class Outcome(val ok: Boolean, val message: String, val noConnection: Boolean = false)
+
+/** Commands for the surfaces that live outside the app: launcher shortcuts and the like. */
+object Quick {
+    /** Outlives the short-lived components that start the work. */
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /** Inverts the power of a device, asking Alexa for its real state first. */
+    suspend fun toggle(context: Context, applianceId: String): Outcome = command(context, applianceId) { device ->
+        val state = Alexa.get(context).api.states(listOf(device))[applianceId]
+        if (state == null || !state.reachable) throw Exception("${device.name} non è raggiungibile")
+        // Without a reported state a toggle would be a guess.
+        val on = state.power ?: throw Exception("${device.name}: stato sconosciuto, apri l'app")
+        !on
+    }
+
+    suspend fun setPower(context: Context, applianceId: String, on: Boolean): Outcome =
+        command(context, applianceId) { on }
+
+    private suspend fun command(
+        context: Context,
+        applianceId: String,
+        target: suspend (Device) -> Boolean,
+    ): Outcome {
+        val cache = Cache(context)
+        val device = cache.devices().find { it.applianceId == applianceId && it.hasPower }
+            ?: return Outcome(false, "Dispositivo non trovato, apri l'app")
+        return try {
+            val on = target(device)
+            Alexa.get(context).api.setPower(device, on)
+            val known = cache.states()
+            val state = (known[applianceId] ?: DeviceState()).copy(power = on, reachable = true)
+            cache.putStates(known + (applianceId to state))
+            refresh(context)
+            Outcome(true, "${device.name}: ${if (on) "acceso" else "spento"}")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: NotLoggedInException) {
+            Outcome(false, "Accesso scaduto, apri l'app")
+        } catch (e: IOException) {
+            Outcome(false, "Nessuna connessione", noConnection = true)
+        } catch (e: Exception) {
+            Outcome(false, e.message ?: "Qualcosa è andato storto")
+        }
+    }
+
+    /** Brings the surfaces outside the app in line with what is remembered on the phone. */
+    fun refresh(context: Context) {
+        publishShortcuts(context.applicationContext)
+    }
+}
+
+/** Target of the taps that toggle a device without opening the app. */
+class ToggleReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val id = intent.getStringExtra(EXTRA_APPLIANCE_ID) ?: return
+        val app = context.applicationContext
+        val pending = goAsync()
+        Quick.scope.launch {
+            try {
+                Toast.makeText(app, Quick.toggle(app, id).message, Toast.LENGTH_SHORT).show()
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+}
