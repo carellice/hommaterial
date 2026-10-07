@@ -66,6 +66,8 @@ collegati al proprio account Alexa.
 - Mostra temperatura e umidità dei sensori, con il grafico dell'ultimo giorno
   o dell'ultima settimana. I dati li raccoglie il telefono quando l'app o il
   widget si aggiornano, quindi il grafico parte vuoto e può avere dei buchi.
+- Avvisa con una notifica quando un sensore supera o scende sotto una
+  temperatura scelta.
 - Permette di nascondere i dispositivi che non interessano.
 - All'apertura mostra subito l'ultimo stato noto e lo aggiorna in sottofondo.
 - Controlla una volta al giorno se su GitHub c'è una versione più recente e,
@@ -78,7 +80,10 @@ telefono, non l'app.
 
 Il timer di spegnimento lo fa scattare il telefono: all'ora stabilita deve
 essere acceso e connesso. Se non c'è rete riprova per dieci minuti, poi
-rinuncia.
+rinuncia e lo segnala con una notifica.
+
+Gli avvisi di temperatura li controlla il telefono, circa ogni 15 minuti e
+più di rado quando è fermo da un po': non sono un allarme in tempo reale.
 
 ## Limiti noti
 

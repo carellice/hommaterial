@@ -143,6 +143,17 @@
     <string name="onboarding_purpose">What it is for</string>
     <string name="onboarding_before">Before you start</string>
     <string name="onboarding_unofficial">Unofficial app, use at your own risk</string>
+    <string name="alerts_title">Alerts</string>
+    <string name="alert_above">Above %1$s</string>
+    <string name="alert_below">Below %1$s</string>
+    <string name="alert_lower">Lower the threshold</string>
+    <string name="alert_raise">Raise the threshold</string>
+    <string name="alerts_note">Checked about every 15 minutes, less often while the phone is idle.</string>
+    <string name="alerts_disabled">Notifications for Hommaterial are turned off in the phone settings.</string>
+    <string name="alert_notification_above">Above the %1$s threshold</string>
+    <string name="alert_notification_below">Below the %1$s threshold</string>
+    <string name="timer_failed_title">%1$s was not turned off</string>
+    <string name="timer_failed_text">The timer could not turn it off: %1$s</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

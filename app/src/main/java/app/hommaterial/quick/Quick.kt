@@ -96,6 +96,7 @@ object Quick {
         }
         cache.putStates(cache.states() + fresh)
         History(context).record(fresh)
+        Alerts.check(context, fresh)
         refresh(context)
     }
 

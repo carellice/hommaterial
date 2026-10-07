@@ -7,7 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import app.hommaterial.R
 import app.hommaterial.data.Cache
+import app.hommaterial.str
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
@@ -92,6 +94,9 @@ class TimerReceiver : BroadcastReceiver() {
                 if (offline && System.currentTimeMillis() - due < RETRY_WINDOW_MS) {
                     Timers.retry(app, id)
                 } else {
+                    if (outcome?.ok != true) {
+                        Alerts.timerFailed(app, id, outcome?.message ?: str(R.string.no_connection))
+                    }
                     Timers.cancel(app, id)
                     Quick.refresh(app)
                 }

@@ -21,6 +21,8 @@ import app.hommaterial.data.Reading
 import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
 import app.hommaterial.data.toJsonArray
+import app.hommaterial.quick.Alert
+import app.hommaterial.quick.Alerts
 import app.hommaterial.quick.PowerTile
 import app.hommaterial.quick.Quick
 import app.hommaterial.quick.Timers
@@ -58,6 +60,8 @@ data class UiState(
     val tileDevices: List<String?> = emptyList(),
     /** Switch-off time of each device with a timer, in epoch milliseconds. */
     val timers: Map<String, Long> = emptyMap(),
+    /** Temperature thresholds each sensor notifies about. */
+    val alerts: Map<String, Alert> = emptyMap(),
     val refreshing: Boolean = false,
     /** A spoken command understood only in part, waiting for the user to pick what was meant. */
     val voice: VoiceResult.Ask? = null,
@@ -122,6 +126,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             favorites = local.favorites(),
             tileDevices = local.tileDevices(),
             timers = Timers.all(getApplication()),
+            alerts = Alerts.all(getApplication()),
         )
     }
 
@@ -164,6 +169,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         auth.logout()
         Timers.cancelAll(getApplication())
         cache.edit().clear().apply()
+        Alerts.schedule(getApplication())
         history.clear()
         Quick.refresh(getApplication())
         _state.update {
@@ -194,6 +200,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     val missing = queryable(devices).filter { it.applianceId !in states }
                     if (missing.isNotEmpty()) states += api.states(missing)
                     history.record(states)
+                    Alerts.check(getApplication(), states)
                     // Devices with a command in flight keep their optimistic state.
                     val now = System.currentTimeMillis()
                     _state.update { s ->
@@ -337,6 +344,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (copied) Toast.makeText(app, str(R.string.diagnostics_copied), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    fun setAlert(device: Device, alert: Alert) {
+        Alerts.set(getApplication(), device.applianceId, alert)
+        _state.update { it.copy(alerts = Alerts.all(getApplication())) }
     }
 
     fun readings(device: Device): List<Reading> = history.readings(device.applianceId)

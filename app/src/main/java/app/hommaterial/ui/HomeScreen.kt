@@ -1,11 +1,15 @@
 package app.hommaterial.ui
 
+import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,12 +37,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.DevicesOther
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.PowerSettingsNew
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.Tv
@@ -58,6 +64,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -66,6 +73,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -76,6 +84,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -92,6 +101,9 @@ import app.hommaterial.data.WHITE_CHOICES
 import app.hommaterial.data.statusText
 import app.hommaterial.label
 import app.hommaterial.plural
+import app.hommaterial.quick.Alert
+import app.hommaterial.quick.Alerts
+import app.hommaterial.quick.degrees
 import app.hommaterial.str
 import app.hommaterial.voice.VoiceResult
 import java.text.DateFormat
@@ -222,6 +234,7 @@ private fun DeviceTile(device: Device, state: UiState, vm: HomeViewModel) {
         tile = state.tileDevices.indexOf(device.applianceId).takeIf { it >= 0 },
         tilesFull = null !in state.tileDevices,
         timer = state.timers[device.applianceId]?.takeIf { it > System.currentTimeMillis() },
+        alert = state.alerts[device.applianceId] ?: Alert(),
         vm = vm,
     )
 }
@@ -335,6 +348,7 @@ private fun DeviceTile(
     tile: Int?,
     tilesFull: Boolean,
     timer: Long?,
+    alert: Alert,
     vm: HomeViewModel,
 ) {
     val on = state?.power == true
@@ -390,7 +404,7 @@ private fun DeviceTile(
     }
 
     if (details) {
-        DeviceSheet(device, state, hidden, favorite, tile, tilesFull, timer, vm, onDismiss = { details = false })
+        DeviceSheet(device, state, hidden, favorite, tile, tilesFull, timer, alert, vm, onDismiss = { details = false })
     }
 }
 
@@ -405,9 +419,11 @@ private fun DeviceSheet(
     tile: Int?,
     tilesFull: Boolean,
     timer: Long?,
+    alert: Alert,
     vm: HomeViewModel,
     onDismiss: () -> Unit,
 ) {
+    val askNotifications = rememberNotificationRequest()
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             Modifier.verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
@@ -462,13 +478,19 @@ private fun DeviceSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         for ((label, minutes) in TIMER_CHOICES) {
-                            AssistChip(onClick = { vm.setTimer(device, minutes) }, label = { Text(str(label)) })
+                            AssistChip(
+                                onClick = { askNotifications(); vm.setTimer(device, minutes) },
+                                label = { Text(str(label)) },
+                            )
                         }
                     }
                 }
             }
 
-            if (device.isSensor) HistoryCharts(remember(device, state) { vm.readings(device) })
+            if (device.isSensor) {
+                HistoryCharts(remember(device, state) { vm.readings(device) })
+                AlertSettings(alert, state?.temperature) { vm.setAlert(device, it) }
+            }
 
             if (device.hasBrightness) {
                 Text(
@@ -518,6 +540,72 @@ private fun DeviceSheet(
             }
             TextButton(onClick = { vm.setHidden(device, !hidden); onDismiss() }) {
                 Text(str(if (hidden) R.string.unhide else R.string.hide))
+            }
+        }
+    }
+}
+
+/**
+ * Returns the action that asks for the permission to notify, where Android wants it asked. Timers
+ * and alerts work without it, but then they cannot tell when something needs attention.
+ */
+@Composable
+private fun rememberNotificationRequest(onAnswer: () -> Unit = {}): () -> Unit {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onAnswer() }
+    return {
+        val permission = Manifest.permission.POST_NOTIFICATIONS
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            context.checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED
+        ) {
+            launcher.launch(permission)
+        }
+    }
+}
+
+/** The temperatures above and below which a sensor notifies. */
+@Composable
+private fun AlertSettings(alert: Alert, temperature: Double?, onChange: (Alert) -> Unit) {
+    val context = LocalContext.current
+    // Bumped when the permission is answered, to read again whether notifications are allowed.
+    var answers by remember { mutableIntStateOf(0) }
+    val askNotifications = rememberNotificationRequest { answers++ }
+    val current = temperature?.takeIf { !it.isNaN() }?.roundToInt()?.toDouble() ?: 22.0
+
+    Text(
+        str(R.string.alerts_title),
+        style = MaterialTheme.typography.labelLarge,
+        modifier = Modifier.padding(top = 20.dp),
+    )
+    AlertRow(R.string.alert_above, alert.above, default = current + 2) {
+        if (it != null) askNotifications()
+        onChange(alert.copy(above = it))
+    }
+    AlertRow(R.string.alert_below, alert.below, default = current - 2) {
+        if (it != null) askNotifications()
+        onChange(alert.copy(below = it))
+    }
+    if (alert != Alert()) {
+        val enabled = remember(answers) { Alerts.enabled(context) }
+        Text(
+            str(if (enabled) R.string.alerts_note else R.string.alerts_disabled),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+@Composable
+private fun AlertRow(@StringRes label: Int, threshold: Double?, default: Double, onChange: (Double?) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Switch(checked = threshold != null, onCheckedChange = { onChange(if (it) default else null) })
+        Text(str(label, degrees(threshold ?: default)), modifier = Modifier.padding(start = 12.dp).weight(1f))
+        if (threshold != null) {
+            IconButton(onClick = { onChange(threshold - 0.5) }) {
+                Icon(Icons.Outlined.Remove, contentDescription = str(R.string.alert_lower))
+            }
+            IconButton(onClick = { onChange(threshold + 0.5) }) {
+                Icon(Icons.Outlined.Add, contentDescription = str(R.string.alert_raise))
             }
         }
     }

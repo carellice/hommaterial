@@ -135,6 +135,17 @@
     <string name="onboarding_purpose">A cosa serve</string>
     <string name="onboarding_before">Prima di iniziare</string>
     <string name="onboarding_unofficial">App non ufficiale, uso a proprio rischio</string>
+    <string name="alerts_title">Avvisi</string>
+    <string name="alert_above">Sopra %1$s</string>
+    <string name="alert_below">Sotto %1$s</string>
+    <string name="alert_lower">Abbassa la soglia</string>
+    <string name="alert_raise">Alza la soglia</string>
+    <string name="alerts_note">Controllo circa ogni 15 minuti, più di rado a telefono fermo.</string>
+    <string name="alerts_disabled">Le notifiche di Hommaterial sono disattivate nelle impostazioni del telefono.</string>
+    <string name="alert_notification_above">Sopra la soglia di %1$s</string>
+    <string name="alert_notification_below">Sotto la soglia di %1$s</string>
+    <string name="timer_failed_title">%1$s non è stato spento</string>
+    <string name="timer_failed_text">Il timer non è riuscito a spegnerlo: %1$s</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>
