@@ -13,6 +13,7 @@ import app.hommaterial.data.Marketplace
 import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
+import app.hommaterial.quick.PowerTileService
 import app.hommaterial.quick.Quick
 import app.hommaterial.data.toJsonArray
 import kotlinx.coroutines.CancellationException
@@ -41,6 +42,8 @@ data class UiState(
     val showHidden: Boolean = false,
     /** applianceIds repeated in the section at the top of the list. */
     val favorites: Set<String> = emptySet(),
+    /** applianceId of the device driven by the quick settings tile. */
+    val tileDevice: String? = null,
     val refreshing: Boolean = false,
     /** When the states were last fetched from Alexa, in epoch milliseconds. */
     val updatedAt: Long? = null,
@@ -84,6 +87,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             updatedAt = cache.getLong("updatedAt", 0).takeIf { it > 0 },
             hidden = local.hidden(),
             favorites = local.favorites(),
+            tileDevice = local.tileDevice(),
         )
     }
 
@@ -210,6 +214,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
         cache.edit().putStringSet("favorites", _state.value.favorites).apply()
         Quick.refresh(getApplication())
+    }
+
+    /** Puts [device] on the quick settings tile, or frees the tile when it is null. */
+    fun setTileDevice(device: Device?) {
+        _state.update { it.copy(tileDevice = device?.applianceId) }
+        cache.edit().putString("tileDevice", device?.applianceId).apply()
+        if (device != null) PowerTileService.offer(getApplication())
     }
 
     fun toggleShowHidden() {

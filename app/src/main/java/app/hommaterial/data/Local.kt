@@ -43,6 +43,9 @@ class Cache(context: Context) {
 
     fun favorites(): Set<String> = prefs.getStringSet("favorites", emptySet())!!.toSet()
 
+    /** applianceId of the device driven by the quick settings tile. */
+    fun tileDevice(): String? = prefs.getString("tileDevice", null)
+
     fun putStates(states: Map<String, DeviceState>) {
         val json = JSONObject().also { json -> states.forEach { (id, st) -> json.put(id, st.toJson()) } }
         prefs.edit().putString("states", json.toString()).apply()

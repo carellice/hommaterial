@@ -170,6 +170,7 @@ private fun DeviceTile(device: Device, state: UiState, vm: HomeViewModel) {
         busy = device.applianceId in state.busy,
         hidden = device.applianceId in state.hidden,
         favorite = device.applianceId in state.favorites,
+        onTile = device.applianceId == state.tileDevice,
         vm = vm,
     )
 }
@@ -235,6 +236,7 @@ private fun DeviceTile(
     busy: Boolean,
     hidden: Boolean,
     favorite: Boolean,
+    onTile: Boolean,
     vm: HomeViewModel,
 ) {
     val on = state?.power == true
@@ -287,7 +289,7 @@ private fun DeviceTile(
         }
     }
 
-    if (details) DeviceSheet(device, state, hidden, favorite, vm, onDismiss = { details = false })
+    if (details) DeviceSheet(device, state, hidden, favorite, onTile, vm, onDismiss = { details = false })
 }
 
 /** Everything beyond the tap-to-toggle: explicit on/off, brightness, favorites, hiding. */
@@ -298,6 +300,7 @@ private fun DeviceSheet(
     state: DeviceState?,
     hidden: Boolean,
     favorite: Boolean,
+    onTile: Boolean,
     vm: HomeViewModel,
     onDismiss: () -> Unit,
 ) {
@@ -340,6 +343,11 @@ private fun DeviceSheet(
                 modifier = Modifier.padding(top = 12.dp),
             ) {
                 Text(if (favorite) "Rimuovi dai preferiti" else "Aggiungi ai preferiti")
+            }
+            if (device.hasPower) {
+                TextButton(onClick = { vm.setTileDevice(device.takeIf { !onTile }) }) {
+                    Text(if (onTile) "Togli dalle Impostazioni rapide" else "Metti nelle Impostazioni rapide")
+                }
             }
             TextButton(onClick = { vm.setHidden(device, !hidden); onDismiss() }) {
                 Text(if (hidden) "Mostra di nuovo nella lista" else "Nascondi dalla lista")
