@@ -177,7 +177,8 @@ private fun DeviceTile(device: Device, state: UiState, vm: HomeViewModel) {
         busy = device.applianceId in state.busy,
         hidden = device.applianceId in state.hidden,
         favorite = device.applianceId in state.favorites,
-        onTile = device.applianceId == state.tileDevice,
+        tile = state.tileDevices.indexOf(device.applianceId).takeIf { it >= 0 },
+        tilesFull = null !in state.tileDevices,
         timer = state.timers[device.applianceId]?.takeIf { it > System.currentTimeMillis() },
         vm = vm,
     )
@@ -244,7 +245,8 @@ private fun DeviceTile(
     busy: Boolean,
     hidden: Boolean,
     favorite: Boolean,
-    onTile: Boolean,
+    tile: Int?,
+    tilesFull: Boolean,
     timer: Long?,
     vm: HomeViewModel,
 ) {
@@ -298,7 +300,7 @@ private fun DeviceTile(
         }
     }
 
-    if (details) DeviceSheet(device, state, hidden, favorite, onTile, timer, vm, onDismiss = { details = false })
+    if (details) DeviceSheet(device, state, hidden, favorite, tile, tilesFull, timer, vm, onDismiss = { details = false })
 }
 
 /** Everything beyond the tap-to-toggle: explicit on/off, timer, brightness, favorites, tile, hiding. */
@@ -309,7 +311,8 @@ private fun DeviceSheet(
     state: DeviceState?,
     hidden: Boolean,
     favorite: Boolean,
-    onTile: Boolean,
+    tile: Int?,
+    tilesFull: Boolean,
     timer: Long?,
     vm: HomeViewModel,
     onDismiss: () -> Unit,
@@ -378,8 +381,14 @@ private fun DeviceSheet(
                 Text(if (favorite) "Rimuovi dai preferiti" else "Aggiungi ai preferiti")
             }
             if (device.hasPower) {
-                TextButton(onClick = { vm.setTileDevice(device.takeIf { !onTile }) }) {
-                    Text(if (onTile) "Togli dalle Impostazioni rapide" else "Metti nelle Impostazioni rapide")
+                TextButton(onClick = { vm.setOnTile(device, tile == null) }, enabled = tile != null || !tilesFull) {
+                    Text(
+                        when {
+                            tile != null -> "Togli dalle Impostazioni rapide (riquadro ${tile + 1})"
+                            tilesFull -> "Impostazioni rapide: riquadri tutti occupati"
+                            else -> "Metti nelle Impostazioni rapide"
+                        },
+                    )
                 }
             }
             TextButton(onClick = { vm.setHidden(device, !hidden); onDismiss() }) {

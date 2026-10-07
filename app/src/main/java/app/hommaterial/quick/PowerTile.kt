@@ -16,18 +16,28 @@ import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 // Alexa can take a few seconds to report a state it has just been asked to change.
 private const val SETTLE_MS = 5_000L
 
-/** Quick settings tile that toggles the device chosen in the app. */
-class PowerTileService : TileService() {
+/**
+ * Quick settings tile that toggles the device assigned to its [slot] in the app. Android wants one
+ * declared service per tile, hence the fixed number of slots.
+ */
+abstract class PowerTile(private val slot: Int) : TileService() {
     private var fetch: Job? = null
+
+    private var lastCommandAt: Long
+        get() = commandTimes[slot] ?: 0
+        set(value) {
+            commandTimes[slot] = value
+        }
 
     override fun onStartListening() {
         render()
         val cache = Cache(this)
-        val device = cache.devices().find { it.applianceId == cache.tileDevice() } ?: return
+        val device = cache.devices().find { it.applianceId == cache.tileDevices()[slot] } ?: return
         if (System.currentTimeMillis() - lastCommandAt < SETTLE_MS) return
         // The remembered state may be old: the panel shows it at once and corrects it if needed.
         fetch = Quick.scope.launch {
@@ -44,7 +54,7 @@ class PowerTileService : TileService() {
     }
 
     override fun onClick() {
-        val id = Cache(this).tileDevice()
+        val id = Cache(this).tileDevices()[slot]
         if (id == null) {
             openApp()
             return
@@ -68,9 +78,9 @@ class PowerTileService : TileService() {
     private fun render() {
         val tile = qsTile ?: return
         val cache = Cache(this)
-        val device = cache.devices().find { it.applianceId == cache.tileDevice() }
+        val device = cache.devices().find { it.applianceId == cache.tileDevices()[slot] }
         val state = device?.let { cache.states()[it.applianceId] }
-        tile.label = device?.name ?: getString(R.string.app_name)
+        tile.label = device?.name ?: "${getString(R.string.app_name)} ${slot + 1}"
         tile.state = if (state?.power == true) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = when {
@@ -95,18 +105,38 @@ class PowerTileService : TileService() {
     }
 
     companion object {
-        @Volatile
-        private var lastCommandAt = 0L
+        const val SLOTS = 5
 
-        /** Asks Android to offer the tile to the user; older versions need it added by hand. */
-        fun offer(context: Context) {
+        private val services = listOf(
+            PowerTile1::class.java,
+            PowerTile2::class.java,
+            PowerTile3::class.java,
+            PowerTile4::class.java,
+            PowerTile5::class.java,
+        )
+
+        /** When each slot last sent a command. */
+        private val commandTimes = ConcurrentHashMap<Int, Long>()
+
+        /** Asks Android to offer the tile of [slot] to the user; older versions need it added by hand. */
+        fun offer(context: Context, slot: Int, label: String) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
             context.getSystemService(StatusBarManager::class.java)?.requestAddTileService(
-                ComponentName(context, PowerTileService::class.java),
-                context.getString(R.string.app_name),
+                ComponentName(context, services[slot]),
+                label,
                 Icon.createWithResource(context, R.drawable.ic_power),
                 context.mainExecutor,
             ) {}
         }
     }
 }
+
+class PowerTile1 : PowerTile(0)
+
+class PowerTile2 : PowerTile(1)
+
+class PowerTile3 : PowerTile(2)
+
+class PowerTile4 : PowerTile(3)
+
+class PowerTile5 : PowerTile(4)

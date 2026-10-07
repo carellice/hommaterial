@@ -57,7 +57,8 @@ collegati al proprio account Alexa.
   timer di spegnimento e luminosità per le luci dimmerabili.
 - I preferiti stanno in cima alla lista, in un widget per la schermata Home e
   sotto l'icona dell'app, tenendola premuta.
-- Un dispositivo a scelta si comanda dalle Impostazioni rapide di Android.
+- Fino a cinque dispositivi a scelta si comandano dalle Impostazioni rapide di
+  Android, ognuno con il suo riquadro.
 - Dall'intestazione di una stanza si accende o spegne tutto in una volta.
 - Mostra temperatura e umidità dei sensori.
 - Permette di nascondere i dispositivi che non interessano.

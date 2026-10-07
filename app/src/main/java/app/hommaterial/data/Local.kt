@@ -2,6 +2,7 @@ package app.hommaterial.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import app.hommaterial.quick.PowerTile
 import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
@@ -43,8 +44,11 @@ class Cache(context: Context) {
 
     fun favorites(): Set<String> = prefs.getStringSet("favorites", emptySet())!!.toSet()
 
-    /** applianceId of the device driven by the quick settings tile. */
-    fun tileDevice(): String? = prefs.getString("tileDevice", null)
+    /** applianceId of the device driven by each quick settings tile, null for the free ones. */
+    fun tileDevices(): List<String?> = List(PowerTile.SLOTS) { prefs.getString("tileDevice$it", null) }
+
+    fun putTileDevice(slot: Int, applianceId: String?) =
+        prefs.edit().putString("tileDevice$slot", applianceId).apply()
 
     fun putStates(states: Map<String, DeviceState>) {
         val json = JSONObject().also { json -> states.forEach { (id, st) -> json.put(id, st.toJson()) } }

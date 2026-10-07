@@ -13,7 +13,7 @@ import app.hommaterial.data.Marketplace
 import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
-import app.hommaterial.quick.PowerTileService
+import app.hommaterial.quick.PowerTile
 import app.hommaterial.quick.Quick
 import app.hommaterial.quick.Timers
 import app.hommaterial.data.toJsonArray
@@ -43,8 +43,8 @@ data class UiState(
     val showHidden: Boolean = false,
     /** applianceIds repeated in the section at the top of the list. */
     val favorites: Set<String> = emptySet(),
-    /** applianceId of the device driven by the quick settings tile. */
-    val tileDevice: String? = null,
+    /** applianceId of the device driven by each quick settings tile, null for the free ones. */
+    val tileDevices: List<String?> = emptyList(),
     /** Switch-off time of each device with a timer, in epoch milliseconds. */
     val timers: Map<String, Long> = emptyMap(),
     val refreshing: Boolean = false,
@@ -106,7 +106,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             updatedAt = cache.getLong("updatedAt", 0).takeIf { it > 0 },
             hidden = local.hidden(),
             favorites = local.favorites(),
-            tileDevice = local.tileDevice(),
+            tileDevices = local.tileDevices(),
             timers = Timers.all(getApplication()),
         )
     }
@@ -250,11 +250,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         Quick.refresh(getApplication())
     }
 
-    /** Puts [device] on the quick settings tile, or frees the tile when it is null. */
-    fun setTileDevice(device: Device?) {
-        _state.update { it.copy(tileDevice = device?.applianceId) }
-        cache.edit().putString("tileDevice", device?.applianceId).apply()
-        if (device != null) PowerTileService.offer(getApplication())
+    /** Gives [device] the first free quick settings tile, or takes its tile away. */
+    fun setOnTile(device: Device, onTile: Boolean) {
+        val tiles = _state.value.tileDevices
+        val slot = tiles.indexOf(if (onTile) null else device.applianceId)
+        if (slot < 0 || (onTile && device.applianceId in tiles)) return
+        local.putTileDevice(slot, device.applianceId.takeIf { onTile })
+        _state.update { it.copy(tileDevices = local.tileDevices()) }
+        if (onTile) PowerTile.offer(getApplication(), slot, device.name)
     }
 
     fun toggleShowHidden() {
