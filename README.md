@@ -59,8 +59,8 @@ collegati al proprio account Alexa.
   alla rovescia, ordinati dal più vicino allo spegnimento.
 - I preferiti stanno in cima alla lista.
 - Il widget per la schermata Home mostra i dispositivi e i gruppi scelti
-  nelle Impostazioni, dove si regolano anche colonne, dimensione dei riquadri,
-  intestazione e sfondo.
+  nelle Impostazioni, dove si regolano anche ordine, colonne, dimensione dei
+  riquadri, intestazione e sfondo.
 - Fino a cinque dispositivi a scelta si comandano dalle Impostazioni rapide di
   Android, ognuno con il suo riquadro.
 - Dall'intestazione di una stanza si accende o spegne tutto in una volta.
@@ -77,9 +77,9 @@ collegati al proprio account Alexa.
 - Controlla una volta al giorno se su GitHub c'è una versione più recente e,
   se confermi, la scarica e la installa. Il controllo si può anche avviare a
   mano da "Controlla aggiornamenti" nel menu.
-- Dal menu si aprono le Impostazioni: notifiche, lingua, aggiornamenti,
-  stanze, preferiti e dispositivi nascosti, riquadri, timer e avvisi attivi,
-  e il backup su file delle proprie scelte.
+- Dal menu si aprono le Impostazioni: tema chiaro, scuro o automatico,
+  lingua, notifiche, aggiornamenti, stanze, preferiti e dispositivi nascosti,
+  riquadri, timer e avvisi attivi, e il backup su file delle proprie scelte.
 - Le stanze si possono riorganizzare dentro l'app, creandone quante se ne
   vuole e scegliendo i dispositivi di ognuna, senza cambiare niente in Alexa.
 - I gruppi accendono o spengono insieme più dispositivi di stanze diverse.

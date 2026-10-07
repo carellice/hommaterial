@@ -154,7 +154,6 @@
     <string name="notifications_on">Le notifiche sono consentite</string>
     <string name="notifications_off">Le notifiche sono disattivate: timer e avvisi non possono avvisarti</string>
     <string name="open_phone_settings">Apri le impostazioni del telefono</string>
-    <string name="s_language">Lingua</string>
     <string name="language_choose">Scegli la lingua dell\'app</string>
     <string name="language_text">Segue il telefono, a meno che tu ne scelga una qui</string>
     <string name="s_updates">Aggiornamenti</string>
@@ -238,6 +237,14 @@
     <string name="widget_header_text">Nome dell\'app, ora dell\'ultimo aggiornamento e tasto per aggiornare</string>
     <string name="widget_transparent">Sfondo trasparente</string>
     <string name="widget_transparent_text">Si vedono solo i riquadri, sopra lo sfondo del telefono</string>
+    <string name="s_appearance">Aspetto</string>
+    <string name="theme">Tema</string>
+    <string name="theme_auto">Automatico</string>
+    <string name="theme_light">Chiaro</string>
+    <string name="theme_dark">Scuro</string>
+    <string name="widget_order">Ordine</string>
+    <string name="move_up">Sposta su</string>
+    <string name="move_down">Sposta giù</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>

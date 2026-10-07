@@ -81,6 +81,8 @@ data class UiState(
     val alerts: Map<String, Alert> = emptyMap(),
     /** Whether the app looks for a newer release by itself, once a day. */
     val autoUpdate: Boolean = true,
+    /** 0 follows the phone, 1 is always light, 2 always dark. */
+    val theme: Int = 0,
     val refreshing: Boolean = false,
     /** A spoken command understood only in part, waiting for the user to pick what was meant. */
     val voice: VoiceResult.Ask? = null,
@@ -161,6 +163,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             timers = Timers.all(getApplication()),
             alerts = Alerts.all(getApplication()),
             autoUpdate = settings.getBoolean("autoUpdate", true),
+            theme = settings.getInt("theme", 0),
         )
     }
 
@@ -212,6 +215,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 loggedIn = false,
                 marketplace = auth.marketplace,
                 autoUpdate = it.autoUpdate,
+                theme = it.theme,
                 update = it.update,
                 updatePrompt = it.updatePrompt,
                 updateProgress = it.updateProgress,
@@ -482,6 +486,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(autoUpdate = on) }
     }
 
+    fun setTheme(theme: Int) {
+        settings.edit().putInt("theme", theme).apply()
+        _state.update { it.copy(theme = theme) }
+    }
+
     fun clearHistory() {
         history.clear()
         _messages.tryEmit(str(R.string.history_cleared))
@@ -510,6 +519,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("tiles", JSONArray(s.tileDevices.map { it ?: JSONObject.NULL }))
             .put("alerts", alerts)
             .put("autoUpdate", s.autoUpdate)
+            .put("theme", s.theme)
         viewModelScope.launch {
             val saved = runCatching {
                 withContext(Dispatchers.IO) {
@@ -566,7 +576,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     ),
                 )
             }
-            settings.edit().putBoolean("autoUpdate", backup.optBoolean("autoUpdate", true)).apply()
+            settings.edit()
+                .putBoolean("autoUpdate", backup.optBoolean("autoUpdate", true))
+                .putInt("theme", backup.optInt("theme", 0).coerceIn(0, 2))
+                .apply()
             _state.update {
                 it.copy(
                     favorites = local.favorites(),
@@ -579,6 +592,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     tileDevices = local.tileDevices(),
                     alerts = Alerts.all(app),
                     autoUpdate = settings.getBoolean("autoUpdate", true),
+                    theme = settings.getInt("theme", 0),
                 )
             }
             Quick.refresh(app)

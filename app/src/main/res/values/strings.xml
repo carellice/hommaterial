@@ -162,7 +162,6 @@
     <string name="notifications_on">Notifications are allowed</string>
     <string name="notifications_off">Notifications are off: timers and alerts cannot notify you</string>
     <string name="open_phone_settings">Open the phone settings</string>
-    <string name="s_language">Language</string>
     <string name="language_choose">Choose the language of the app</string>
     <string name="language_text">It follows the phone unless you pick one here</string>
     <string name="s_updates">Updates</string>
@@ -248,6 +247,14 @@
     <string name="widget_header_text">App name, time of the last update and a refresh button</string>
     <string name="widget_transparent">Transparent background</string>
     <string name="widget_transparent_text">Only the tiles are drawn, over the wallpaper</string>
+    <string name="s_appearance">Appearance</string>
+    <string name="theme">Theme</string>
+    <string name="theme_auto">Automatic</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="widget_order">Order</string>
+    <string name="move_up">Move up</string>
+    <string name="move_down">Move down</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

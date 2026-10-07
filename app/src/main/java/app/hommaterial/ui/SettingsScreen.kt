@@ -9,6 +9,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,13 +23,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -33,6 +43,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -47,8 +58,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -188,6 +203,14 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
         if (it != null) vm.importBackup(it)
     }
     val names = state.devices.associate { it.applianceId to it.name }
+    // The name behind an entry of the shortcuts or of the widget, null when it no longer exists.
+    fun nameOf(key: String): String? {
+        val id = key.substringAfter(':')
+        return if (key.startsWith(SHORTCUT_GROUP)) state.groups.find { it.id == id }?.name else names[id]
+    }
+    val favoriteKeys = state.devices
+        .filter { it.applianceId in state.favorites && it.applianceId !in state.hidden }
+        .map { SHORTCUT_DEVICE + it.applianceId }
     val now = System.currentTimeMillis()
     val timers = state.timers.filter { it.value > now && it.key in names }
     val alerts = state.alerts.filterKeys { it in names }
@@ -222,24 +245,28 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             }
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
-            item { Section(R.string.s_notifications) }
-            item {
-                Setting(
-                    title = str(if (notifications) R.string.notifications_on else R.string.notifications_off),
-                    text = str(R.string.open_phone_settings),
-                    onClick = {
-                        context.open(
-                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
-                        )
-                    },
-                )
-            }
+        // The sections that are open, by their title; all closed on arrival.
+        var open by rememberSaveable { mutableStateOf(setOf<Int>()) }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                item { Section(R.string.s_language) }
-                item {
+        @Composable
+        fun Section(@StringRes title: Int, @StringRes text: Int? = null, content: @Composable () -> Unit) {
+            Accordion(
+                title = title,
+                text = text,
+                expanded = title in open,
+                onToggle = { open = if (title in open) open - title else open + title },
+                content = content,
+            )
+        }
+
+        Column(
+            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Section(R.string.s_appearance) {
+                val themes = listOf(R.string.theme_auto, R.string.theme_light, R.string.theme_dark)
+                Chips(R.string.theme, themes.mapIndexed { i, label -> i to str(label) }, state.theme, vm::setTheme)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     Setting(
                         title = str(R.string.language_choose),
                         text = str(R.string.language_text),
@@ -255,16 +282,21 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 }
             }
 
-            item { Section(R.string.s_updates) }
-            item {
+            Section(R.string.s_notifications) {
                 Setting(
-                    title = str(R.string.auto_update),
-                    text = str(R.string.auto_update_text),
-                    onClick = { vm.setAutoUpdate(!state.autoUpdate) },
-                    trailing = { Switch(checked = state.autoUpdate, onCheckedChange = vm::setAutoUpdate) },
+                    title = str(if (notifications) R.string.notifications_on else R.string.notifications_off),
+                    text = str(R.string.open_phone_settings),
+                    onClick = {
+                        context.open(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                        )
+                    },
                 )
             }
-            item {
+
+            Section(R.string.s_updates) {
+                Toggle(R.string.auto_update, R.string.auto_update_text, state.autoUpdate, vm::setAutoUpdate)
                 Setting(
                     title = str(R.string.check_updates),
                     text = str(R.string.installed_version, vm.installedVersion),
@@ -273,39 +305,38 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             }
 
             if (state.devices.isNotEmpty()) {
-                item { Section(R.string.s_rooms, R.string.rooms_text) }
-                items(rooms, key = { "room:$it" }) { room ->
-                    Setting(
-                        title = room,
-                        text = plural(R.plurals.devices, placed.count { it.room == room }),
-                        onClick = { editingRoom = room },
-                    )
-                }
-                item {
+                Section(R.string.s_rooms, R.string.rooms_text) {
+                    for (room in rooms) {
+                        Setting(
+                            title = room,
+                            text = plural(R.plurals.devices, placed.count { it.room == room }),
+                            onClick = { editingRoom = room },
+                        )
+                    }
                     Setting(title = str(R.string.room_new), onClick = { editingRoom = "" }, trailing = { AddIcon() })
-                }
-                if (state.rooms.isNotEmpty() || state.roomList.isNotEmpty()) {
-                    item { Setting(title = str(R.string.rooms_reset), onClick = { confirmRooms = true }) }
+                    if (state.rooms.isNotEmpty() || state.roomList.isNotEmpty()) {
+                        Setting(title = str(R.string.rooms_reset), onClick = { confirmRooms = true })
+                    }
                 }
 
-                item { Section(R.string.s_devices, R.string.devices_text) }
-                // Listed in their rooms as shown in the app, but moved as the devices Alexa knows.
-                items(state.devices, key = { it.applianceId }) { device ->
-                    val room = placed.first { it.applianceId == device.applianceId }.room
-                    DeviceRow(device, room, state, vm, onClick = { moving = device })
+                Section(R.string.s_devices, R.string.devices_text) {
+                    // Listed in their rooms as shown in the app, but moved as the devices Alexa knows.
+                    for (device in state.devices) {
+                        val room = placed.first { it.applianceId == device.applianceId }.room
+                        DeviceRow(device, room, state, vm, onClick = { moving = device })
+                    }
                 }
             }
 
             if (switchable.isNotEmpty()) {
-                item { Section(R.string.s_groups, R.string.groups_text) }
-                items(state.groups, key = { "group:${it.id}" }) { group ->
-                    Setting(
-                        title = group.name,
-                        text = plural(R.plurals.devices, switchable.count { it.applianceId in group.devices }),
-                        onClick = { editingGroup = group },
-                    )
-                }
-                item {
+                Section(R.string.s_groups, R.string.groups_text) {
+                    for (group in state.groups) {
+                        Setting(
+                            title = group.name,
+                            text = plural(R.plurals.devices, switchable.count { it.applianceId in group.devices }),
+                            onClick = { editingGroup = group },
+                        )
+                    }
                     Setting(
                         title = str(R.string.group_new),
                         onClick = { creatingGroup = true },
@@ -313,22 +344,14 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                     )
                 }
 
-                item { Section(R.string.s_shortcuts, R.string.shortcuts_text) }
-                item {
-                    val names = state.shortcuts?.mapNotNull { key ->
-                        val id = key.substringAfter(':')
-                        if (key.startsWith(SHORTCUT_GROUP)) {
-                            state.groups.find { it.id == id }?.name
-                        } else {
-                            switchable.find { it.applianceId == id }?.name
-                        }
-                    }
+                Section(R.string.s_shortcuts, R.string.shortcuts_text) {
+                    val chosen = state.shortcuts?.mapNotNull(::nameOf)
                     Setting(
                         title = str(R.string.shortcuts_choose),
                         text = when {
-                            names == null -> str(R.string.shortcuts_default)
-                            names.isEmpty() -> str(R.string.shortcuts_none)
-                            else -> names.joinToString(", ")
+                            chosen == null -> str(R.string.shortcuts_default)
+                            chosen.isEmpty() -> str(R.string.shortcuts_none)
+                            else -> chosen.joinToString(", ")
                         },
                         onClick = { choosingShortcuts = true },
                     )
@@ -336,114 +359,115 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             }
 
             if (state.devices.isNotEmpty()) {
-                val widget = state.widget
-                item { Section(R.string.s_widget, R.string.widget_text) }
-                item {
-                    val names = widget.items?.mapNotNull { key ->
-                        val id = key.substringAfter(':')
-                        if (key.startsWith(SHORTCUT_GROUP)) {
-                            state.groups.find { it.id == id }?.name
-                        } else {
-                            placed.find { it.applianceId == id }?.name
-                        }
-                    }
+                Section(R.string.s_widget, R.string.widget_text) {
+                    val widget = state.widget
+                    // What the widget shows now, in its order: the choice made, or the favorites.
+                    val shown = (widget.items ?: favoriteKeys).filter { nameOf(it) != null }
                     Setting(
                         title = str(R.string.widget_items),
                         text = when {
-                            names == null -> str(R.string.widget_items_default)
-                            names.isEmpty() -> str(R.string.widget_items_none)
-                            else -> names.joinToString(", ")
+                            widget.items == null -> str(R.string.widget_items_default)
+                            shown.isEmpty() -> str(R.string.widget_items_none)
+                            else -> shown.mapNotNull(::nameOf).joinToString(", ")
                         },
                         onClick = { choosingWidget = true },
                     )
-                }
-                item {
+                    if (shown.size > 1) {
+                        Text(
+                            str(R.string.widget_order),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                        )
+                        shown.forEachIndexed { index, key ->
+                            OrderRow(nameOf(key).orEmpty(), first = index == 0, last = index == shown.lastIndex) { by ->
+                                val moved = shown.toMutableList()
+                                moved.add(index + by, moved.removeAt(index))
+                                vm.setWidget(widget.copy(items = moved))
+                            }
+                        }
+                    }
                     Chips(R.string.widget_columns, (1..4).map { it to it.toString() }, widget.columns) {
                         vm.setWidget(widget.copy(columns = it))
                     }
-                }
-                item {
                     val sizes = listOf(R.string.widget_compact, R.string.widget_normal, R.string.widget_large)
                     Chips(R.string.widget_size, sizes.mapIndexed { i, label -> i to str(label) }, widget.size) {
                         vm.setWidget(widget.copy(size = it))
                     }
-                }
-                item {
                     Toggle(R.string.widget_status, R.string.widget_status_text, widget.status) {
                         vm.setWidget(widget.copy(status = it))
                     }
-                }
-                item {
                     Toggle(R.string.widget_header, R.string.widget_header_text, widget.header) {
                         vm.setWidget(widget.copy(header = it))
                     }
-                }
-                item {
                     Toggle(R.string.widget_transparent, R.string.widget_transparent_text, widget.transparent) {
                         vm.setWidget(widget.copy(transparent = it))
                     }
                 }
             }
 
-            item { Section(R.string.s_tiles, R.string.tiles_text) }
-            items(state.tileDevices.size) { slot ->
-                val name = names[state.tileDevices[slot]]
-                Setting(
-                    title = str(R.string.tile_slot, slot + 1),
-                    text = name ?: str(R.string.tile_free),
-                    trailing = {
-                        if (name != null) {
-                            IconButton(onClick = { vm.clearTile(slot) }) {
-                                Icon(Icons.Outlined.Close, contentDescription = str(R.string.tile_clear))
-                            }
-                        }
-                    },
-                )
-            }
-
-            if (timers.isNotEmpty()) {
-                item { Section(R.string.s_timers) }
-                items(timers.toList(), key = { "timer:${it.first}" }) { (id, at) ->
+            Section(R.string.s_tiles, R.string.tiles_text) {
+                state.tileDevices.forEachIndexed { slot, id ->
+                    val name = names[id]
                     Setting(
-                        title = names.getValue(id),
-                        text = str(R.string.turns_off_at, clock(at)),
+                        title = str(R.string.tile_slot, slot + 1),
+                        text = name ?: str(R.string.tile_free),
                         trailing = {
-                            IconButton(onClick = { vm.cancelTimer(id) }) {
-                                Icon(Icons.Outlined.Close, contentDescription = str(R.string.cancel_timer))
+                            if (name != null) {
+                                IconButton(onClick = { vm.clearTile(slot) }) {
+                                    Icon(Icons.Outlined.Close, contentDescription = str(R.string.tile_clear))
+                                }
                             }
                         },
                     )
+                }
+            }
+
+            if (timers.isNotEmpty()) {
+                Section(R.string.s_timers) {
+                    for ((id, at) in timers) {
+                        Setting(
+                            title = names.getValue(id),
+                            text = str(R.string.turns_off_at, clock(at)),
+                            trailing = {
+                                IconButton(onClick = { vm.cancelTimer(id) }) {
+                                    Icon(Icons.Outlined.Close, contentDescription = str(R.string.cancel_timer))
+                                }
+                            },
+                        )
+                    }
                 }
             }
 
             if (alerts.isNotEmpty()) {
-                item { Section(R.string.s_alerts) }
-                items(alerts.toList(), key = { "alert:${it.first}" }) { (id, alert) ->
-                    val thresholds = listOfNotNull(
-                        alert.above?.let { str(R.string.alert_above, degrees(it)) },
-                        alert.below?.let { str(R.string.alert_below, degrees(it)) },
-                    )
-                    Setting(
-                        title = names.getValue(id),
-                        text = thresholds.joinToString(" · "),
-                        trailing = {
-                            IconButton(onClick = { vm.clearAlert(id) }) {
-                                Icon(Icons.Outlined.Close, contentDescription = str(R.string.alert_remove))
-                            }
-                        },
-                    )
+                Section(R.string.s_alerts) {
+                    for ((id, alert) in alerts) {
+                        val thresholds = listOfNotNull(
+                            alert.above?.let { str(R.string.alert_above, degrees(it)) },
+                            alert.below?.let { str(R.string.alert_below, degrees(it)) },
+                        )
+                        Setting(
+                            title = names.getValue(id),
+                            text = thresholds.joinToString(" · "),
+                            trailing = {
+                                IconButton(onClick = { vm.clearAlert(id) }) {
+                                    Icon(Icons.Outlined.Close, contentDescription = str(R.string.alert_remove))
+                                }
+                            },
+                        )
+                    }
                 }
             }
 
-            item { Section(R.string.s_backup, R.string.backup_text) }
-            item { Setting(title = str(R.string.backup_export), onClick = { export.launch(BACKUP_FILE) }) }
-            item { Setting(title = str(R.string.backup_import), onClick = { import.launch(BACKUP_TYPES) }) }
+            Section(R.string.s_backup, R.string.backup_text) {
+                Setting(title = str(R.string.backup_export), onClick = { export.launch(BACKUP_FILE) })
+                Setting(title = str(R.string.backup_import), onClick = { import.launch(BACKUP_TYPES) })
+            }
 
-            item { Section(R.string.s_data) }
-            item { Setting(title = str(R.string.history_clear), onClick = { confirmClear = true }) }
+            Section(R.string.s_data) {
+                Setting(title = str(R.string.history_clear), onClick = { confirmClear = true })
+            }
 
-            item { Section(R.string.s_account) }
-            item {
+            Section(R.string.s_account) {
                 Setting(
                     title = str(R.string.sign_out),
                     text = str(R.string.account_marketplace, state.marketplace.domain),
@@ -451,8 +475,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 )
             }
 
-            item { Section(R.string.s_about) }
-            item {
+            Section(R.string.s_about) {
                 Setting(
                     title = str(R.string.about_source),
                     text = str(R.string.installed_version, vm.installedVersion),
@@ -461,6 +484,64 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             }
         }
     }
+}
+
+/** A section of the settings that opens and closes on a tap of its title. */
+@Composable
+private fun Accordion(
+    @StringRes title: Int,
+    @StringRes text: Int?,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val turn by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(20.dp)) {
+        Column {
+            Row(
+                Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(horizontal = 16.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(str(title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Icon(Icons.Outlined.ExpandMore, contentDescription = null, modifier = Modifier.rotate(turn))
+            }
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                Column(Modifier.padding(bottom = 8.dp)) {
+                    if (text != null) {
+                        Text(
+                            str(text),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
+                        )
+                    }
+                    content()
+                }
+            }
+        }
+    }
+}
+
+/** An entry of an ordered list, with the arrows that move it one place up or down. */
+@Composable
+private fun OrderRow(name: String, first: Boolean, last: Boolean, onMove: (Int) -> Unit) {
+    Setting(
+        title = name,
+        trailing = {
+            Row {
+                IconButton(onClick = { onMove(-1) }, enabled = !first) {
+                    Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = str(R.string.move_up))
+                }
+                IconButton(onClick = { onMove(1) }, enabled = !last) {
+                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = str(R.string.move_down))
+                }
+            }
+        },
+    )
 }
 
 /** A setting with a handful of values, all in sight. */
@@ -492,24 +573,6 @@ private fun AddIcon() {
 }
 
 @Composable
-private fun Section(@StringRes title: Int, @StringRes text: Int? = null) {
-    Text(
-        str(title),
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 4.dp),
-    )
-    if (text != null) {
-        Text(
-            str(text),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-    }
-}
-
-@Composable
 private fun Setting(
     title: String,
     text: String? = null,
@@ -520,6 +583,8 @@ private fun Setting(
         headlineContent = { Text(title) },
         supportingContent = text?.let { { Text(it) } },
         trailingContent = trailing,
+        // Transparent, to sit on the card of its section.
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
     )
 }
@@ -533,6 +598,7 @@ private fun DeviceRow(device: Device, room: String?, state: UiState, vm: HomeVie
     ListItem(
         headlineContent = { Text(device.name) },
         supportingContent = { Text(room ?: str(R.string.room_none)) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier.clickable(onClick = onClick),
         trailingContent = {
             Row {
