@@ -95,6 +95,19 @@ gh release create "$tag" "$apk" \
     --title "Hommaterial $version_name" \
     --generate-notes || fail "Pubblicazione non riuscita"
 
+# Dopo una pubblicazione riuscita si eliminano le release precedenti, tag compresi.
+echo
+echo "Eliminazione delle vecchie release..."
+old_tags=$(gh release list --repo "$REPO" --limit 1000 --json tagName --jq '.[].tagName')
+for old_tag in $old_tags; do
+    [ "$old_tag" = "$tag" ] && continue
+    if gh release delete "$old_tag" --repo "$REPO" --yes --cleanup-tag >/dev/null 2>&1; then
+        echo "  eliminata $old_tag"
+    else
+        echo "  impossibile eliminare $old_tag"
+    fi
+done
+
 echo
 echo "Fatto: https://github.com/$REPO/releases/tag/$tag"
 finish 0
