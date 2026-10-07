@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 internal const val EXTRA_APPLIANCE_ID = "applianceId"
+internal const val EXTRA_GROUP_ID = "groupId"
 
 /** How a command sent from outside the app ended, with the sentence to show for it. */
 class Outcome(val ok: Boolean, val message: String, val noConnection: Boolean = false)
@@ -58,7 +59,7 @@ object Quick {
         val cache = Cache(context)
         val device = cache.devices().find { it.applianceId == applianceId && it.hasPower }
             ?: return Outcome(false, str(R.string.quick_not_found))
-        return try {
+        return attempt {
             val on = target(device)
             Alexa.get(context).api.setPower(device, on)
             val known = cache.states()
@@ -66,6 +67,47 @@ object Quick {
             cache.putStates(known + (applianceId to state))
             refresh(context)
             Outcome(true, str(if (on) R.string.quick_on else R.string.quick_off, device.name))
+        }
+    }
+
+    /** Switches a whole group: off if any of its devices is on, according to Alexa, on otherwise. */
+    suspend fun toggleGroup(context: Context, groupId: String): Outcome {
+        val cache = Cache(context)
+        val group = cache.groups().find { it.id == groupId }
+        val hidden = cache.hidden()
+        val devices = cache.devices().filter {
+            it.hasPower && it.applianceId in group?.devices.orEmpty() && it.applianceId !in hidden
+        }
+        if (group == null || devices.isEmpty()) return Outcome(false, str(R.string.quick_group_not_found))
+        return attempt {
+            val api = Alexa.get(context).api
+            val fresh = api.states(devices)
+            val on = devices.none { fresh[it.applianceId]?.power == true }
+            val switched = HashMap<String, DeviceState>()
+            var refused: Exception? = null
+            for (device in devices.filter { fresh[it.applianceId]?.power != on }) {
+                // One device that does not answer must not keep the others from switching.
+                try {
+                    api.setPower(device, on)
+                    switched[device.applianceId] = (fresh[device.applianceId] ?: DeviceState()).copy(power = on)
+                } catch (e: IOException) {
+                    throw e
+                } catch (e: NotLoggedInException) {
+                    throw e
+                } catch (e: Exception) {
+                    refused = e
+                }
+            }
+            cache.putStates(cache.states() + fresh + switched)
+            refresh(context)
+            refused?.let { Outcome(false, it.message ?: str(R.string.something_wrong)) }
+                ?: Outcome(true, str(if (on) R.string.quick_on else R.string.quick_off, group.name))
+        }
+    }
+
+    private suspend fun attempt(block: suspend () -> Outcome): Outcome =
+        try {
+            block()
         } catch (e: CancellationException) {
             throw e
         } catch (e: NotLoggedInException) {
@@ -75,7 +117,6 @@ object Quick {
         } catch (e: Exception) {
             Outcome(false, e.message ?: str(R.string.something_wrong))
         }
-    }
 
     /** Fetches the current state of favorites and sensors, for the widget; failures leave things as they are. */
     suspend fun fetchFavorites(context: Context) {
@@ -112,12 +153,15 @@ object Quick {
 /** Target of the taps that toggle a device without opening the app. */
 class ToggleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val id = intent.getStringExtra(EXTRA_APPLIANCE_ID) ?: return
+        val device = intent.getStringExtra(EXTRA_APPLIANCE_ID)
+        val group = intent.getStringExtra(EXTRA_GROUP_ID)
+        if (device == null && group == null) return
         val app = context.applicationContext
         val pending = goAsync()
         Quick.scope.launch {
             try {
-                Toast.makeText(app, Quick.toggle(app, id).message, Toast.LENGTH_SHORT).show()
+                val outcome = if (device != null) Quick.toggle(app, device) else Quick.toggleGroup(app, group!!)
+                Toast.makeText(app, outcome.message, Toast.LENGTH_SHORT).show()
             } finally {
                 pending.finish()
             }

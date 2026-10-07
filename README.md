@@ -57,8 +57,7 @@ collegati al proprio account Alexa.
   timer di spegnimento, luminosità e colore per le luci che li supportano.
 - I timer in corso stanno in una sezione in cima alla lista, con il conto
   alla rovescia, ordinati dal più vicino allo spegnimento.
-- I preferiti stanno in cima alla lista, in un widget per la schermata Home e
-  sotto l'icona dell'app, tenendola premuta.
+- I preferiti stanno in cima alla lista e in un widget per la schermata Home.
 - Fino a cinque dispositivi a scelta si comandano dalle Impostazioni rapide di
   Android, ognuno con il suo riquadro.
 - Dall'intestazione di una stanza si accende o spegne tutto in una volta.
@@ -78,8 +77,11 @@ collegati al proprio account Alexa.
 - Dal menu si aprono le Impostazioni: notifiche, lingua, aggiornamenti,
   stanze, preferiti e dispositivi nascosti, riquadri, timer e avvisi attivi,
   e il backup su file delle proprie scelte.
-- Le stanze si possono riorganizzare dentro l'app, spostando i dispositivi,
-  creandone di nuove o rinominandole, senza cambiare niente in Alexa.
+- Le stanze si possono riorganizzare dentro l'app, creandone quante se ne
+  vuole e scegliendo i dispositivi di ognuna, senza cambiare niente in Alexa.
+- I gruppi accendono o spengono insieme più dispositivi di stanze diverse.
+- Sotto l'icona dell'app, tenendola premuta, compaiono i dispositivi e i
+  gruppi scelti nelle Impostazioni, oppure i preferiti.
 
 Non fa altro, di proposito: niente routine, niente assistente sempre in
 ascolto, niente musica. La voce la trascrive il riconoscimento vocale del

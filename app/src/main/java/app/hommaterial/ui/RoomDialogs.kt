@@ -3,11 +3,15 @@ package app.hommaterial.ui
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -78,25 +82,125 @@ private fun Choice(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+/** A device offered in a list of choices, with a line saying where it is now. */
+class Pick(val key: String, val label: String, val hint: String? = null)
+
+/**
+ * Edits a room or a group: its name and which of the [picks] belong to it. [onDelete] is null
+ * for what cannot be deleted, such as the rooms that come from Alexa.
+ */
 @Composable
-fun RoomRename(room: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
-    var name by remember { mutableStateOf(room) }
+fun MembersDialog(
+    title: String,
+    hint: String,
+    name: String,
+    picks: List<Pick>,
+    members: Set<String>,
+    onSave: (String, Set<String>) -> Unit,
+    onDelete: (() -> Unit)?,
+    onDismiss: () -> Unit,
+) {
+    var typed by remember { mutableStateOf(name) }
+    var chosen by remember { mutableStateOf(members) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(str(R.string.room_rename_title, room)) },
+        title = { Text(title) },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text(str(R.string.room_name)) },
-                singleLine = true,
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onRename(name.trim()) }, enabled = name.isNotBlank() && name.trim() != room) {
-                Text(str(R.string.room_rename))
+            Column {
+                OutlinedTextField(
+                    value = typed,
+                    onValueChange = { typed = it },
+                    label = { Text(str(R.string.room_name)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    hint,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                )
+                Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+                    for (pick in picks) {
+                        Check(pick, checked = pick.key in chosen) {
+                            chosen = if (it) chosen + pick.key else chosen - pick.key
+                        }
+                    }
+                }
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
+        confirmButton = {
+            TextButton(onClick = { onSave(typed.trim(), chosen) }, enabled = typed.isNotBlank()) {
+                Text(str(R.string.save))
+            }
+        },
+        dismissButton = {
+            Row {
+                if (onDelete != null) TextButton(onClick = onDelete) { Text(str(R.string.delete)) }
+                TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) }
+            }
+        },
     )
+}
+
+/**
+ * Chooses what is listed under the app icon, [limit] entries at most, in the order they are
+ * ticked. [onSave] receives null when the user goes back to the favorites.
+ */
+@Composable
+fun ShortcutsDialog(
+    picks: List<Pick>,
+    initial: List<String>,
+    limit: Int,
+    onSave: (List<String>?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var chosen by remember { mutableStateOf(initial.filter { key -> picks.any { it.key == key } }) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.shortcuts_choose)) },
+        text = {
+            Column {
+                Text(
+                    str(R.string.shortcuts_count, chosen.size, limit),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                    for (pick in picks) {
+                        val checked = pick.key in chosen
+                        Check(pick, checked, enabled = checked || chosen.size < limit) {
+                            chosen = if (it) chosen + pick.key else chosen - pick.key
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(chosen) }) { Text(str(R.string.save)) } },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { onSave(null) }) { Text(str(R.string.shortcuts_use_favorites)) }
+                TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) }
+            }
+        },
+    )
+}
+
+@Composable
+private fun Check(pick: Pick, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().toggleable(checked, enabled = enabled, role = Role.Checkbox, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled, modifier = Modifier.padding(12.dp))
+        Column {
+            Text(pick.label)
+            if (pick.hint != null) {
+                Text(
+                    pick.hint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }

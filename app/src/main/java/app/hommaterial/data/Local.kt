@@ -3,10 +3,10 @@ package app.hommaterial.data
 import android.content.Context
 import android.content.SharedPreferences
 import app.hommaterial.quick.PowerTile
+import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 /** One client for the whole process, so that the app and what runs outside it share the session. */
 class Alexa private constructor(context: Context) {
@@ -54,6 +54,39 @@ class Cache(context: Context) {
     }.getOrDefault(emptyMap())
 
     fun putRooms(rooms: Map<String, String>) = prefs.edit().putString("rooms", JSONObject(rooms).toString()).apply()
+
+    /** The rooms the user created, which exist even while no device is in them. */
+    fun roomList(): List<String> = strings("roomList")
+
+    fun putRoomList(rooms: List<String>) = prefs.edit().putString("roomList", JSONArray(rooms).toString()).apply()
+
+    fun groups(): List<Group> = runCatching {
+        JSONArray(prefs.getString("groups", "[]")).mapObjects(Group::fromJson)
+    }.getOrDefault(emptyList())
+
+    fun putGroups(groups: List<Group>) =
+        prefs.edit().putString("groups", JSONArray(groups.map { it.toJson() }).toString()).apply()
+
+    /**
+     * What is listed under the app icon, in order: "device:" or "group:" followed by an id. Null
+     * until the user chooses, and the favorites are listed instead.
+     */
+    fun shortcuts(): List<String>? = if (prefs.contains("shortcuts")) strings("shortcuts") else null
+
+    fun putShortcuts(shortcuts: List<String>?) {
+        val editor = prefs.edit()
+        if (shortcuts == null) {
+            editor.remove("shortcuts")
+        } else {
+            editor.putString("shortcuts", JSONArray(shortcuts).toString())
+        }
+        editor.apply()
+    }
+
+    private fun strings(key: String): List<String> = runCatching {
+        val json = JSONArray(prefs.getString(key, "[]"))
+        (0 until json.length()).map { json.getString(it) }
+    }.getOrDefault(emptyList())
 
     /** applianceId of the device driven by each quick settings tile, null for the free ones. */
     fun tileDevices(): List<String?> = List(PowerTile.SLOTS) { prefs.getString("tileDevice$it", null) }

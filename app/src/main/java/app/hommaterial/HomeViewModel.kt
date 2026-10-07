@@ -14,6 +14,7 @@ import app.hommaterial.data.Cache
 import app.hommaterial.data.ColorChoice
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
+import app.hommaterial.data.Group
 import app.hommaterial.data.History
 import app.hommaterial.data.LoginAttempt
 import app.hommaterial.data.Marketplace
@@ -21,6 +22,7 @@ import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Reading
 import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
+import app.hommaterial.data.mapObjects
 import app.hommaterial.data.toJsonArray
 import app.hommaterial.quick.Alert
 import app.hommaterial.quick.Alerts
@@ -31,6 +33,7 @@ import app.hommaterial.str
 import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
 import app.hommaterial.voice.parseVoice
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,6 +63,11 @@ data class UiState(
     val hidden: Set<String> = emptySet(),
     /** The room the user moved each device to: a name, or an empty text for no room. */
     val rooms: Map<String, String> = emptyMap(),
+    /** The rooms the user created, which exist even while no device is in them. */
+    val roomList: List<String> = emptyList(),
+    val groups: List<Group> = emptyList(),
+    /** What is listed under the app icon, or null for the favorites. See [Cache.shortcuts]. */
+    val shortcuts: List<String>? = null,
     val showHidden: Boolean = false,
     /** applianceIds repeated in the section at the top of the list. */
     val favorites: Set<String> = emptySet(),
@@ -142,6 +150,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             updatedAt = cache.getLong("updatedAt", 0).takeIf { it > 0 },
             hidden = local.hidden(),
             rooms = local.rooms(),
+            roomList = local.roomList(),
+            groups = local.groups(),
+            shortcuts = local.shortcuts(),
             favorites = local.favorites(),
             tileDevices = local.tileDevices(),
             timers = Timers.all(getApplication()),
@@ -274,7 +285,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         api.setBrightness(device, percent)
     }
 
-    /** Switches every device of a room that is not already in the requested state. */
+    /** Switches every device of a room or group that is not already in the requested state. */
     fun setRoomPower(devices: List<Device>, on: Boolean) {
         val s = _state.value
         devices
@@ -385,17 +396,71 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         saveRooms(if (room == null) rooms - device.applianceId else rooms + (device.applianceId to room))
     }
 
-    /** Gives another name to a room, moving there all the devices that are in it. */
-    fun renameRoom(room: String, name: String) {
+    /**
+     * Creates the room [name] or edits the room [old]: gives it the name [name] and puts in it
+     * exactly the devices in [members]. Those taken out go back to their Alexa room.
+     */
+    fun saveRoom(old: String?, name: String, members: Set<String>) {
         val s = _state.value
-        saveRooms(s.rooms + s.placed.filter { it.room == room }.associate { it.applianceId to name })
+        val rooms = s.rooms.toMutableMap()
+        for (device in s.devices) {
+            val id = device.applianceId
+            val wasIn = old != null && (rooms[id] ?: device.room) == old
+            when {
+                id in members && device.room == name -> rooms.remove(id)
+                id in members -> rooms[id] = name
+                // Out of its own Alexa room a device can only go to no room at all.
+                wasIn && device.room == old -> rooms[id] = ""
+                wasIn -> rooms.remove(id)
+            }
+        }
+        val list = (s.roomList.map { if (it == old) name else it } + name).distinct()
+        saveRooms(rooms, list)
     }
 
-    fun resetRooms() = saveRooms(emptyMap())
+    /** Removes a room created in the app; its devices go back to their Alexa room. */
+    fun deleteRoom(room: String) {
+        val s = _state.value
+        saveRooms(s.rooms.filterValues { it != room }, s.roomList - room)
+    }
 
-    private fun saveRooms(rooms: Map<String, String>) {
+    fun resetRooms() = saveRooms(emptyMap(), emptyList())
+
+    private fun saveRooms(rooms: Map<String, String>, list: List<String> = _state.value.roomList) {
         local.putRooms(rooms)
-        _state.update { it.copy(rooms = rooms) }
+        local.putRoomList(list)
+        _state.update { it.copy(rooms = rooms, roomList = list) }
+    }
+
+    /** Creates a group, when [id] is null, or changes its name and devices. */
+    fun saveGroup(id: String?, name: String, members: Set<String>) {
+        val groups = _state.value.groups
+        val group = Group(id ?: UUID.randomUUID().toString(), name, members)
+        saveGroups(if (id == null) groups + group else groups.map { if (it.id == id) group else it })
+    }
+
+    fun deleteGroup(id: String) = saveGroups(_state.value.groups.filter { it.id != id })
+
+    private fun saveGroups(groups: List<Group>) {
+        local.putGroups(groups)
+        _state.update { it.copy(groups = groups) }
+        Quick.refresh(getApplication())
+    }
+
+    /** Switches a group off if any of its devices is on, on otherwise. */
+    fun toggleGroup(group: Group) {
+        val s = _state.value
+        val devices = s.devices.filter {
+            it.hasPower && it.applianceId in group.devices && it.applianceId !in s.hidden
+        }
+        setRoomPower(devices, on = devices.none { s.states[it.applianceId]?.power == true })
+    }
+
+    /** Chooses what is listed under the app icon; null goes back to the favorites. */
+    fun setShortcuts(shortcuts: List<String>?) {
+        local.putShortcuts(shortcuts)
+        _state.update { it.copy(shortcuts = shortcuts) }
+        Quick.refresh(getApplication())
     }
 
     fun clearTile(slot: Int) {
@@ -429,6 +494,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("favorites", JSONArray(s.favorites))
             .put("hidden", JSONArray(s.hidden))
             .put("rooms", JSONObject(s.rooms))
+            .put("roomList", JSONArray(s.roomList))
+            .put("groups", JSONArray(s.groups.map { it.toJson() }))
+            .put("shortcuts", s.shortcuts?.let { JSONArray(it) } ?: JSONObject.NULL)
             .put("tiles", JSONArray(s.tileDevices.map { it ?: JSONObject.NULL }))
             .put("alerts", alerts)
             .put("autoUpdate", s.autoUpdate)
@@ -465,6 +533,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 .apply()
             val rooms = backup.optJSONObject("rooms") ?: JSONObject()
             local.putRooms(rooms.keys().asSequence().associateWith { rooms.getString(it) })
+            fun list(name: String) =
+                backup.optJSONArray(name)?.let { a -> (0 until a.length()).map { a.getString(it) } }
+            local.putRoomList(list("roomList").orEmpty())
+            local.putGroups(backup.optJSONArray("groups")?.mapObjects(Group::fromJson).orEmpty())
+            local.putShortcuts(list("shortcuts"))
             val tiles = backup.optJSONArray("tiles")
             for (slot in 0 until PowerTile.SLOTS) {
                 local.putTileDevice(slot, tiles?.optString(slot)?.takeIf { it.isNotEmpty() && !tiles.isNull(slot) })
@@ -488,6 +561,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     favorites = local.favorites(),
                     hidden = local.hidden(),
                     rooms = local.rooms(),
+                    roomList = local.roomList(),
+                    groups = local.groups(),
+                    shortcuts = local.shortcuts(),
                     tileDevices = local.tileDevices(),
                     alerts = Alerts.all(app),
                     autoUpdate = settings.getBoolean("autoUpdate", true),

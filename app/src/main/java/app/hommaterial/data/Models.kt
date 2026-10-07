@@ -79,6 +79,22 @@ data class DeviceState(
     }
 }
 
+/** Devices of any room that the user switches together; [devices] holds their applianceIds. */
+data class Group(val id: String, val name: String, val devices: Set<String>) {
+    fun toJson(): JSONObject = JSONObject().put("id", id).put("name", name).put("devices", JSONArray(devices))
+
+    companion object {
+        fun fromJson(o: JSONObject): Group {
+            val devices = o.getJSONArray("devices")
+            return Group(
+                id = o.getString("id"),
+                name = o.getString("name"),
+                devices = (0 until devices.length()).map { devices.getString(it) }.toSet(),
+            )
+        }
+    }
+}
+
 /** The line shown under a device name, in the app and in the widget. */
 fun statusText(device: Device, state: DeviceState?): String = when {
     state == null -> "…"

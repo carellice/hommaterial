@@ -13,28 +13,45 @@ import app.hommaterial.str
 
 private const val ACTION_TOGGLE = "app.hommaterial.action.TOGGLE"
 // Launchers show four shortcuts at most.
-private const val MAX_SHORTCUTS = 4
+internal const val MAX_SHORTCUTS = 4
 
-/** Lists the favorites under the app icon; a tap on one toggles it. */
+internal const val SHORTCUT_DEVICE = "device:"
+internal const val SHORTCUT_GROUP = "group:"
+
+/**
+ * Lists under the app icon the devices and groups the user chose, or the favorites until a choice
+ * is made; a tap on one toggles it.
+ */
 internal fun publishShortcuts(context: Context) {
     val manager = context.getSystemService(ShortcutManager::class.java) ?: return
     val cache = Cache(context)
-    val favorites = cache.favorites()
     val hidden = cache.hidden()
-    val shortcuts = cache.devices()
-        .filter { it.hasPower && it.applianceId in favorites && it.applianceId !in hidden }
+    val devices = cache.devices().filter { it.hasPower && it.applianceId !in hidden }
+    val groups = cache.groups()
+    val chosen = cache.shortcuts() ?: run {
+        val favorites = cache.favorites()
+        devices.filter { it.applianceId in favorites }.map { SHORTCUT_DEVICE + it.applianceId }
+    }
+    val shortcuts = chosen
+        .mapNotNull { key ->
+            // Devices and groups that are gone leave their place to the next ones.
+            val id = key.substringAfter(':')
+            val intent = Intent(context, ToggleActivity::class.java).setAction(ACTION_TOGGLE)
+            if (key.startsWith(SHORTCUT_GROUP)) {
+                groups.find { it.id == id }?.let { Triple(key, it.name, intent.putExtra(EXTRA_GROUP_ID, id)) }
+            } else {
+                devices.find { it.applianceId == id }
+                    ?.let { Triple(key, it.name, intent.putExtra(EXTRA_APPLIANCE_ID, id)) }
+            }
+        }
         .take(minOf(MAX_SHORTCUTS, manager.maxShortcutCountPerActivity))
-        .mapIndexed { rank, device ->
-            ShortcutInfo.Builder(context, device.applianceId)
-                .setShortLabel(device.name)
-                .setLongLabel(str(R.string.shortcut_long, device.name))
+        .mapIndexed { rank, (key, name, intent) ->
+            ShortcutInfo.Builder(context, key)
+                .setShortLabel(name)
+                .setLongLabel(str(R.string.shortcut_long, name))
                 .setIcon(Icon.createWithResource(context, R.drawable.ic_shortcut_power))
                 .setRank(rank)
-                .setIntent(
-                    Intent(context, ToggleActivity::class.java)
-                        .setAction(ACTION_TOGGLE)
-                        .putExtra(EXTRA_APPLIANCE_ID, device.applianceId),
-                )
+                .setIntent(intent)
                 .build()
         }
     // The system limits how often an app in the background may publish; the next call catches up.
@@ -45,9 +62,11 @@ internal fun publishShortcuts(context: Context) {
 class ToggleActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        intent.getStringExtra(EXTRA_APPLIANCE_ID)?.let {
-            sendBroadcast(Intent(this, ToggleReceiver::class.java).putExtra(EXTRA_APPLIANCE_ID, it))
-        }
+        sendBroadcast(
+            Intent(this, ToggleReceiver::class.java)
+                .putExtra(EXTRA_APPLIANCE_ID, intent.getStringExtra(EXTRA_APPLIANCE_ID))
+                .putExtra(EXTRA_GROUP_ID, intent.getStringExtra(EXTRA_GROUP_ID)),
+        )
         finish()
     }
 }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Visibility
@@ -53,8 +54,12 @@ import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.UiState
 import app.hommaterial.data.Device
+import app.hommaterial.data.Group
 import app.hommaterial.plural
 import app.hommaterial.quick.Alerts
+import app.hommaterial.quick.MAX_SHORTCUTS
+import app.hommaterial.quick.SHORTCUT_DEVICE
+import app.hommaterial.quick.SHORTCUT_GROUP
 import app.hommaterial.quick.clock
 import app.hommaterial.quick.degrees
 import app.hommaterial.str
@@ -78,9 +83,15 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     var confirmRooms by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf<Device?>(null) }
-    var renaming by remember { mutableStateOf<String?>(null) }
+    // The room or group being edited; an empty name or a null group stand for a new one.
+    var editingRoom by remember { mutableStateOf<String?>(null) }
+    var editingGroup by remember { mutableStateOf<Group?>(null) }
+    var creatingGroup by remember { mutableStateOf(false) }
+    var choosingShortcuts by remember { mutableStateOf(false) }
     val placed = state.placed
-    val rooms = placed.mapNotNull { it.room }.distinct().sortedBy { it.lowercase() }
+    val noRoom = str(R.string.room_none)
+    val rooms = (placed.mapNotNull { it.room } + state.roomList).distinct().sortedBy { it.lowercase() }
+    val switchable = placed.filter { it.hasPower }
     moving?.let { device ->
         RoomPicker(
             device = device,
@@ -90,8 +101,43 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             onDismiss = { moving = null },
         )
     }
-    renaming?.let { room ->
-        RoomRename(room, onRename = { vm.renameRoom(room, it); renaming = null }, onDismiss = { renaming = null })
+    editingRoom?.let { room ->
+        val old = room.ifEmpty { null }
+        MembersDialog(
+            title = str(if (old == null) R.string.room_new else R.string.room_edit_title),
+            hint = str(R.string.room_devices_hint),
+            name = room,
+            picks = placed.map { Pick(it.applianceId, it.name, it.room ?: noRoom) },
+            members = placed.filter { old != null && it.room == old }.map { it.applianceId }.toSet(),
+            onSave = { name, members -> vm.saveRoom(old, name, members); editingRoom = null },
+            // Only the rooms made here can go: those of Alexa come back as long as devices are in them.
+            onDelete = if (room in state.roomList) { { vm.deleteRoom(room); editingRoom = null } } else null,
+            onDismiss = { editingRoom = null },
+        )
+    }
+    if (creatingGroup || editingGroup != null) {
+        val group = editingGroup
+        val close = { creatingGroup = false; editingGroup = null }
+        MembersDialog(
+            title = str(if (group == null) R.string.group_new else R.string.group_edit_title),
+            hint = str(R.string.group_devices_hint),
+            name = group?.name.orEmpty(),
+            picks = switchable.map { Pick(it.applianceId, it.name, it.room ?: noRoom) },
+            members = group?.devices.orEmpty(),
+            onSave = { name, members -> vm.saveGroup(group?.id, name, members); close() },
+            onDelete = group?.let { { vm.deleteGroup(it.id); close() } },
+            onDismiss = close,
+        )
+    }
+    if (choosingShortcuts) {
+        ShortcutsDialog(
+            picks = state.groups.map { Pick(SHORTCUT_GROUP + it.id, it.name, str(R.string.group_edit_title)) } +
+                switchable.map { Pick(SHORTCUT_DEVICE + it.applianceId, it.name, it.room ?: noRoom) },
+            initial = state.shortcuts.orEmpty(),
+            limit = MAX_SHORTCUTS,
+            onSave = { vm.setShortcuts(it); choosingShortcuts = false },
+            onDismiss = { choosingShortcuts = false },
+        )
     }
     if (confirmRooms) {
         ConfirmDialog(
@@ -215,10 +261,13 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                     Setting(
                         title = room,
                         text = plural(R.plurals.devices, placed.count { it.room == room }),
-                        onClick = { renaming = room },
+                        onClick = { editingRoom = room },
                     )
                 }
-                if (state.rooms.isNotEmpty()) {
+                item {
+                    Setting(title = str(R.string.room_new), onClick = { editingRoom = "" }, trailing = { AddIcon() })
+                }
+                if (state.rooms.isNotEmpty() || state.roomList.isNotEmpty()) {
                     item { Setting(title = str(R.string.rooms_reset), onClick = { confirmRooms = true }) }
                 }
 
@@ -227,6 +276,45 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 items(state.devices, key = { it.applianceId }) { device ->
                     val room = placed.first { it.applianceId == device.applianceId }.room
                     DeviceRow(device, room, state, vm, onClick = { moving = device })
+                }
+            }
+
+            if (switchable.isNotEmpty()) {
+                item { Section(R.string.s_groups, R.string.groups_text) }
+                items(state.groups, key = { "group:${it.id}" }) { group ->
+                    Setting(
+                        title = group.name,
+                        text = plural(R.plurals.devices, switchable.count { it.applianceId in group.devices }),
+                        onClick = { editingGroup = group },
+                    )
+                }
+                item {
+                    Setting(
+                        title = str(R.string.group_new),
+                        onClick = { creatingGroup = true },
+                        trailing = { AddIcon() },
+                    )
+                }
+
+                item { Section(R.string.s_shortcuts, R.string.shortcuts_text) }
+                item {
+                    val names = state.shortcuts?.mapNotNull { key ->
+                        val id = key.substringAfter(':')
+                        if (key.startsWith(SHORTCUT_GROUP)) {
+                            state.groups.find { it.id == id }?.name
+                        } else {
+                            switchable.find { it.applianceId == id }?.name
+                        }
+                    }
+                    Setting(
+                        title = str(R.string.shortcuts_choose),
+                        text = when {
+                            names == null -> str(R.string.shortcuts_default)
+                            names.isEmpty() -> str(R.string.shortcuts_none)
+                            else -> names.joinToString(", ")
+                        },
+                        onClick = { choosingShortcuts = true },
+                    )
                 }
             }
 
@@ -306,6 +394,11 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun AddIcon() {
+    Icon(Icons.Outlined.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable

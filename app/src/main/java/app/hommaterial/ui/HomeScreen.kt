@@ -41,6 +41,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DevicesOther
+import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Power
@@ -98,6 +99,7 @@ import app.hommaterial.data.COLOR_CHOICES
 import app.hommaterial.data.ColorChoice
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
+import app.hommaterial.data.Group
 import app.hommaterial.data.WHITE_CHOICES
 import app.hommaterial.data.statusText
 import app.hommaterial.label
@@ -177,6 +179,20 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                     }
                     items(favorites, key = { "favorite:${it.applianceId}" }) { DeviceTile(it, state, vm) }
                 }
+                // Hidden devices do not count for a group, as they do not for a room.
+                val groups = state.groups.map { group ->
+                    group to state.devices.filter {
+                        it.hasPower && it.applianceId in group.devices && it.applianceId !in state.hidden
+                    }
+                }.filter { it.second.isNotEmpty() }
+                if (groups.isNotEmpty()) {
+                    item(key = "groups", span = { GridItemSpan(maxLineSpan) }) {
+                        SectionHeader(str(R.string.s_groups))
+                    }
+                    items(groups, key = { "group:${it.first.id}" }) { (group, devices) ->
+                        GroupTile(group, devices, state) { vm.toggleGroup(group) }
+                    }
+                }
                 for ((room, devices) in rooms) {
                     item(key = "room:$room", span = { GridItemSpan(maxLineSpan) }) {
                         // The devices without a room are unrelated: switching them together makes no sense.
@@ -248,6 +264,52 @@ private fun DeviceTile(device: Device, state: UiState, vm: HomeViewModel) {
         alert = state.alerts[device.applianceId] ?: Alert(),
         vm = vm,
     )
+}
+
+/** A group as one tile: lit while any of its devices is on, and a tap switches them all. */
+@Composable
+private fun GroupTile(group: Group, devices: List<Device>, state: UiState, onToggle: () -> Unit) {
+    val lit = devices.count { state.states[it.applianceId]?.power == true }
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        color = if (lit > 0) colors.primaryContainer else colors.surfaceContainerHigh,
+        contentColor = if (lit > 0) colors.onPrimaryContainer else colors.onSurface,
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TILE_HEIGHT)
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onToggle),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Layers, contentDescription = null, modifier = Modifier.size(26.dp))
+                Spacer(Modifier.weight(1f))
+                if (devices.any { it.applianceId in state.busy }) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                group.name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                when (lit) {
+                    0 -> str(R.string.off)
+                    devices.size -> str(R.string.on)
+                    else -> str(R.string.group_some_on, lit, devices.size)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.alpha(0.75f),
+            )
+        }
+    }
 }
 
 /** A device with a switch-off timer and the time left, counted down second by second. */
