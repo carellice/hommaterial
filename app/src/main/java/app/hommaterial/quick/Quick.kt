@@ -5,12 +5,15 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.glance.appwidget.updateAll
+import app.hommaterial.R
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.History
 import app.hommaterial.data.NotLoggedInException
+import app.hommaterial.str
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +22,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.IOException
 
 internal const val EXTRA_APPLIANCE_ID = "applianceId"
 
@@ -39,9 +41,9 @@ object Quick {
     /** Inverts the power of a device, asking Alexa for its real state first. */
     suspend fun toggle(context: Context, applianceId: String): Outcome = command(context, applianceId) { device ->
         val state = Alexa.get(context).api.states(listOf(device))[applianceId]
-        if (state == null || !state.reachable) throw Exception("${device.name} non è raggiungibile")
+        if (state == null || !state.reachable) throw Exception(str(R.string.device_unreachable, device.name))
         // Without a reported state a toggle would be a guess.
-        val on = state.power ?: throw Exception("${device.name}: stato sconosciuto, apri l'app")
+        val on = state.power ?: throw Exception(str(R.string.quick_unknown_state, device.name))
         !on
     }
 
@@ -55,7 +57,7 @@ object Quick {
     ): Outcome {
         val cache = Cache(context)
         val device = cache.devices().find { it.applianceId == applianceId && it.hasPower }
-            ?: return Outcome(false, "Dispositivo non trovato, apri l'app")
+            ?: return Outcome(false, str(R.string.quick_not_found))
         return try {
             val on = target(device)
             Alexa.get(context).api.setPower(device, on)
@@ -63,15 +65,15 @@ object Quick {
             val state = (known[applianceId] ?: DeviceState()).copy(power = on, reachable = true)
             cache.putStates(known + (applianceId to state))
             refresh(context)
-            Outcome(true, "${device.name}: ${if (on) "acceso" else "spento"}")
+            Outcome(true, str(if (on) R.string.quick_on else R.string.quick_off, device.name))
         } catch (e: CancellationException) {
             throw e
         } catch (e: NotLoggedInException) {
-            Outcome(false, "Accesso scaduto, apri l'app")
+            Outcome(false, str(R.string.login_expired_open_app))
         } catch (e: IOException) {
-            Outcome(false, "Nessuna connessione", noConnection = true)
+            Outcome(false, str(R.string.no_connection), noConnection = true)
         } catch (e: Exception) {
-            Outcome(false, e.message ?: "Qualcosa è andato storto")
+            Outcome(false, e.message ?: str(R.string.something_wrong))
         }
     }
 

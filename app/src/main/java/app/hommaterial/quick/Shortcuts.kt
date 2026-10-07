@@ -9,6 +9,7 @@ import android.graphics.drawable.Icon
 import android.os.Bundle
 import app.hommaterial.R
 import app.hommaterial.data.Cache
+import app.hommaterial.str
 
 private const val ACTION_TOGGLE = "app.hommaterial.action.TOGGLE"
 // Launchers show four shortcuts at most.
@@ -26,7 +27,7 @@ internal fun publishShortcuts(context: Context) {
         .mapIndexed { rank, device ->
             ShortcutInfo.Builder(context, device.applianceId)
                 .setShortLabel(device.name)
-                .setLongLabel("Accendi o spegni ${device.name}")
+                .setLongLabel(str(R.string.shortcut_long, device.name))
                 .setIcon(Icon.createWithResource(context, R.drawable.ic_shortcut_power))
                 .setRank(rank)
                 .setIntent(

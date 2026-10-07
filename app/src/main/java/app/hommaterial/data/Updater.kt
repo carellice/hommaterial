@@ -6,13 +6,15 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.FileProvider
+import app.hommaterial.R
+import app.hommaterial.str
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import java.io.File
 
 private const val REPO = "carellice/hommaterial"
 private const val LATEST_RELEASE = "https://api.github.com/repos/$REPO/releases/latest"
@@ -40,8 +42,8 @@ class Updater(private val context: Context, private val http: OkHttpClient) {
                 // No release published yet.
                 response.code == 404 -> return@withContext null
                 response.code == 403 || response.code == 429 ->
-                    throw Exception("Troppe richieste a GitHub, riprova più tardi")
-                !response.isSuccessful -> throw Exception("GitHub ha risposto con errore ${response.code}")
+                    throw Exception(str(R.string.update_too_many))
+                !response.isSuccessful -> throw Exception(str(R.string.update_github_error, response.code))
             }
             val release = JSONObject(response.body?.string().orEmpty())
             val version = release.getString("tag_name").removePrefix("v")
@@ -49,7 +51,7 @@ class Updater(private val context: Context, private val http: OkHttpClient) {
             val apk = release.getJSONArray("assets").mapObjects { it }.firstOrNull {
                 it.getString("name").endsWith(".apk") &&
                     it.getString("browser_download_url").startsWith(DOWNLOAD_PREFIX)
-            } ?: throw Exception("La versione $version non contiene un APK")
+            } ?: throw Exception(str(R.string.update_no_apk, version))
             Update(version, apk.getString("browser_download_url"), apk.optLong("size"))
         }
     }
@@ -60,8 +62,8 @@ class Updater(private val context: Context, private val http: OkHttpClient) {
         dir.mkdirs()
         val file = File(dir, "Hommaterial-${update.version}.apk")
         http.newCall(Request.Builder().url(update.apkUrl).build()).execute().use { response ->
-            if (!response.isSuccessful) throw Exception("Download non riuscito (errore ${response.code})")
-            val body = response.body ?: throw Exception("Download non riuscito")
+            if (!response.isSuccessful) throw Exception(str(R.string.update_download_error, response.code))
+            val body = response.body ?: throw Exception(str(R.string.update_download_failed))
             val total = body.contentLength().takeIf { it > 0 } ?: update.sizeBytes
             body.byteStream().use { input ->
                 file.outputStream().use { output ->
@@ -92,13 +94,13 @@ class Updater(private val context: Context, private val http: OkHttpClient) {
             PackageManager.GET_SIGNATURES
         }
         val archive = pm.getPackageArchiveInfo(file.path, flags)
-            ?: fail(file, "Il file scaricato non è un APK valido")
-        if (archive.packageName != context.packageName) fail(file, "Il file scaricato non è Hommaterial")
+            ?: fail(file, str(R.string.update_not_apk))
+        if (archive.packageName != context.packageName) fail(file, str(R.string.update_not_app))
         // Some Android versions do not report the signatures of an APK that is not installed.
         val downloaded = signers(archive) ?: return
         val installed = signers(pm.getPackageInfo(context.packageName, flags)) ?: return
         if (downloaded != installed) {
-            fail(file, "L'aggiornamento è firmato con una chiave diversa da quella dell'app installata")
+            fail(file, str(R.string.update_wrong_key))
         }
     }
 

@@ -11,7 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.hommaterial.HomeViewModel
+import app.hommaterial.R
 import app.hommaterial.UiState
+import app.hommaterial.str
 
 /** Offers the update found on GitHub and follows its download. */
 @Composable
@@ -21,11 +23,11 @@ fun UpdateDialog(state: UiState, vm: HomeViewModel) {
     AlertDialog(
         // While downloading the dialog only closes through "Annulla".
         onDismissRequest = { if (progress == null) vm.dismissUpdate() },
-        title = { Text("Aggiornamento disponibile") },
+        title = { Text(str(R.string.update_title)) },
         text = {
             Column {
-                val size = if (update.sizeBytes > 0) " (%.1f MB)".format(update.sizeBytes / 1_000_000.0) else ""
-                Text("Hommaterial ${update.version}$size. Hai la versione ${vm.installedVersion}.")
+                val size = if (update.sizeBytes > 0) str(R.string.update_size, update.sizeBytes / 1_000_000.0) else ""
+                Text(str(R.string.update_text, update.version, size, vm.installedVersion))
                 if (progress != null) {
                     LinearProgressIndicator(
                         progress = { progress },
@@ -35,10 +37,12 @@ fun UpdateDialog(state: UiState, vm: HomeViewModel) {
             }
         },
         confirmButton = {
-            if (progress == null) TextButton(onClick = vm::installUpdate) { Text("Aggiorna") }
+            if (progress == null) TextButton(onClick = vm::installUpdate) { Text(str(R.string.update_now)) }
         },
         dismissButton = {
-            TextButton(onClick = vm::dismissUpdate) { Text(if (progress == null) "Più tardi" else "Annulla") }
+            TextButton(onClick = vm::dismissUpdate) {
+                Text(str(if (progress == null) R.string.update_later else R.string.cancel))
+            }
         },
     )
 }

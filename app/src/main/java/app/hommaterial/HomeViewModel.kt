@@ -7,6 +7,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.hommaterial.R
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
 import app.hommaterial.data.ColorChoice
@@ -19,13 +20,14 @@ import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Reading
 import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
+import app.hommaterial.data.toJsonArray
 import app.hommaterial.quick.PowerTile
 import app.hommaterial.quick.Quick
 import app.hommaterial.quick.Timers
+import app.hommaterial.str
 import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
 import app.hommaterial.voice.parseVoice
-import app.hommaterial.data.toJsonArray
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -152,7 +154,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(signingIn = false, loginMessage = e.message ?: "Accesso non riuscito") }
+                _state.update { it.copy(signingIn = false, loginMessage = e.message ?: str(R.string.login_failed)) }
             }
         }
     }
@@ -164,7 +166,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         cache.edit().clear().apply()
         history.clear()
         Quick.refresh(getApplication())
-        _state.update { UiState(onboarded = true, loggedIn = false, marketplace = auth.marketplace, update = it.update, updateProgress = it.updateProgress) }
+        _state.update {
+            UiState(
+                onboarded = true,
+                loggedIn = false,
+                marketplace = auth.marketplace,
+                update = it.update,
+                updateProgress = it.updateProgress,
+            )
+        }
     }
 
     fun refresh() {
@@ -291,14 +301,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             is VoiceResult.Run -> runVoice(result.command)
             is VoiceResult.Ask -> _state.update { it.copy(voice = result) }
             is VoiceResult.Unknown -> _messages.tryEmit(
-                if (result.heard.isBlank()) "Non ho sentito niente" else "Non ho capito «${result.heard}»",
+                if (result.heard.isBlank()) {
+                    str(R.string.voice_nothing_heard)
+                } else {
+                    str(R.string.voice_not_understood, result.heard)
+                },
             )
         }
     }
 
     fun runVoice(command: VoiceCommand) {
         dismissVoice()
-        _messages.tryEmit(command.label)
+        _messages.tryEmit(command.label())
         if (command.room != null) {
             setRoomPower(command.devices, command.on)
         } else {
@@ -309,7 +323,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissVoice() = _state.update { it.copy(voice = null) }
 
     fun speechUnavailable() {
-        _messages.tryEmit("Riconoscimento vocale non disponibile su questo telefono")
+        _messages.tryEmit(str(R.string.voice_unavailable))
     }
 
     /** Copies to the clipboard everything Alexa says about [device], for writing support for it. */
@@ -321,7 +335,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 app.getSystemService(ClipboardManager::class.java)
                     .setPrimaryClip(ClipData.newPlainText("Hommaterial: ${device.name}", text))
             }
-            if (copied) Toast.makeText(app, "Dati tecnici copiati negli appunti", Toast.LENGTH_SHORT).show()
+            if (copied) Toast.makeText(app, str(R.string.diagnostics_copied), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -348,14 +362,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 if (update != null) {
                     _state.update { it.copy(update = update) }
                 } else if (manual) {
-                    _messages.tryEmit("Hai già l'ultima versione (${updater.installedVersion})")
+                    _messages.tryEmit(str(R.string.update_latest, updater.installedVersion))
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: java.io.IOException) {
-                if (manual) _messages.tryEmit("Nessuna connessione")
+                if (manual) _messages.tryEmit(str(R.string.no_connection))
             } catch (e: Exception) {
-                if (manual) _messages.tryEmit(e.message ?: "Controllo degli aggiornamenti non riuscito")
+                if (manual) _messages.tryEmit(e.message ?: str(R.string.update_check_failed))
             }
         }
     }
@@ -371,9 +385,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: java.io.IOException) {
-                _messages.tryEmit("Download non riuscito, controlla la connessione")
+                _messages.tryEmit(str(R.string.update_download_no_connection))
             } catch (e: Exception) {
-                _messages.tryEmit(e.message ?: "Aggiornamento non riuscito")
+                _messages.tryEmit(e.message ?: str(R.string.update_failed))
             }
             _state.update { it.copy(update = null, updateProgress = null) }
         }
@@ -395,10 +409,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(loggedIn = false, loginMessage = e.message) }
         false
     } catch (e: java.io.IOException) {
-        _messages.tryEmit("Nessuna connessione")
+        _messages.tryEmit(str(R.string.no_connection))
         false
     } catch (e: Exception) {
-        _messages.tryEmit(e.message ?: "Qualcosa è andato storto")
+        _messages.tryEmit(e.message ?: str(R.string.something_wrong))
         false
     }
+}
+
+/** The command as a sentence, to offer it or to say it is being carried out. */
+fun VoiceCommand.label(): String = when {
+    room != null -> str(if (on) R.string.voice_room_on else R.string.voice_room_off, room)
+    else -> str(if (on) R.string.voice_on else R.string.voice_off, devices.single().name)
 }

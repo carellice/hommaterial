@@ -20,12 +20,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
+import app.hommaterial.R
 import app.hommaterial.data.Reading
+import app.hommaterial.str
 
 private const val HOUR_MS = 60 * 60_000L
 // Readings further apart than this are not joined: the line would invent what happened in between.
 private const val MAX_JOIN_MS = 2 * HOUR_MS
-private val SPANS = listOf("24 ore" to 24 * HOUR_MS, "7 giorni" to 7 * 24 * HOUR_MS)
+private val SPANS = listOf(R.string.span_day to 24 * HOUR_MS, R.string.span_week to 7 * 24 * HOUR_MS)
 
 /** Temperature and humidity of a sensor over the last day or week. */
 @Composable
@@ -37,12 +39,12 @@ fun HistoryCharts(readings: List<Reading>) {
     Column(Modifier.padding(top = 20.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (choice in SPANS) {
-                FilterChip(selected = span == choice, onClick = { span = choice }, label = { Text(choice.first) })
+                FilterChip(selected = span == choice, onClick = { span = choice }, label = { Text(str(choice.first)) })
             }
         }
         if (shown.size < 2) {
             Text(
-                "Ancora pochi dati: la cronologia si riempie ogni volta che l'app o il widget aggiornano gli stati.",
+                str(R.string.history_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 12.dp),
@@ -51,7 +53,7 @@ fun HistoryCharts(readings: List<Reading>) {
         }
         val start = now - span.second
         Chart(
-            title = "Temperatura",
+            title = str(R.string.temperature),
             points = shown.map { it.at to it.temperature.toFloat() },
             start = start,
             end = now,
@@ -61,7 +63,7 @@ fun HistoryCharts(readings: List<Reading>) {
         val humidity = shown.mapNotNull { r -> r.humidity?.let { r.at to it.toFloat() } }
         if (humidity.size >= 2) {
             Chart(
-                title = "Umidità",
+                title = str(R.string.humidity),
                 points = humidity,
                 start = start,
                 end = now,
@@ -71,8 +73,9 @@ fun HistoryCharts(readings: List<Reading>) {
         }
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             val labels = MaterialTheme.typography.labelSmall
-            Text("${span.first} fa", style = labels, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("adesso", style = labels, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val faint = MaterialTheme.colorScheme.onSurfaceVariant
+            Text(str(R.string.history_ago, str(span.first)), style = labels, color = faint)
+            Text(str(R.string.now), style = labels, color = faint)
         }
     }
 }
@@ -93,7 +96,7 @@ private fun Chart(
     Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(title, style = MaterialTheme.typography.labelLarge)
         Text(
-            "min ${format(lowest)} · max ${format(highest)}",
+            str(R.string.min_max, format(lowest), format(highest)),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

@@ -14,9 +14,10 @@ import app.hommaterial.MainActivity
 import app.hommaterial.R
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
+import app.hommaterial.str
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import java.util.concurrent.ConcurrentHashMap
 
 // Alexa can take a few seconds to report a state it has just been asked to change.
 private const val SETTLE_MS = 5_000L
@@ -84,11 +85,11 @@ abstract class PowerTile(private val slot: Int) : TileService() {
         tile.state = if (state?.power == true) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = when {
-                device == null -> "Scegli un dispositivo"
-                state == null || state.power == null -> "Stato sconosciuto"
-                !state.reachable -> "Non raggiungibile"
-                state.power -> "Acceso"
-                else -> "Spento"
+                device == null -> str(R.string.tile_choose)
+                state == null || state.power == null -> str(R.string.unknown_state)
+                !state.reachable -> str(R.string.unreachable)
+                state.power -> str(R.string.on)
+                else -> str(R.string.off)
             }
         }
         tile.updateTile()

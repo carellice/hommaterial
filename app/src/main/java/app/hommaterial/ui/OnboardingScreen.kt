@@ -36,34 +36,24 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.hommaterial.R
+import app.hommaterial.str
 
 private val FEATURES = listOf(
-    Icons.Outlined.MeetingRoom to "Mostra i dispositivi collegati al tuo account Alexa, divisi per stanza.",
-    Icons.Outlined.TouchApp to "Un tocco accende o spegne luci, prese, TV e interruttori.",
-    Icons.Outlined.Lightbulb to "Tieni premuto su un dispositivo per regolare la luminosità o nasconderlo.",
-    Icons.Outlined.Thermostat to "Legge temperatura e umidità dei sensori.",
-    Icons.Outlined.Bolt to "Si apre subito con l'ultimo stato noto e si aggiorna in sottofondo.",
+    Icons.Outlined.MeetingRoom to R.string.feature_1,
+    Icons.Outlined.TouchApp to R.string.feature_2,
+    Icons.Outlined.Lightbulb to R.string.feature_3,
+    Icons.Outlined.Thermostat to R.string.feature_4,
+    Icons.Outlined.Bolt to R.string.feature_5,
 )
 
 private val WARNINGS = listOf(
-    "Non è un'app ufficiale" to
-        "Hommaterial non è affiliata, approvata né supportata da Amazon. Amazon, Alexa ed Echo sono marchi di " +
-        "Amazon.com, Inc. o delle sue affiliate.",
-    "Usa API non ufficiali" to
-        "L'app comunica con i server di Amazon presentandosi come l'app Alexa ufficiale. Questo con ogni " +
-        "probabilità viola le condizioni d'uso di Amazon.",
-    "Il tuo account è a rischio" to
-        "Amazon può limitare, sospendere o chiudere gli account che usano app non autorizzate, e l'app può " +
-        "smettere di funzionare in qualsiasi momento.",
-    "Gestisce l'accesso al tuo account" to
-        "Accedi sulla pagina di Amazon mostrata dentro l'app. La password non viene letta né salvata, ma sul " +
-        "telefono resta un token che dà accesso al tuo account Alexa. Usa solo versioni di cui ti fidi.",
-    "Comanda dispositivi reali" to
-        "Un errore dell'app o un tocco sbagliato accende o spegne cose vere in casa tua, come stufe e " +
-        "climatizzatori.",
-    "Nessuna garanzia" to
-        "Il software è fornito così com'è. Gli autori non rispondono di danni, blocchi dell'account o altre " +
-        "conseguenze del suo uso.",
+    R.string.warning_1_title to R.string.warning_1_text,
+    R.string.warning_2_title to R.string.warning_2_text,
+    R.string.warning_3_title to R.string.warning_3_text,
+    R.string.warning_4_title to R.string.warning_4_text,
+    R.string.warning_5_title to R.string.warning_5_text,
+    R.string.warning_6_title to R.string.warning_6_text,
 )
 
 /** Shown once, before the sign-in: what the app is for and what using it implies. */
@@ -83,13 +73,13 @@ fun OnboardingScreen(onAccept: () -> Unit) {
                     ) {
                         Checkbox(checked = accepted, onCheckedChange = null)
                         Text(
-                            "Ho letto le avvertenze e uso l'app a mio rischio",
+                            str(R.string.onboarding_accept),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp),
                         )
                     }
                     Button(onClick = onAccept, enabled = accepted, modifier = Modifier.fillMaxWidth()) {
-                        Text("Continua")
+                        Text(str(R.string.continue_))
                     }
                 }
             }
@@ -103,21 +93,21 @@ fun OnboardingScreen(onAccept: () -> Unit) {
                 .padding(horizontal = 24.dp),
         ) {
             Text(
-                "Benvenuto in Hommaterial",
+                str(R.string.welcome),
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(top = 32.dp),
             )
             Text(
-                "Un modo veloce ed essenziale per comandare la casa collegata ad Alexa.",
+                str(R.string.tagline),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp),
             )
 
-            SectionTitle("A cosa serve")
-            for ((icon, text) in FEATURES) Feature(icon, text)
+            SectionTitle(str(R.string.onboarding_purpose))
+            for ((icon, text) in FEATURES) Feature(icon, str(text))
 
-            SectionTitle("Prima di iniziare")
+            SectionTitle(str(R.string.onboarding_before))
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -128,7 +118,7 @@ fun OnboardingScreen(onAccept: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.WarningAmber, contentDescription = null, modifier = Modifier.size(28.dp))
                         Text(
-                            "App non ufficiale, uso a proprio rischio",
+                            str(R.string.onboarding_unofficial),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(start = 12.dp),
@@ -136,12 +126,12 @@ fun OnboardingScreen(onAccept: () -> Unit) {
                     }
                     for ((title, text) in WARNINGS) {
                         Text(
-                            title,
+                            str(title),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(top = 16.dp),
                         )
-                        Text(text, style = MaterialTheme.typography.bodyMedium)
+                        Text(str(text), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }

@@ -38,10 +38,12 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import app.hommaterial.MainActivity
+import app.hommaterial.R
 import app.hommaterial.data.Cache
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.statusText
+import app.hommaterial.str
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,7 +74,7 @@ private fun Content(favorites: List<Device>, states: Map<String, DeviceState>) {
     if (favorites.isEmpty()) {
         Box(frame.clickable(actionStartActivity<MainActivity>()), contentAlignment = Alignment.Center) {
             Text(
-                "Aggiungi dei preferiti dall'app",
+                str(R.string.widget_empty),
                 style = TextStyle(color = colors.onSurfaceVariant, textAlign = TextAlign.Center),
             )
         }

@@ -4,13 +4,7 @@ import app.hommaterial.data.Device
 import java.text.Normalizer
 
 /** What a spoken sentence asks for: [devices] switched [on] or off, all those of [room] when it is set. */
-data class VoiceCommand(val on: Boolean, val devices: List<Device>, val room: String? = null) {
-    val label: String
-        get() {
-            val verb = if (on) "Accendi" else "Spegni"
-            return if (room != null) "$verb tutto in $room" else "$verb ${devices.single().name}"
-        }
-}
+data class VoiceCommand(val on: Boolean, val devices: List<Device>, val room: String? = null)
 
 sealed interface VoiceResult {
     /** Understood without doubt. */
@@ -22,13 +16,17 @@ sealed interface VoiceResult {
     data class Unknown(val heard: String) : VoiceResult
 }
 
-private val ON_WORDS = setOf("accendi", "accendere", "accendimi", "accenda", "attiva", "attivare")
-private val OFF_WORDS = setOf("spegni", "spegnere", "spegnimi", "spenga", "spengi", "disattiva", "disattivare")
-private val ALL_WORDS = setOf("tutto", "tutta", "tutti", "tutte")
+// Italian and English are both understood, whatever the language of the phone.
+private val ON_WORDS = setOf("accendi", "accendere", "accendimi", "accenda", "attiva", "attivare", "on")
+private val OFF_WORDS = setOf(
+    "spegni", "spegnere", "spegnimi", "spenga", "spengi", "disattiva", "disattivare", "off",
+)
+private val ALL_WORDS = setOf("tutto", "tutta", "tutti", "tutte", "all", "everything", "every")
 private val FILLER_WORDS = setOf(
     "il", "lo", "la", "i", "gli", "le", "l", "un", "uno", "una",
     "di", "del", "dello", "della", "dei", "degli", "delle", "in", "nel", "nello", "nella", "a", "al", "alla",
     "per", "favore", "piacere", "grazie", "ora", "adesso", "subito", "e",
+    "turn", "switch", "the", "an", "of", "at", "to", "my", "please", "now", "thanks",
 )
 
 // Below this nothing is offered; from here up to a perfect match the user is asked.

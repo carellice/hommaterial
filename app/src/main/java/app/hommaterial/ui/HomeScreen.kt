@@ -82,6 +82,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.hommaterial.HomeViewModel
+import app.hommaterial.R
 import app.hommaterial.UiState
 import app.hommaterial.data.COLOR_CHOICES
 import app.hommaterial.data.ColorChoice
@@ -89,16 +90,18 @@ import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.WHITE_CHOICES
 import app.hommaterial.data.statusText
+import app.hommaterial.label
+import app.hommaterial.plural
+import app.hommaterial.str
 import app.hommaterial.voice.VoiceResult
-import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
-private const val NO_ROOM = "Altro"
-private const val FAVORITES = "Preferiti"
 private val TILE_HEIGHT = 116.dp
-private val TIMER_CHOICES = listOf("15 min" to 15, "30 min" to 30, "1 ora" to 60, "2 ore" to 120)
+private val TIMER_CHOICES =
+    listOf(R.string.timer_15 to 15, R.string.timer_30 to 30, R.string.timer_60 to 60, R.string.timer_120 to 120)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,8 +125,9 @@ fun HomeScreen(state: UiState, vm: HomeViewModel) {
     ) { padding ->
         val visible = state.devices.filter { state.showHidden || it.applianceId !in state.hidden }
         // Named rooms first, alphabetically; devices without a room close the list.
-        val rooms = visible.groupBy { it.room ?: NO_ROOM }
-            .toSortedMap(compareBy<String> { it == NO_ROOM }.thenBy { it.lowercase() })
+        val noRoom = str(R.string.no_room)
+        val rooms = visible.groupBy { it.room ?: noRoom }
+            .toSortedMap(compareBy<String> { it == noRoom }.thenBy { it.lowercase() })
 
         PullToRefreshBox(
             isRefreshing = state.refreshing,
@@ -132,7 +136,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel) {
         ) {
             if (visible.isEmpty() && !state.refreshing) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Nessun dispositivo", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(str(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             LazyVerticalGrid(
@@ -145,14 +149,16 @@ fun HomeScreen(state: UiState, vm: HomeViewModel) {
                 // Favorites are repeated at the top and stay in their rooms too.
                 val favorites = visible.filter { it.applianceId in state.favorites }.sortedBy { it.name.lowercase() }
                 if (favorites.isNotEmpty()) {
-                    item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(FAVORITES) }
+                    item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) {
+                        SectionHeader(str(R.string.favorites))
+                    }
                     items(favorites, key = { "favorite:${it.applianceId}" }) { DeviceTile(it, state, vm) }
                 }
                 for ((room, devices) in rooms) {
                     item(key = "room:$room", span = { GridItemSpan(maxLineSpan) }) {
-                        // "Altro" gathers unrelated devices: switching them together makes no sense.
+                        // The devices without a room are unrelated: switching them together makes no sense.
                         // Hidden devices stay out of it even while they are being shown.
-                        val switchable = if (room == NO_ROOM) emptyList() else {
+                        val switchable = if (room == noRoom) emptyList() else {
                             devices.filter { it.hasPower && it.applianceId !in state.hidden }
                         }
                         if (switchable.size > 1) {
@@ -185,14 +191,20 @@ private fun SectionHeader(name: String, onPower: ((Boolean) -> Unit)? = null) {
                 IconButton(onClick = { open = true }, modifier = Modifier.size(40.dp)) {
                     Icon(
                         Icons.Outlined.PowerSettingsNew,
-                        contentDescription = "Accendi o spegni $name",
+                        contentDescription = str(R.string.room_power, name),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp),
                     )
                 }
                 DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                    DropdownMenuItem(text = { Text("Accendi tutto") }, onClick = { open = false; onPower(true) })
-                    DropdownMenuItem(text = { Text("Spegni tutto") }, onClick = { open = false; onPower(false) })
+                    DropdownMenuItem(
+                        text = { Text(str(R.string.all_on)) },
+                        onClick = { open = false; onPower(true) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(str(R.string.all_off)) },
+                        onClick = { open = false; onPower(false) },
+                    )
                 }
             }
         }
@@ -217,7 +229,7 @@ private fun DeviceTile(device: Device, state: UiState, vm: HomeViewModel) {
 @Composable
 private fun Title(updatedAt: Long?) {
     Column {
-        Text("Hommaterial")
+        Text(str(R.string.app_name))
         if (updatedAt != null) {
             // Recomputed every half minute so that the age keeps growing while the screen stays open.
             val now by produceState(System.currentTimeMillis(), updatedAt) {
@@ -238,12 +250,10 @@ private fun Title(updatedAt: Long?) {
 private fun ageText(updatedAt: Long, now: Long): String {
     val minutes = (now - updatedAt) / 60_000
     return when {
-        minutes < 1 -> "Aggiornato adesso"
-        minutes == 1L -> "Aggiornato 1 minuto fa"
-        minutes < 60 -> "Aggiornato $minutes minuti fa"
-        minutes < 120 -> "Aggiornato 1 ora fa"
-        minutes < 24 * 60 -> "Aggiornato ${minutes / 60} ore fa"
-        else -> "Aggiornato più di un giorno fa"
+        minutes < 1 -> str(R.string.updated_now)
+        minutes < 60 -> plural(R.plurals.updated_minutes, minutes.toInt())
+        minutes < 24 * 60 -> plural(R.plurals.updated_hours, (minutes / 60).toInt())
+        else -> str(R.string.updated_long_ago)
     }
 }
 
@@ -259,9 +269,9 @@ private fun VoiceButton(vm: HomeViewModel) {
         onClick = {
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "it-IT")
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, str(R.string.voice_language))
                 .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-                .putExtra(RecognizerIntent.EXTRA_PROMPT, "Accendi o spegni…")
+                .putExtra(RecognizerIntent.EXTRA_PROMPT, str(R.string.voice_prompt))
             try {
                 speech.launch(intent)
             } catch (e: ActivityNotFoundException) {
@@ -269,7 +279,7 @@ private fun VoiceButton(vm: HomeViewModel) {
             }
         },
     ) {
-        Icon(Icons.Outlined.Mic, contentDescription = "Comando vocale")
+        Icon(Icons.Outlined.Mic, contentDescription = str(R.string.voice_button))
     }
 }
 
@@ -277,38 +287,40 @@ private fun VoiceButton(vm: HomeViewModel) {
 private fun VoiceDialog(ask: VoiceResult.Ask, vm: HomeViewModel) {
     AlertDialog(
         onDismissRequest = vm::dismissVoice,
-        title = { Text("Cosa intendevi?") },
+        title = { Text(str(R.string.voice_ask_title)) },
         text = {
             Column {
-                Text("Ho sentito «${ask.heard}».", modifier = Modifier.padding(bottom = 8.dp))
+                Text(str(R.string.voice_heard, ask.heard), modifier = Modifier.padding(bottom = 8.dp))
                 for (option in ask.options) {
-                    val count = if (option.room != null) " (${option.devices.size} dispositivi)" else ""
-                    TextButton(onClick = { vm.runVoice(option) }) { Text(option.label + count) }
+                    val label = if (option.room == null) option.label() else {
+                        str(R.string.voice_room_option, option.label(), plural(R.plurals.devices, option.devices.size))
+                    }
+                    TextButton(onClick = { vm.runVoice(option) }) { Text(label) }
                 }
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = vm::dismissVoice) { Text("Annulla") } },
+        dismissButton = { TextButton(onClick = vm::dismissVoice) { Text(str(R.string.cancel)) } },
     )
 }
 
 @Composable
 private fun OverflowMenu(state: UiState, vm: HomeViewModel) {
     var open by remember { mutableStateOf(false) }
-    IconButton(onClick = { open = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Menu") }
+    IconButton(onClick = { open = true }) { Icon(Icons.Filled.MoreVert, contentDescription = str(R.string.menu)) }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-        DropdownMenuItem(text = { Text("Aggiorna") }, onClick = { open = false; vm.refresh() })
+        DropdownMenuItem(text = { Text(str(R.string.refresh)) }, onClick = { open = false; vm.refresh() })
         if (state.hidden.isNotEmpty()) {
             DropdownMenuItem(
-                text = { Text(if (state.showHidden) "Non mostrare i nascosti" else "Mostra i nascosti") },
+                text = { Text(str(if (state.showHidden) R.string.hide_hidden else R.string.show_hidden)) },
                 onClick = { open = false; vm.toggleShowHidden() },
             )
         }
         DropdownMenuItem(
-            text = { Text("Controlla aggiornamenti") },
+            text = { Text(str(R.string.check_updates)) },
             onClick = { open = false; vm.checkForUpdate(manual = true) },
         )
-        DropdownMenuItem(text = { Text("Esci") }, onClick = { open = false; vm.logout() })
+        DropdownMenuItem(text = { Text(str(R.string.sign_out)) }, onClick = { open = false; vm.logout() })
     }
 }
 
@@ -366,7 +378,9 @@ private fun DeviceTile(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                statusText(device, state) + (timer?.let { " · fino alle ${clockTime(it)}" } ?: ""),
+                statusText(device, state).let { status ->
+                    if (timer == null) status else str(R.string.status_until, status, clockTime(timer))
+                },
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -375,7 +389,9 @@ private fun DeviceTile(
         }
     }
 
-    if (details) DeviceSheet(device, state, hidden, favorite, tile, tilesFull, timer, vm, onDismiss = { details = false })
+    if (details) {
+        DeviceSheet(device, state, hidden, favorite, tile, tilesFull, timer, vm, onDismiss = { details = false })
+    }
 }
 
 /** Everything beyond the tap-to-toggle: explicit on/off, timer, brightness, color, favorites, tile, hiding. */
@@ -421,24 +437,24 @@ private fun DeviceSheet(
             if (device.hasPower) {
                 Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     FilledTonalButton(onClick = { vm.setPower(device, true) }, modifier = Modifier.weight(1f)) {
-                        Text("Accendi")
+                        Text(str(R.string.turn_on))
                     }
                     FilledTonalButton(onClick = { vm.setPower(device, false) }, modifier = Modifier.weight(1f)) {
-                        Text("Spegni")
+                        Text(str(R.string.turn_off))
                     }
                 }
             }
 
             if (device.hasPower) {
                 Text(
-                    "Spegni tra",
+                    str(R.string.turn_off_in),
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(top = 20.dp),
                 )
                 if (timer != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Si spegne alle ${clockTime(timer)}", modifier = Modifier.weight(1f))
-                        TextButton(onClick = { vm.cancelTimer(device) }) { Text("Annulla timer") }
+                        Text(str(R.string.turns_off_at, clockTime(timer)), modifier = Modifier.weight(1f))
+                        TextButton(onClick = { vm.cancelTimer(device) }) { Text(str(R.string.cancel_timer)) }
                     }
                 } else {
                     Row(
@@ -446,7 +462,7 @@ private fun DeviceSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         for ((label, minutes) in TIMER_CHOICES) {
-                            AssistChip(onClick = { vm.setTimer(device, minutes) }, label = { Text(label) })
+                            AssistChip(onClick = { vm.setTimer(device, minutes) }, label = { Text(str(label)) })
                         }
                     }
                 }
@@ -456,7 +472,7 @@ private fun DeviceSheet(
 
             if (device.hasBrightness) {
                 Text(
-                    "Luminosità",
+                    str(R.string.brightness),
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(top = 20.dp),
                 )
@@ -467,7 +483,7 @@ private fun DeviceSheet(
                 (if (device.hasColor) COLOR_CHOICES else emptyList())
             if (choices.isNotEmpty()) {
                 Text(
-                    "Colore",
+                    str(R.string.color),
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
                 )
@@ -487,21 +503,21 @@ private fun DeviceSheet(
                 onClick = { vm.setFavorite(device, !favorite) },
                 modifier = Modifier.padding(top = 12.dp),
             ) {
-                Text(if (favorite) "Rimuovi dai preferiti" else "Aggiungi ai preferiti")
+                Text(str(if (favorite) R.string.favorite_remove else R.string.favorite_add))
             }
             if (device.hasPower) {
                 TextButton(onClick = { vm.setOnTile(device, tile == null) }, enabled = tile != null || !tilesFull) {
                     Text(
                         when {
-                            tile != null -> "Togli dalle Impostazioni rapide (riquadro ${tile + 1})"
-                            tilesFull -> "Impostazioni rapide: riquadri tutti occupati"
-                            else -> "Metti nelle Impostazioni rapide"
+                            tile != null -> str(R.string.tile_remove, tile + 1)
+                            tilesFull -> str(R.string.tiles_full)
+                            else -> str(R.string.tile_add)
                         },
                     )
                 }
             }
             TextButton(onClick = { vm.setHidden(device, !hidden); onDismiss() }) {
-                Text(if (hidden) "Mostra di nuovo nella lista" else "Nascondi dalla lista")
+                Text(str(if (hidden) R.string.unhide else R.string.hide))
             }
         }
     }
@@ -510,16 +526,17 @@ private fun DeviceSheet(
 @Composable
 private fun ColorSwatch(choice: ColorChoice, selected: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val label = str(choice.label)
     Box(
         Modifier
             .size(44.dp)
             .clip(CircleShape)
-            .clickable(onClickLabel = choice.label, onClick = onClick)
+            .clickable(onClickLabel = label, onClick = onClick)
             // The ring marks the color the lamp is on; the thin outline keeps pale whites visible.
             .border(if (selected) 3.dp else 1.dp, if (selected) colors.primary else colors.outlineVariant, CircleShape)
             .padding(if (selected) 6.dp else 0.dp)
             .background(Color(choice.rgb), CircleShape)
-            .semantics { contentDescription = choice.label },
+            .semantics { contentDescription = label },
     )
 }
 

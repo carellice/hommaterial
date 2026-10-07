@@ -1,5 +1,7 @@
 package app.hommaterial.data
 
+import app.hommaterial.R
+import app.hommaterial.str
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -52,8 +54,8 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
                     when {
                         // The web session lasts a few days; the first 401 just means it needs renewing.
                         response.code == 401 && attempt == 0 -> session = auth.session(forceRefresh = true)
-                        response.code == 401 -> throw NotLoggedInException("Accesso scaduto, entra di nuovo")
-                        !response.isSuccessful -> throw Exception("Alexa ha risposto con errore ${response.code}")
+                        response.code == 401 -> throw NotLoggedInException(str(R.string.login_expired))
+                        !response.isSuccessful -> throw Exception(str(R.string.alexa_error, response.code))
                         else -> return@withContext if (text.isBlank()) JSONObject() else JSONObject(text)
                     }
                 }
@@ -73,7 +75,7 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
         }
 
         val items = endpoints.await().optJSONObject("data")?.optJSONObject("endpoints")?.optJSONArray("items")
-            ?: throw Exception("Risposta inattesa da Alexa")
+            ?: throw Exception(str(R.string.alexa_unexpected))
         items.mapObjects { item ->
             val appliance = item.optJSONObject("legacyAppliance") ?: return@mapObjects null
             val applianceId = appliance.optString("applianceId")
@@ -195,8 +197,8 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
         if (error != null) {
             throw Exception(
                 when (error.optString("code")) {
-                    "ENDPOINT_UNREACHABLE", "NO_SUCH_ENDPOINT" -> "${device.name} non è raggiungibile"
-                    else -> "${device.name}: comando rifiutato (${error.optString("code")})"
+                    "ENDPOINT_UNREACHABLE", "NO_SUCH_ENDPOINT" -> str(R.string.device_unreachable, device.name)
+                    else -> str(R.string.command_refused, device.name, error.optString("code"))
                 },
             )
         }

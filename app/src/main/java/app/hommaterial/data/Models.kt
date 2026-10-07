@@ -1,5 +1,8 @@
 package app.hommaterial.data
 
+import androidx.annotation.StringRes
+import app.hommaterial.R
+import app.hommaterial.str
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -79,13 +82,14 @@ data class DeviceState(
 /** The line shown under a device name, in the app and in the widget. */
 fun statusText(device: Device, state: DeviceState?): String = when {
     state == null -> "…"
-    !state.reachable -> "Non raggiungibile"
+    !state.reachable -> str(R.string.unreachable)
     device.isSensor && state.temperature != null && !state.temperature.isNaN() ->
         "%.1f°".format(state.temperature) + (state.humidity?.let { " · $it%" } ?: "")
-    state.power == true && device.hasBrightness && state.brightness != null -> "Acceso · ${state.brightness}%"
-    state.power == true -> "Acceso"
-    state.power == false -> "Spento"
-    else -> "Stato sconosciuto"
+    state.power == true && device.hasBrightness && state.brightness != null ->
+        str(R.string.on_brightness, state.brightness)
+    state.power == true -> str(R.string.on)
+    state.power == false -> str(R.string.off)
+    else -> str(R.string.unknown_state)
 }
 
 fun List<Device>.toJsonArray(): JSONArray = JSONArray().also { arr -> forEach { arr.put(it.toJson()) } }
@@ -94,27 +98,27 @@ inline fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> =
     (0 until length()).map { transform(getJSONObject(it)) }
 
 /** A color or shade of white a lamp can be set to; [rgb] is how the app paints it. */
-data class ColorChoice(val alexaName: String, val label: String, val rgb: Long, val white: Boolean = false)
+data class ColorChoice(val alexaName: String, @StringRes val label: Int, val rgb: Long, val white: Boolean = false)
 
 val WHITE_CHOICES = listOf(
-    ColorChoice("warm_white", "Bianco caldo", 0xFFFFC58F, white = true),
-    ColorChoice("soft_white", "Bianco tenue", 0xFFFFDDB8, white = true),
-    ColorChoice("white", "Bianco", 0xFFFFF1E0, white = true),
-    ColorChoice("daylight_white", "Bianco luce diurna", 0xFFF3F6FF, white = true),
-    ColorChoice("cool_white", "Bianco freddo", 0xFFDCE8FF, white = true),
+    ColorChoice("warm_white", R.string.color_warm_white, 0xFFFFC58F, white = true),
+    ColorChoice("soft_white", R.string.color_soft_white, 0xFFFFDDB8, white = true),
+    ColorChoice("white", R.string.color_white, 0xFFFFF1E0, white = true),
+    ColorChoice("daylight_white", R.string.color_daylight_white, 0xFFF3F6FF, white = true),
+    ColorChoice("cool_white", R.string.color_cool_white, 0xFFDCE8FF, white = true),
 )
 
 val COLOR_CHOICES = listOf(
-    ColorChoice("red", "Rosso", 0xFFFF0000),
-    ColorChoice("orange", "Arancione", 0xFFFF8C00),
-    ColorChoice("yellow", "Giallo", 0xFFFFE600),
-    ColorChoice("green", "Verde", 0xFF00C853),
-    ColorChoice("turquoise", "Turchese", 0xFF40E0D0),
-    ColorChoice("cyan", "Ciano", 0xFF00E5FF),
-    ColorChoice("sky_blue", "Azzurro", 0xFF87CEEB),
-    ColorChoice("blue", "Blu", 0xFF2962FF),
-    ColorChoice("purple", "Viola", 0xFF8E24AA),
-    ColorChoice("magenta", "Magenta", 0xFFFF00FF),
-    ColorChoice("pink", "Rosa", 0xFFFF80AB),
-    ColorChoice("lavender", "Lavanda", 0xFFB39DDB),
+    ColorChoice("red", R.string.color_red, 0xFFFF0000),
+    ColorChoice("orange", R.string.color_orange, 0xFFFF8C00),
+    ColorChoice("yellow", R.string.color_yellow, 0xFFFFE600),
+    ColorChoice("green", R.string.color_green, 0xFF00C853),
+    ColorChoice("turquoise", R.string.color_turquoise, 0xFF40E0D0),
+    ColorChoice("cyan", R.string.color_cyan, 0xFF00E5FF),
+    ColorChoice("sky_blue", R.string.color_sky_blue, 0xFF87CEEB),
+    ColorChoice("blue", R.string.color_blue, 0xFF2962FF),
+    ColorChoice("purple", R.string.color_purple, 0xFF8E24AA),
+    ColorChoice("magenta", R.string.color_magenta, 0xFFFF00FF),
+    ColorChoice("pink", R.string.color_pink, 0xFFFF80AB),
+    ColorChoice("lavender", R.string.color_lavender, 0xFFB39DDB),
 )

@@ -86,4 +86,12 @@ class VoiceParserTest {
     fun betterGuessOfTheRecognizerWins() {
         assertEquals("Lampada", ran(run("accendi la rampa", "accendi la lampada")).devices.single().name)
     }
+
+    @Test
+    fun englishIsUnderstoodToo() {
+        val command = ran(run("turn off the Lampada, please"))
+        assertEquals("Lampada", command.devices.single().name)
+        assertEquals(false, command.on)
+        assertEquals("Salotto", asked(run("turn on everything in the Salotto")).first().room)
+    }
 }

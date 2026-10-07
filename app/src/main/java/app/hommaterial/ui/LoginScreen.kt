@@ -33,9 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.hommaterial.HomeViewModel
+import app.hommaterial.R
 import app.hommaterial.UiState
 import app.hommaterial.data.LOGIN_DOMAIN
 import app.hommaterial.data.MARKETPLACES
+import app.hommaterial.str
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,7 +45,7 @@ fun LoginScreen(state: UiState, vm: HomeViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Accedi ad Amazon") },
+                title = { Text(str(R.string.login_title)) },
                 actions = { if (!state.signingIn) MarketplacePicker(state, vm) },
             )
         },
@@ -61,7 +63,7 @@ fun LoginScreen(state: UiState, vm: HomeViewModel) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     CircularProgressIndicator()
-                    Text("Collegamento ad Alexa…", Modifier.padding(top = 16.dp))
+                    Text(str(R.string.login_connecting), Modifier.padding(top = 16.dp))
                 }
             } else {
                 // A failed attempt cannot be reused: bumping the key starts over with a new one.

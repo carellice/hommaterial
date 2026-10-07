@@ -2,6 +2,11 @@ package app.hommaterial.data
 
 import android.content.Context
 import android.util.Base64
+import app.hommaterial.R
+import app.hommaterial.str
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -13,12 +18,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.security.MessageDigest
-import java.security.SecureRandom
-import java.util.Locale
 
 /** Thrown when the stored login is missing or no longer accepted by Amazon. */
-class NotLoggedInException(message: String = "Accesso ad Amazon richiesto") : Exception(message)
+class NotLoggedInException(message: String = str(R.string.login_required)) : Exception(message)
 
 data class Session(val cookie: String, val csrf: String)
 
@@ -177,7 +179,7 @@ class AlexaAuth(context: Context, private val http: OkHttpClient) {
                 val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
                 json?.optJSONObject("response")?.optJSONObject("success")?.optJSONObject("tokens")
                     ?.optJSONObject("bearer")?.optString("refresh_token")?.takeIf { it.isNotEmpty() }
-                    ?: throw Exception("Registrazione rifiutata da Amazon (HTTP ${response.code})")
+                    ?: throw Exception(str(R.string.registration_refused, response.code))
             }
 
             prefs.edit().remove("cookie").remove("csrf").putString("refreshToken", refreshToken).apply()
@@ -233,9 +235,9 @@ class AlexaAuth(context: Context, private val http: OkHttpClient) {
             if (cookies == null) {
                 // The stored token is kept: a later sign-in replaces it, and a transient refusal heals itself.
                 if (response.code == 400 || response.code == 401) {
-                    throw NotLoggedInException("Accesso scaduto, entra di nuovo")
+                    throw NotLoggedInException(str(R.string.login_expired))
                 }
-                throw Exception("Amazon non risponde (HTTP ${response.code})")
+                throw Exception(str(R.string.amazon_no_answer, response.code))
             }
             cookies.mapObjects { jar[it.getString("Name")] = it.getString("Value") }
         }
@@ -256,7 +258,7 @@ class AlexaAuth(context: Context, private val http: OkHttpClient) {
                 if (i > 0) jar[pair.substring(0, i).trim()] = pair.substring(i + 1).trim()
             }
         }
-        val csrf = jar["csrf"] ?: throw Exception("Amazon non ha fornito il token csrf")
+        val csrf = jar["csrf"] ?: throw Exception(str(R.string.amazon_no_csrf))
         return Session(jar.entries.joinToString("; ") { "${it.key}=${it.value}" }, csrf)
     }
 

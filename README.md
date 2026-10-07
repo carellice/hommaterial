@@ -6,7 +6,7 @@
 
 <p align="center"><b>Comanda la tua smart home Alexa, senza fronzoli.</b></p>
 
-<p align="center">App Android · Gratuita · Open source · Solo italiano</p>
+<p align="center">App Android · Gratuita · Open source · Italiano e inglese</p>
 
 Un'app Android nativa, veloce e minimale per comandare i dispositivi smart home
 collegati al proprio account Alexa.
@@ -82,7 +82,8 @@ rinuncia.
 
 ## Limiti noti
 
-- L'interfaccia è solo in italiano.
+- L'interfaccia è in italiano e in inglese e segue la lingua del telefono; con
+  le altre lingue è in inglese.
 - È stata provata solo con un account **amazon.it**. Alla schermata di accesso
   si possono scegliere altri marketplace (amazon.de, .fr, .es, .co.uk, .com),
   ma **non sono stati verificati**.
