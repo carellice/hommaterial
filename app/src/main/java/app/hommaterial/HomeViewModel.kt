@@ -8,9 +8,11 @@ import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
+import app.hommaterial.data.History
 import app.hommaterial.data.LoginAttempt
 import app.hommaterial.data.Marketplace
 import app.hommaterial.data.NotLoggedInException
+import app.hommaterial.data.Reading
 import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
 import app.hommaterial.quick.PowerTile
@@ -65,6 +67,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val updater = Updater(app, alexa.http)
     private val local = Cache(app)
     private val cache = local.prefs
+    private val history = History(app)
     // Kept apart from the cache so that signing out does not bring the first-run notice back.
     private val settings = app.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
@@ -150,6 +153,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         auth.logout()
         Timers.cancelAll(getApplication())
         cache.edit().clear().apply()
+        history.clear()
         Quick.refresh(getApplication())
         _state.update { UiState(onboarded = true, loggedIn = false, marketplace = auth.marketplace, update = it.update, updateProgress = it.updateProgress) }
     }
@@ -170,6 +174,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     val states = early?.await().orEmpty().toMutableMap()
                     val missing = queryable(devices).filter { it.applianceId !in states }
                     if (missing.isNotEmpty()) states += api.states(missing)
+                    history.record(states)
                     // Devices with a command in flight keep their optimistic state.
                     val now = System.currentTimeMillis()
                     _state.update { s ->
@@ -259,6 +264,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(tileDevices = local.tileDevices()) }
         if (onTile) PowerTile.offer(getApplication(), slot, device.name)
     }
+
+    fun readings(device: Device): List<Reading> = history.readings(device.applianceId)
 
     fun toggleShowHidden() {
         _state.update { it.copy(showHidden = !it.showHidden) }

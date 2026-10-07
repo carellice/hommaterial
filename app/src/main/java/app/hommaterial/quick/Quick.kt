@@ -9,6 +9,7 @@ import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
+import app.hommaterial.data.History
 import app.hommaterial.data.NotLoggedInException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -74,11 +75,15 @@ object Quick {
         }
     }
 
-    /** Fetches the current state of the favorites, for the widget; failures leave things as they are. */
+    /** Fetches the current state of favorites and sensors, for the widget; failures leave things as they are. */
     suspend fun fetchFavorites(context: Context) {
         val cache = Cache(context)
-        val chosen = cache.favorites() - cache.hidden()
-        val devices = cache.devices().filter { it.applianceId in chosen }
+        val hidden = cache.hidden()
+        val favorites = cache.favorites()
+        // Sensors come along whether favorite or not, to keep their history going.
+        val devices = cache.devices().filter {
+            it.applianceId !in hidden && (it.applianceId in favorites || it.isSensor)
+        }
         if (devices.isEmpty()) return
         val fresh = try {
             Alexa.get(context).api.states(devices)
@@ -88,6 +93,7 @@ object Quick {
             return
         }
         cache.putStates(cache.states() + fresh)
+        History(context).record(fresh)
         refresh(context)
     }
 

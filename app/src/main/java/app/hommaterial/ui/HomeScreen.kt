@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.CleaningServices
@@ -318,7 +319,9 @@ private fun DeviceSheet(
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
+        Column(
+            Modifier.verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(iconFor(device), contentDescription = null, modifier = Modifier.size(28.dp))
                 Column(Modifier.padding(start = 16.dp)) {
@@ -364,6 +367,8 @@ private fun DeviceSheet(
                     }
                 }
             }
+
+            if (device.isSensor) HistoryCharts(remember(device, state) { vm.readings(device) })
 
             if (device.hasBrightness) {
                 Text(

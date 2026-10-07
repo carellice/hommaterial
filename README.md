@@ -60,7 +60,9 @@ collegati al proprio account Alexa.
 - Fino a cinque dispositivi a scelta si comandano dalle Impostazioni rapide di
   Android, ognuno con il suo riquadro.
 - Dall'intestazione di una stanza si accende o spegne tutto in una volta.
-- Mostra temperatura e umidità dei sensori.
+- Mostra temperatura e umidità dei sensori, con il grafico dell'ultimo giorno
+  o dell'ultima settimana. I dati li raccoglie il telefono quando l'app o il
+  widget si aggiornano, quindi il grafico parte vuoto e può avere dei buchi.
 - Permette di nascondere i dispositivi che non interessano.
 - All'apertura mostra subito l'ultimo stato noto e lo aggiorna in sottofondo.
 - Controlla una volta al giorno se su GitHub c'è una versione più recente e,
