@@ -60,6 +60,9 @@ collegati al proprio account Alexa.
 - Fino a cinque dispositivi a scelta si comandano dalle Impostazioni rapide di
   Android, ognuno con il suo riquadro.
 - Dall'intestazione di una stanza si accende o spegne tutto in una volta.
+- Col microfono in alto si dice "accendi la lampada" o "spegni tutto in
+  salotto". Capisce solo accensione e spegnimento, e chiede conferma quando il
+  nome non è esatto o riguarda una stanza intera.
 - Mostra temperatura e umidità dei sensori, con il grafico dell'ultimo giorno
   o dell'ultima settimana. I dati li raccoglie il telefono quando l'app o il
   widget si aggiornano, quindi il grafico parte vuoto e può avere dei buchi.
@@ -69,8 +72,9 @@ collegati al proprio account Alexa.
   se confermi, la scarica e la installa. Il controllo si può anche avviare a
   mano da "Controlla aggiornamenti" nel menu.
 
-Non fa altro, di proposito: niente routine, niente comandi vocali, niente
-musica.
+Non fa altro, di proposito: niente routine, niente assistente sempre in
+ascolto, niente musica. La voce la trascrive il riconoscimento vocale del
+telefono, non l'app.
 
 Il timer di spegnimento lo fa scattare il telefono: all'ora stabilita deve
 essere acceso e connesso. Se non c'è rete riprova per dieci minuti, poi

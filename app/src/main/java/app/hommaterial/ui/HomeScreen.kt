@@ -1,5 +1,11 @@
 package app.hommaterial.ui
 
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -26,11 +32,13 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.DevicesOther
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.Tv
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -71,6 +79,7 @@ import app.hommaterial.UiState
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.statusText
+import app.hommaterial.voice.VoiceResult
 import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
@@ -87,8 +96,18 @@ fun HomeScreen(state: UiState, vm: HomeViewModel) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
 
+    state.voice?.let { VoiceDialog(it, vm) }
+
     Scaffold(
-        topBar = { TopAppBar(title = { Title(state.updatedAt) }, actions = { OverflowMenu(state, vm) }) },
+        topBar = {
+            TopAppBar(
+                title = { Title(state.updatedAt) },
+                actions = {
+                    VoiceButton(vm)
+                    OverflowMenu(state, vm)
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         val visible = state.devices.filter { state.showHidden || it.applianceId !in state.hidden }
@@ -216,6 +235,51 @@ private fun ageText(updatedAt: Long, now: Long): String {
         minutes < 24 * 60 -> "Aggiornato ${minutes / 60} ore fa"
         else -> "Aggiornato più di un giorno fa"
     }
+}
+
+/** Asks the phone's speech recognizer for a sentence and passes on what it heard. */
+@Composable
+private fun VoiceButton(vm: HomeViewModel) {
+    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            vm.onSpeech(result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty())
+        }
+    }
+    IconButton(
+        onClick = {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "it-IT")
+                .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+                .putExtra(RecognizerIntent.EXTRA_PROMPT, "Accendi o spegni…")
+            try {
+                speech.launch(intent)
+            } catch (e: ActivityNotFoundException) {
+                vm.speechUnavailable()
+            }
+        },
+    ) {
+        Icon(Icons.Outlined.Mic, contentDescription = "Comando vocale")
+    }
+}
+
+@Composable
+private fun VoiceDialog(ask: VoiceResult.Ask, vm: HomeViewModel) {
+    AlertDialog(
+        onDismissRequest = vm::dismissVoice,
+        title = { Text("Cosa intendevi?") },
+        text = {
+            Column {
+                Text("Ho sentito «${ask.heard}».", modifier = Modifier.padding(bottom = 8.dp))
+                for (option in ask.options) {
+                    val count = if (option.room != null) " (${option.devices.size} dispositivi)" else ""
+                    TextButton(onClick = { vm.runVoice(option) }) { Text(option.label + count) }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = vm::dismissVoice) { Text("Annulla") } },
+    )
 }
 
 @Composable

@@ -18,6 +18,9 @@ import app.hommaterial.data.Updater
 import app.hommaterial.quick.PowerTile
 import app.hommaterial.quick.Quick
 import app.hommaterial.quick.Timers
+import app.hommaterial.voice.VoiceCommand
+import app.hommaterial.voice.VoiceResult
+import app.hommaterial.voice.parseVoice
 import app.hommaterial.data.toJsonArray
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -50,6 +53,8 @@ data class UiState(
     /** Switch-off time of each device with a timer, in epoch milliseconds. */
     val timers: Map<String, Long> = emptyMap(),
     val refreshing: Boolean = false,
+    /** A spoken command understood only in part, waiting for the user to pick what was meant. */
+    val voice: VoiceResult.Ask? = null,
     /** When the states were last fetched from Alexa, in epoch milliseconds. */
     val updatedAt: Long? = null,
     /** A newer release found on GitHub, while it is being offered or downloaded. */
@@ -263,6 +268,34 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         local.putTileDevice(slot, device.applianceId.takeIf { onTile })
         _state.update { it.copy(tileDevices = local.tileDevices()) }
         if (onTile) PowerTile.offer(getApplication(), slot, device.name)
+    }
+
+    /** Acts on what the speech recognizer [heard], its guesses best first. */
+    fun onSpeech(heard: List<String>) {
+        val s = _state.value
+        when (val result = parseVoice(heard, s.devices.filter { it.applianceId !in s.hidden })) {
+            is VoiceResult.Run -> runVoice(result.command)
+            is VoiceResult.Ask -> _state.update { it.copy(voice = result) }
+            is VoiceResult.Unknown -> _messages.tryEmit(
+                if (result.heard.isBlank()) "Non ho sentito niente" else "Non ho capito «${result.heard}»",
+            )
+        }
+    }
+
+    fun runVoice(command: VoiceCommand) {
+        dismissVoice()
+        _messages.tryEmit(command.label)
+        if (command.room != null) {
+            setRoomPower(command.devices, command.on)
+        } else {
+            setPower(command.devices.single(), command.on)
+        }
+    }
+
+    fun dismissVoice() = _state.update { it.copy(voice = null) }
+
+    fun speechUnavailable() {
+        _messages.tryEmit("Riconoscimento vocale non disponibile su questo telefono")
     }
 
     fun readings(device: Device): List<Reading> = history.readings(device.applianceId)
