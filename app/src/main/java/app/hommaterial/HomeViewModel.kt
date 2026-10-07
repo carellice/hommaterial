@@ -78,6 +78,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private var updateJob: Job? = null
 
     init {
+        // Shortcuts and widget may be stale after an update of the app or a change made elsewhere.
+        Quick.refresh(app)
         // The tile, the widget, the shortcuts and the timers act while the app is open too.
         viewModelScope.launch {
             Quick.changes.collect {

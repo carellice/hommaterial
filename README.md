@@ -53,8 +53,12 @@ collegati al proprio account Alexa.
 
 - Mostra i dispositivi raggruppati per stanza, come configurati in Alexa.
 - Un tocco accende o spegne.
-- Tenendo premuto si apre il pannello con accensione, spegnimento esplicito e
-  luminosità per le luci dimmerabili.
+- Tenendo premuto si apre il pannello con accensione, spegnimento esplicito,
+  timer di spegnimento e luminosità per le luci dimmerabili.
+- I preferiti stanno in cima alla lista, in un widget per la schermata Home e
+  sotto l'icona dell'app, tenendola premuta.
+- Un dispositivo a scelta si comanda dalle Impostazioni rapide di Android.
+- Dall'intestazione di una stanza si accende o spegne tutto in una volta.
 - Mostra temperatura e umidità dei sensori.
 - Permette di nascondere i dispositivi che non interessano.
 - All'apertura mostra subito l'ultimo stato noto e lo aggiorna in sottofondo.
@@ -64,6 +68,10 @@ collegati al proprio account Alexa.
 
 Non fa altro, di proposito: niente routine, niente comandi vocali, niente
 musica.
+
+Il timer di spegnimento lo fa scattare il telefono: all'ora stabilita deve
+essere acceso e connesso. Se non c'è rete riprova per dieci minuti, poi
+rinuncia.
 
 ## Limiti noti
 
