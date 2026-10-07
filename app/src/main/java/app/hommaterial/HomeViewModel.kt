@@ -76,6 +76,8 @@ data class UiState(
     val updatedAt: Long? = null,
     /** A newer release found on GitHub, while it is being offered or downloaded. */
     val update: Update? = null,
+    /** Whether [update] is being offered in a dialog; the settings offer it without one. */
+    val updatePrompt: Boolean = false,
     /** Download progress from 0 to 1, null when no download is running. */
     val updateProgress: Float? = null,
 )
@@ -188,6 +190,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 marketplace = auth.marketplace,
                 autoUpdate = it.autoUpdate,
                 update = it.update,
+                updatePrompt = it.updatePrompt,
                 updateProgress = it.updateProgress,
             )
         }
@@ -472,9 +475,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Looks for a newer release on GitHub. The automatic check runs at most once a day and stays
-     * silent unless it finds something; the [manual] one always reports its outcome.
+     * silent unless it finds something; the [manual] one always runs and reports its outcome. A
+     * [quiet] manual check, the one of the settings, only notes down what it finds.
      */
-    fun checkForUpdate(manual: Boolean) {
+    fun checkForUpdate(manual: Boolean, quiet: Boolean = false) {
         if (updateJob?.isActive == true || !_state.value.onboarded) return
         val now = System.currentTimeMillis()
         val last = settings.getLong("updateCheckedAt", 0)
@@ -484,16 +488,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 val update = updater.check()
                 settings.edit().putLong("updateCheckedAt", now).apply()
                 if (update != null) {
-                    _state.update { it.copy(update = update) }
-                } else if (manual) {
+                    _state.update { it.copy(update = update, updatePrompt = it.updatePrompt || !quiet) }
+                } else if (manual && !quiet) {
                     _messages.tryEmit(str(R.string.update_latest, updater.installedVersion))
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: java.io.IOException) {
-                if (manual) _messages.tryEmit(str(R.string.no_connection))
+                if (manual && !quiet) _messages.tryEmit(str(R.string.no_connection))
             } catch (e: Exception) {
-                if (manual) _messages.tryEmit(e.message ?: str(R.string.update_check_failed))
+                if (manual && !quiet) _messages.tryEmit(e.message ?: str(R.string.update_check_failed))
             }
         }
     }
@@ -513,14 +517,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 _messages.tryEmit(e.message ?: str(R.string.update_failed))
             }
-            _state.update { it.copy(update = null, updateProgress = null) }
+            // The update stays known: the installer may be turned down and the settings still offer it.
+            _state.update { it.copy(updatePrompt = false, updateProgress = null) }
         }
     }
 
     /** Closes the offer, cancelling the download if one is running. */
     fun dismissUpdate() {
         updateJob?.cancel()
-        _state.update { it.copy(update = null, updateProgress = null) }
+        _state.update { it.copy(updatePrompt = false, updateProgress = null) }
     }
 
     /** Runs [block], turning failures into a message or a return to the sign-in screen. */

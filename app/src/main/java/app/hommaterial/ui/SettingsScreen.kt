@@ -12,6 +12,8 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -37,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -66,6 +71,20 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
+    // Every visit looks for a newer release, whatever the automatic check is set to.
+    LaunchedEffect(Unit) { vm.checkForUpdate(manual = true, quiet = true) }
+    var confirmSignOut by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
+    if (confirmSignOut) SignOutDialog(onConfirm = vm::logout, onDismiss = { confirmSignOut = false })
+    if (confirmClear) {
+        ConfirmDialog(
+            title = str(R.string.history_clear_title),
+            text = str(R.string.history_clear_text),
+            confirm = str(R.string.history_clear_confirm),
+            onConfirm = vm::clearHistory,
+            onDismiss = { confirmClear = false },
+        )
+    }
 
     // Notifications are switched in the phone settings: read again on the way back from there.
     var returns by remember { mutableIntStateOf(0) }
@@ -95,6 +114,23 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
+        bottomBar = {
+            val update = state.update
+            if (update != null) {
+                Surface(tonalElevation = 3.dp) {
+                    Button(
+                        onClick = vm::installUpdate,
+                        enabled = state.updateProgress == null,
+                        modifier = Modifier
+                            .navigationBarsPadding()
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                    ) {
+                        Text(str(R.string.update_to, update.version))
+                    }
+                }
+            }
+        },
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
             item { Section(R.string.s_notifications) }
@@ -206,14 +242,14 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             item { Setting(title = str(R.string.backup_import), onClick = { import.launch(BACKUP_TYPES) }) }
 
             item { Section(R.string.s_data) }
-            item { Setting(title = str(R.string.history_clear), onClick = vm::clearHistory) }
+            item { Setting(title = str(R.string.history_clear), onClick = { confirmClear = true }) }
 
             item { Section(R.string.s_account) }
             item {
                 Setting(
                     title = str(R.string.sign_out),
                     text = str(R.string.account_marketplace, state.marketplace.domain),
-                    onClick = vm::logout,
+                    onClick = { confirmSignOut = true },
                 )
             }
 

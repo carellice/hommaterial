@@ -319,6 +319,8 @@ private fun VoiceDialog(ask: VoiceResult.Ask, vm: HomeViewModel) {
 @Composable
 private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     var open by remember { mutableStateOf(false) }
+    var confirmSignOut by remember { mutableStateOf(false) }
+    if (confirmSignOut) SignOutDialog(onConfirm = vm::logout, onDismiss = { confirmSignOut = false })
     IconButton(onClick = { open = true }) { Icon(Icons.Filled.MoreVert, contentDescription = str(R.string.menu)) }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
         DropdownMenuItem(text = { Text(str(R.string.refresh)) }, onClick = { open = false; vm.refresh() })
@@ -333,7 +335,7 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
             onClick = { open = false; vm.checkForUpdate(manual = true) },
         )
         DropdownMenuItem(text = { Text(str(R.string.settings)) }, onClick = { open = false; onSettings() })
-        DropdownMenuItem(text = { Text(str(R.string.sign_out)) }, onClick = { open = false; vm.logout() })
+        DropdownMenuItem(text = { Text(str(R.string.sign_out)) }, onClick = { open = false; confirmSignOut = true })
     }
 }
 

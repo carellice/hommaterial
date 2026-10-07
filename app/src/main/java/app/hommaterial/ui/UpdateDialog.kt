@@ -20,6 +20,8 @@ import app.hommaterial.str
 fun UpdateDialog(state: UiState, vm: HomeViewModel) {
     val update = state.update ?: return
     val progress = state.updateProgress
+    // A download started from the settings is followed here too.
+    if (!state.updatePrompt && progress == null) return
     AlertDialog(
         // While downloading the dialog only closes through "Annulla".
         onDismissRequest = { if (progress == null) vm.dismissUpdate() },
