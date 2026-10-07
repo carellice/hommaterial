@@ -43,6 +43,8 @@ data class UiState(
     val busy: Set<String> = emptySet(),
     val hidden: Set<String> = emptySet(),
     val showHidden: Boolean = false,
+    /** applianceIds repeated in the section at the top of the list. */
+    val favorites: Set<String> = emptySet(),
     val refreshing: Boolean = false,
     /** When the states were last fetched from Alexa, in epoch milliseconds. */
     val updatedAt: Long? = null,
@@ -94,6 +96,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             states = states,
             updatedAt = cache.getLong("updatedAt", 0).takeIf { it > 0 },
             hidden = cache.getStringSet("hidden", emptySet())!!.toSet(),
+            favorites = cache.getStringSet("favorites", emptySet())!!.toSet(),
         )
     }
 
@@ -204,6 +207,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(hidden = if (hidden) it.hidden + device.applianceId else it.hidden - device.applianceId)
         }
         cache.edit().putStringSet("hidden", _state.value.hidden).apply()
+    }
+
+    fun setFavorite(device: Device, favorite: Boolean) {
+        _state.update {
+            it.copy(favorites = if (favorite) it.favorites + device.applianceId else it.favorites - device.applianceId)
+        }
+        cache.edit().putStringSet("favorites", _state.value.favorites).apply()
     }
 
     fun toggleShowHidden() {

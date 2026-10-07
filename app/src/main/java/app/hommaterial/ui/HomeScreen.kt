@@ -69,6 +69,7 @@ import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 private const val NO_ROOM = "Altro"
+private const val FAVORITES = "Preferiti"
 private val TILE_HEIGHT = 116.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,28 +104,41 @@ fun HomeScreen(state: UiState, vm: HomeViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // Favorites are repeated at the top and stay in their rooms too.
+                val favorites = visible.filter { it.applianceId in state.favorites }.sortedBy { it.name.lowercase() }
+                if (favorites.isNotEmpty()) {
+                    item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(FAVORITES) }
+                    items(favorites, key = { "favorite:${it.applianceId}" }) { DeviceTile(it, state, vm) }
+                }
                 for ((room, devices) in rooms) {
-                    item(key = "room:$room", span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            room,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 12.dp),
-                        )
-                    }
-                    items(devices, key = { it.applianceId }) { device ->
-                        DeviceTile(
-                            device = device,
-                            state = state.states[device.applianceId],
-                            busy = device.applianceId in state.busy,
-                            hidden = device.applianceId in state.hidden,
-                            vm = vm,
-                        )
-                    }
+                    item(key = "room:$room", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(room) }
+                    items(devices, key = { it.applianceId }) { DeviceTile(it, state, vm) }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(name: String) {
+    Text(
+        name,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 12.dp),
+    )
+}
+
+@Composable
+private fun DeviceTile(device: Device, state: UiState, vm: HomeViewModel) {
+    DeviceTile(
+        device = device,
+        state = state.states[device.applianceId],
+        busy = device.applianceId in state.busy,
+        hidden = device.applianceId in state.hidden,
+        favorite = device.applianceId in state.favorites,
+        vm = vm,
+    )
 }
 
 @Composable
@@ -182,7 +196,14 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DeviceTile(device: Device, state: DeviceState?, busy: Boolean, hidden: Boolean, vm: HomeViewModel) {
+private fun DeviceTile(
+    device: Device,
+    state: DeviceState?,
+    busy: Boolean,
+    hidden: Boolean,
+    favorite: Boolean,
+    vm: HomeViewModel,
+) {
     val on = state?.power == true
     val powerKnown = state?.power != null
     val colors = MaterialTheme.colorScheme
@@ -233,13 +254,20 @@ private fun DeviceTile(device: Device, state: DeviceState?, busy: Boolean, hidde
         }
     }
 
-    if (details) DeviceSheet(device, state, hidden, vm, onDismiss = { details = false })
+    if (details) DeviceSheet(device, state, hidden, favorite, vm, onDismiss = { details = false })
 }
 
-/** Everything beyond the tap-to-toggle: explicit on/off, brightness, hiding. */
+/** Everything beyond the tap-to-toggle: explicit on/off, brightness, favorites, hiding. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DeviceSheet(device: Device, state: DeviceState?, hidden: Boolean, vm: HomeViewModel, onDismiss: () -> Unit) {
+private fun DeviceSheet(
+    device: Device,
+    state: DeviceState?,
+    hidden: Boolean,
+    favorite: Boolean,
+    vm: HomeViewModel,
+    onDismiss: () -> Unit,
+) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -275,9 +303,12 @@ private fun DeviceSheet(device: Device, state: DeviceState?, hidden: Boolean, vm
             }
 
             TextButton(
-                onClick = { vm.setHidden(device, !hidden); onDismiss() },
+                onClick = { vm.setFavorite(device, !favorite) },
                 modifier = Modifier.padding(top = 12.dp),
             ) {
+                Text(if (favorite) "Rimuovi dai preferiti" else "Aggiungi ai preferiti")
+            }
+            TextButton(onClick = { vm.setHidden(device, !hidden); onDismiss() }) {
                 Text(if (hidden) "Mostra di nuovo nella lista" else "Nascondi dalla lista")
             }
         }
