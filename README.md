@@ -88,6 +88,11 @@ collegati al proprio account Alexa.
 - Sugli schermi larghi, come i tablet, una barra laterale divide la casa in
   pagine (tutto, preferiti, gruppi e una per stanza) e il pannello di un
   dispositivo si apre di lato.
+- La modalità monitor, dalle Impostazioni, trasforma un tablet nel pannello
+  della casa: si scelgono le pagine, il loro ordine e i dispositivi di
+  ognuna, la dimensione dei riquadri e l'orologio; lo schermo resta acceso e
+  a tutto schermo e gli stati si aggiornano da soli. Ogni tablet ha il suo
+  pannello, anche con lo stesso account.
 
 Non fa altro, di proposito: niente routine, niente assistente sempre in
 ascolto, niente musica. La voce la trascrive il riconoscimento vocale del

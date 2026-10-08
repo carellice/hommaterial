@@ -144,7 +144,7 @@ fun MembersDialog(
 
 /**
  * Chooses among the [picks], in the order they are ticked and no more than [limit] when there is
- * one. [onSave] receives null when the user goes back to the favorites.
+ * one. [onSave] receives null when the user takes [reset], which goes back to no choice at all.
  */
 @Composable
 fun PicksDialog(
@@ -152,6 +152,7 @@ fun PicksDialog(
     picks: List<Pick>,
     initial: List<String>,
     limit: Int?,
+    reset: String = str(R.string.shortcuts_use_favorites),
     onSave: (List<String>?) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -181,7 +182,7 @@ fun PicksDialog(
         confirmButton = { TextButton(onClick = { onSave(chosen) }) { Text(str(R.string.save)) } },
         dismissButton = {
             Row {
-                TextButton(onClick = { onSave(null) }) { Text(str(R.string.shortcuts_use_favorites)) }
+                TextButton(onClick = { onSave(null) }) { Text(reset) }
                 TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) }
             }
         },

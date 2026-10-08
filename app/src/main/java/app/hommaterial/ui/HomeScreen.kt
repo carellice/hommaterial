@@ -130,7 +130,9 @@ import app.hommaterial.voice.VoiceResult
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
-private val TILE_HEIGHT = 116.dp
+// By size of the tiles: compact, normal, large.
+private val TILE_MIN_WIDTHS = listOf(132.dp, 156.dp, 216.dp)
+private val TILE_HEIGHTS = listOf(92.dp, 116.dp, 156.dp)
 private const val WIDE_DP = 600
 private const val SIDE_BAR_DP = 840
 private val TIMER_CHOICES =
@@ -147,15 +149,27 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     // A wide screen has room for a side bar that splits the home in pages.
     val width = LocalConfiguration.current.screenWidthDp
     val wide = width >= WIDE_DP
-    val pages = if (wide) availablePages(state) else listOf(PAGE_ALL)
-    var page by rememberSaveable { mutableStateOf(PAGE_ALL) }
+    val monitor = state.monitor
+    val pages = shownPages(state, wide)
+    // Nothing chosen yet opens the first page, which on a monitor is the one put first.
+    var page by rememberSaveable { mutableStateOf<String?>(null) }
     val current = page.takeIf { it in pages } ?: pages.first()
+    val clock = monitor.enabled && monitor.clock
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Title(state.updatedAt) },
                 actions = {
+                    // Without a side bar to sit in, the clock of the monitor goes up here.
+                    if (clock && pages.size == 1) {
+                        val now by rememberNow()
+                        Text(
+                            clock(now),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                    }
                     VoiceButton(vm)
                     OverflowMenu(state, vm, onSettings)
                 },
@@ -164,13 +178,14 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Row(Modifier.padding(padding).fillMaxSize()) {
-            if (pages.size > 1) SideBar(pages, current, expanded = width >= SIDE_BAR_DP) { page = it }
+            if (pages.size > 1) SideBar(pages, current, expanded = width >= SIDE_BAR_DP, clock) { page = it }
             PullToRefreshBox(
                 isRefreshing = state.refreshing,
                 onRefresh = vm::refresh,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             ) {
-                CompositionLocalProvider(LocalHomeLook provides HomeLook(wide)) {
+                val look = HomeLook(wide, if (monitor.enabled) monitor.tileSize else 1)
+                CompositionLocalProvider(LocalHomeLook provides look) {
                     Crossfade(current, label = "page") { PageGrid(it, state, vm) }
                 }
             }
@@ -178,14 +193,24 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     }
 }
 
-/** How the tiles look and behave, which depends on the screen the app is on. */
-private class HomeLook(val wide: Boolean = false)
+/** How the tiles look and behave, which depends on the screen the app is on and on the monitor mode. */
+private class HomeLook(val wide: Boolean = false, val tileSize: Int = 1) {
+    val tileMinWidth get() = TILE_MIN_WIDTHS[tileSize]
+    val tileHeight get() = TILE_HEIGHTS[tileSize]
+}
 
 private val LocalHomeLook = compositionLocalOf { HomeLook() }
 
 /** The pages to move between, with their names where the screen has room for them. */
 @Composable
-private fun SideBar(pages: List<String>, current: String, expanded: Boolean, onSelect: (String) -> Unit) {
+private fun SideBar(
+    pages: List<String>,
+    current: String,
+    expanded: Boolean,
+    clock: Boolean,
+    onSelect: (String) -> Unit,
+) {
+    val now by rememberNow()
     if (expanded) {
         Column(
             Modifier
@@ -195,6 +220,16 @@ private fun SideBar(pages: List<String>, current: String, expanded: Boolean, onS
                 .padding(start = 12.dp, end = 4.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            if (clock) {
+                Column(Modifier.padding(start = 16.dp, bottom = 12.dp)) {
+                    Text(clock(now), style = MaterialTheme.typography.displaySmall)
+                    Text(
+                        dateText(now),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             for (page in pages) {
                 NavigationDrawerItem(
                     label = { Text(pageLabel(page), maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -206,7 +241,17 @@ private fun SideBar(pages: List<String>, current: String, expanded: Boolean, onS
         }
     } else {
         NavigationRail(containerColor = Color.Transparent, windowInsets = WindowInsets(0)) {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (clock) {
+                    Text(
+                        clock(now),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                }
                 for (page in pages) {
                     NavigationRailItem(
                         selected = page == current,
@@ -225,18 +270,25 @@ private fun SideBar(pages: List<String>, current: String, expanded: Boolean, onS
 private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
     val visible = state.placed.filter { state.showHidden || it.applianceId !in state.hidden }
     val room = page.takeIf { it.startsWith(PAGE_ROOM) }?.removePrefix(PAGE_ROOM)?.ifEmpty { null }
+    // On a monitor a page may be narrowed to some of its devices, or of its groups.
+    val only = state.monitor.takeIf { it.enabled }?.only?.get(page)
     val shown = when {
         page == PAGE_ALL -> visible
         page == PAGE_FAVORITES -> visible.filter { it.applianceId in state.favorites }
         page == PAGE_GROUPS -> emptyList()
         else -> visible.filter { it.room == room }
-    }
+    }.filter { only == null || it.applianceId in only }
     // Named rooms first, alphabetically; devices without a room close the list.
     val noRoom = str(R.string.no_room)
     val rooms = (if (page == PAGE_FAVORITES) emptyList() else shown).groupBy { it.room ?: noRoom }
         .toSortedMap(compareBy<String> { it == noRoom }.thenBy { it.lowercase() })
     // Hidden devices do not count for a group, as they do not for a room.
-    val groups = (if (page == PAGE_ALL || page == PAGE_GROUPS) state.groups else emptyList()).map { group ->
+    val listed = when (page) {
+        PAGE_ALL -> state.groups
+        PAGE_GROUPS -> state.groups.filter { only == null || it.id in only }
+        else -> emptyList()
+    }
+    val groups = listed.map { group ->
         group to state.devices.filter {
             it.hasPower && it.applianceId in group.devices && it.applianceId !in state.hidden
         }
@@ -248,7 +300,7 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
         }
     }
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(156.dp),
+        columns = GridCells.Adaptive(LocalHomeLook.current.tileMinWidth),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -363,38 +415,50 @@ private fun GroupTile(group: Group, devices: List<Device>, state: UiState, onTog
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .height(TILE_HEIGHT)
+            .height(LocalHomeLook.current.tileHeight)
             .clip(RoundedCornerShape(20.dp))
             .clickable(onClick = onToggle),
     ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Layers, contentDescription = null, modifier = Modifier.size(26.dp))
-                Spacer(Modifier.weight(1f))
-                if (devices.any { it.applianceId in state.busy }) {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                }
-            }
+        TileBody(
+            icon = Icons.Outlined.Layers,
+            busy = devices.any { it.applianceId in state.busy },
+            name = group.name,
+            status = when (lit) {
+                0 -> str(R.string.off)
+                devices.size -> str(R.string.on)
+                else -> str(R.string.group_some_on, lit, devices.size)
+            },
+        )
+    }
+}
+
+/** What every tile shows, sized as the screen it is on asks. */
+@Composable
+private fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: String) {
+    val size = LocalHomeLook.current.tileSize
+    val type = MaterialTheme.typography
+    Column(Modifier.padding(listOf(12.dp, 14.dp, 18.dp)[size])) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(listOf(22.dp, 26.dp, 36.dp)[size]))
             Spacer(Modifier.weight(1f))
-            Text(
-                group.name,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                when (lit) {
-                    0 -> str(R.string.off)
-                    devices.size -> str(R.string.on)
-                    else -> str(R.string.group_some_on, lit, devices.size)
-                },
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.alpha(0.75f),
-            )
+            if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
         }
+        Spacer(Modifier.weight(1f))
+        Text(
+            name,
+            style = if (size == 2) type.titleLarge else type.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            // A compact tile has no room for a name on two lines.
+            maxLines = if (size == 0) 1 else 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            status,
+            style = if (size == 2) type.bodyLarge else type.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.alpha(0.75f),
+        )
     }
 }
 
@@ -572,7 +636,7 @@ private fun DeviceTile(
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .height(TILE_HEIGHT)
+            .height(LocalHomeLook.current.tileHeight)
             .alpha(if (hidden) 0.5f else 1f)
             .clip(RoundedCornerShape(20.dp))
             .combinedClickable(
@@ -587,30 +651,14 @@ private fun DeviceTile(
                 onLongClick = { details = true },
             ),
     ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(iconFor(device), contentDescription = null, modifier = Modifier.size(26.dp))
-                Spacer(Modifier.weight(1f))
-                if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-            }
-            Spacer(Modifier.weight(1f))
-            Text(
-                device.name,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                statusText(device, state).let { status ->
-                    if (timer == null) status else str(R.string.status_until, status, clock(timer))
-                },
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.alpha(0.75f),
-            )
-        }
+        TileBody(
+            icon = iconFor(device),
+            busy = busy,
+            name = device.name,
+            status = statusText(device, state).let { status ->
+                if (timer == null) status else str(R.string.status_until, status, clock(timer))
+            },
+        )
     }
 
     if (details) {

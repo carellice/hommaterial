@@ -30,6 +30,17 @@ fun availablePages(state: UiState): List<String> {
     }
 }
 
+/** The pages to move between: those chosen for the monitor, all of them on a wide screen, one on a phone. */
+fun shownPages(state: UiState, wide: Boolean): List<String> {
+    val available = availablePages(state)
+    val monitor = state.monitor
+    return when {
+        monitor.enabled -> monitor.pages?.filter { it in available }?.ifEmpty { null } ?: available
+        wide -> available
+        else -> listOf(PAGE_ALL)
+    }
+}
+
 fun pageLabel(page: String): String = when (page) {
     PAGE_ALL -> str(R.string.page_all)
     PAGE_FAVORITES -> str(R.string.favorites)

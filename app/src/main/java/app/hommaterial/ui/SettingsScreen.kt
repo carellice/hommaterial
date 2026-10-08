@@ -16,6 +16,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -414,6 +415,10 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 }
             }
 
+            if (state.devices.isNotEmpty()) {
+                Section(R.string.s_monitor, R.string.monitor_text) { MonitorSettings(state, vm) }
+            }
+
             Section(R.string.s_tiles, R.string.tiles_text) {
                 state.tileDevices.forEachIndexed { slot, id ->
                     val name = names[id]
@@ -537,9 +542,18 @@ private fun Accordion(
 
 /** An entry of an ordered list, with the arrows that move it one place up or down. */
 @Composable
-private fun OrderRow(name: String, first: Boolean, last: Boolean, onMove: (Int) -> Unit) {
+internal fun OrderRow(
+    name: String,
+    first: Boolean,
+    last: Boolean,
+    text: String? = null,
+    onClick: (() -> Unit)? = null,
+    onMove: (Int) -> Unit,
+) {
     Setting(
         title = name,
+        text = text,
+        onClick = onClick,
         trailing = {
             Row {
                 IconButton(onClick = { onMove(-1) }, enabled = !first) {
@@ -555,10 +569,15 @@ private fun OrderRow(name: String, first: Boolean, last: Boolean, onMove: (Int) 
 
 /** A setting with a handful of values, all in sight. */
 @Composable
-private fun Chips(@StringRes title: Int, choices: List<Pair<Int, String>>, selected: Int, onSelect: (Int) -> Unit) {
+internal fun Chips(
+    @StringRes title: Int,
+    choices: List<Pair<Int, String>>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(str(title), style = MaterialTheme.typography.bodyLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for ((value, label) in choices) {
                 FilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(label) })
             }
@@ -567,7 +586,7 @@ private fun Chips(@StringRes title: Int, choices: List<Pair<Int, String>>, selec
 }
 
 @Composable
-private fun Toggle(@StringRes title: Int, @StringRes text: Int, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun Toggle(@StringRes title: Int, @StringRes text: Int, checked: Boolean, onChange: (Boolean) -> Unit) {
     Setting(
         title = str(title),
         text = str(text),
@@ -582,7 +601,7 @@ private fun AddIcon() {
 }
 
 @Composable
-private fun Setting(
+internal fun Setting(
     title: String,
     text: String? = null,
     onClick: (() -> Unit)? = null,

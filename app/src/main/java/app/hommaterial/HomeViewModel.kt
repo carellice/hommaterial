@@ -18,6 +18,7 @@ import app.hommaterial.data.Group
 import app.hommaterial.data.History
 import app.hommaterial.data.LoginAttempt
 import app.hommaterial.data.Marketplace
+import app.hommaterial.data.MonitorConfig
 import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Reading
 import app.hommaterial.data.Update
@@ -83,6 +84,8 @@ data class UiState(
     val autoUpdate: Boolean = true,
     /** 0 follows the phone, 1 is always light, 2 always dark. */
     val theme: Int = 0,
+    /** How this tablet behaves as the panel of the home. */
+    val monitor: MonitorConfig = MonitorConfig(),
     val refreshing: Boolean = false,
     /** A spoken command understood only in part, waiting for the user to pick what was meant. */
     val voice: VoiceResult.Ask? = null,
@@ -164,6 +167,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             alerts = Alerts.all(getApplication()),
             autoUpdate = settings.getBoolean("autoUpdate", true),
             theme = settings.getInt("theme", 0),
+            monitor = runCatching {
+                MonitorConfig.fromJson(JSONObject(settings.getString("monitor", "{}")!!))
+            }.getOrDefault(MonitorConfig()),
         )
     }
 
@@ -216,6 +222,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 marketplace = auth.marketplace,
                 autoUpdate = it.autoUpdate,
                 theme = it.theme,
+                monitor = it.monitor,
                 update = it.update,
                 updatePrompt = it.updatePrompt,
                 updateProgress = it.updateProgress,
@@ -239,19 +246,32 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     val states = early?.await().orEmpty().toMutableMap()
                     val missing = queryable(devices).filter { it.applianceId !in states }
                     if (missing.isNotEmpty()) states += api.states(missing)
-                    history.record(states)
-                    Alerts.check(getApplication(), states)
-                    // Devices with a command in flight keep their optimistic state.
-                    val now = System.currentTimeMillis()
-                    _state.update { s ->
-                        s.copy(states = s.states + states.filterKeys { it !in s.busy }, updatedAt = now)
-                    }
-                    cache.edit().putLong("updatedAt", now).apply()
-                    saveCache()
+                    received(states)
                 }
             }
             _state.update { it.copy(refreshing = false) }
         }
+    }
+
+    /**
+     * Fetches the states alone and says nothing when it cannot: for a screen that stays open and
+     * asks again shortly. The list of devices rarely changes and waits for a real [refresh].
+     */
+    fun poll() {
+        if (!_state.value.loggedIn || refreshJob?.isActive == true) return
+        val known = queryable(_state.value.devices)
+        if (known.isEmpty()) return refresh()
+        refreshJob = viewModelScope.launch { guarded(quiet = true) { received(api.states(known)) } }
+    }
+
+    private fun received(states: Map<String, DeviceState>) {
+        history.record(states)
+        Alerts.check(getApplication(), states)
+        // Devices with a command in flight keep their optimistic state.
+        val now = System.currentTimeMillis()
+        _state.update { s -> s.copy(states = s.states + states.filterKeys { it !in s.busy }, updatedAt = now) }
+        cache.edit().putLong("updatedAt", now).apply()
+        saveCache()
     }
 
     private fun queryable(devices: List<Device>): List<Device> {
@@ -491,6 +511,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(theme = theme) }
     }
 
+    fun setMonitor(config: MonitorConfig) {
+        settings.edit().putString("monitor", config.toJson().toString()).apply()
+        _state.update { it.copy(monitor = config) }
+    }
+
     fun clearHistory() {
         history.clear()
         _messages.tryEmit(str(R.string.history_cleared))
@@ -662,8 +687,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(updatePrompt = false, updateProgress = null) }
     }
 
-    /** Runs [block], turning failures into a message or a return to the sign-in screen. */
-    private suspend fun guarded(block: suspend () -> Unit): Boolean = try {
+    /** Runs [block], turning failures into a message, unless [quiet], or a return to the sign-in screen. */
+    private suspend fun guarded(quiet: Boolean = false, block: suspend () -> Unit): Boolean = try {
         block()
         true
     } catch (e: CancellationException) {
@@ -672,10 +697,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(loggedIn = false, loginMessage = e.message) }
         false
     } catch (e: java.io.IOException) {
-        _messages.tryEmit(str(R.string.no_connection))
+        if (!quiet) _messages.tryEmit(str(R.string.no_connection))
         false
     } catch (e: Exception) {
-        _messages.tryEmit(e.message ?: str(R.string.something_wrong))
+        if (!quiet) _messages.tryEmit(e.message ?: str(R.string.something_wrong))
         false
     }
 }
