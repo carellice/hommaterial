@@ -10,6 +10,11 @@ import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,11 +27,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -61,6 +69,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
@@ -72,13 +83,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,12 +100,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.UiState
@@ -114,6 +131,8 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 private val TILE_HEIGHT = 116.dp
+private const val WIDE_DP = 600
+private const val SIDE_BAR_DP = 840
 private val TIMER_CHOICES =
     listOf(R.string.timer_15 to 15, R.string.timer_30 to 30, R.string.timer_60 to 60, R.string.timer_120 to 120)
 
@@ -124,6 +143,13 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
 
     state.voice?.let { VoiceDialog(it, vm) }
+
+    // A wide screen has room for a side bar that splits the home in pages.
+    val width = LocalConfiguration.current.screenWidthDp
+    val wide = width >= WIDE_DP
+    val pages = if (wide) availablePages(state) else listOf(PAGE_ALL)
+    var page by rememberSaveable { mutableStateOf(PAGE_ALL) }
+    val current = page.takeIf { it in pages } ?: pages.first()
 
     Scaffold(
         topBar = {
@@ -137,78 +163,138 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        val visible = state.placed.filter { state.showHidden || it.applianceId !in state.hidden }
-        // Named rooms first, alphabetically; devices without a room close the list.
-        val noRoom = str(R.string.no_room)
-        val rooms = visible.groupBy { it.room ?: noRoom }
-            .toSortedMap(compareBy<String> { it == noRoom }.thenBy { it.lowercase() })
-
-        PullToRefreshBox(
-            isRefreshing = state.refreshing,
-            onRefresh = vm::refresh,
-            modifier = Modifier.padding(padding).fillMaxSize(),
-        ) {
-            if (visible.isEmpty() && !state.refreshing) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(str(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(156.dp),
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+        Row(Modifier.padding(padding).fillMaxSize()) {
+            if (pages.size > 1) SideBar(pages, current, expanded = width >= SIDE_BAR_DP) { page = it }
+            PullToRefreshBox(
+                isRefreshing = state.refreshing,
+                onRefresh = vm::refresh,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
             ) {
-                // Running timers come first, the one closest to switching off at the top.
-                val timers = state.timers.entries.sortedBy { it.value }
-                    .mapNotNull { (id, at) -> state.placed.find { it.applianceId == id }?.let { it to at } }
-                if (timers.isNotEmpty()) {
-                    item(key = "timers", span = { GridItemSpan(maxLineSpan) }) {
-                        SectionHeader(str(R.string.s_timers))
-                    }
-                    items(timers, key = { "timer:${it.first.applianceId}" }, span = { GridItemSpan(maxLineSpan) }) {
-                        TimerRow(it.first, it.second) { vm.cancelTimer(it.first) }
-                    }
-                }
-                // Favorites are repeated at the top and stay in their rooms too.
-                val favorites = visible.filter { it.applianceId in state.favorites }.sortedBy { it.name.lowercase() }
-                if (favorites.isNotEmpty()) {
-                    item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) {
-                        SectionHeader(str(R.string.favorites))
-                    }
-                    items(favorites, key = { "favorite:${it.applianceId}" }) { DeviceTile(it, state, vm) }
-                }
-                // Hidden devices do not count for a group, as they do not for a room.
-                val groups = state.groups.map { group ->
-                    group to state.devices.filter {
-                        it.hasPower && it.applianceId in group.devices && it.applianceId !in state.hidden
-                    }
-                }.filter { it.second.isNotEmpty() }
-                if (groups.isNotEmpty()) {
-                    item(key = "groups", span = { GridItemSpan(maxLineSpan) }) {
-                        SectionHeader(str(R.string.s_groups))
-                    }
-                    items(groups, key = { "group:${it.first.id}" }) { (group, devices) ->
-                        GroupTile(group, devices, state) { vm.toggleGroup(group) }
-                    }
-                }
-                for ((room, devices) in rooms) {
-                    item(key = "room:$room", span = { GridItemSpan(maxLineSpan) }) {
-                        // The devices without a room are unrelated: switching them together makes no sense.
-                        // Hidden devices stay out of it even while they are being shown.
-                        val switchable = if (room == noRoom) emptyList() else {
-                            devices.filter { it.hasPower && it.applianceId !in state.hidden }
-                        }
-                        if (switchable.size > 1) {
-                            SectionHeader(room) { on -> vm.setRoomPower(switchable, on) }
-                        } else {
-                            SectionHeader(room)
-                        }
-                    }
-                    items(devices, key = { it.applianceId }) { DeviceTile(it, state, vm) }
+                CompositionLocalProvider(LocalHomeLook provides HomeLook(wide)) {
+                    Crossfade(current, label = "page") { PageGrid(it, state, vm) }
                 }
             }
+        }
+    }
+}
+
+/** How the tiles look and behave, which depends on the screen the app is on. */
+private class HomeLook(val wide: Boolean = false)
+
+private val LocalHomeLook = compositionLocalOf { HomeLook() }
+
+/** The pages to move between, with their names where the screen has room for them. */
+@Composable
+private fun SideBar(pages: List<String>, current: String, expanded: Boolean, onSelect: (String) -> Unit) {
+    if (expanded) {
+        Column(
+            Modifier
+                .width(220.dp)
+                .fillMaxHeight()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 12.dp, end = 4.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            for (page in pages) {
+                NavigationDrawerItem(
+                    label = { Text(pageLabel(page), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    icon = { Icon(pageIcon(page), contentDescription = null) },
+                    selected = page == current,
+                    onClick = { onSelect(page) },
+                )
+            }
+        }
+    } else {
+        NavigationRail(containerColor = Color.Transparent, windowInsets = WindowInsets(0)) {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                for (page in pages) {
+                    NavigationRailItem(
+                        selected = page == current,
+                        onClick = { onSelect(page) },
+                        icon = { Icon(pageIcon(page), contentDescription = null) },
+                        label = { Text(pageLabel(page), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The tiles of a page: the whole home in sections, or only the favorites, the groups or a room. */
+@Composable
+private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
+    val visible = state.placed.filter { state.showHidden || it.applianceId !in state.hidden }
+    val room = page.takeIf { it.startsWith(PAGE_ROOM) }?.removePrefix(PAGE_ROOM)?.ifEmpty { null }
+    val shown = when {
+        page == PAGE_ALL -> visible
+        page == PAGE_FAVORITES -> visible.filter { it.applianceId in state.favorites }
+        page == PAGE_GROUPS -> emptyList()
+        else -> visible.filter { it.room == room }
+    }
+    // Named rooms first, alphabetically; devices without a room close the list.
+    val noRoom = str(R.string.no_room)
+    val rooms = (if (page == PAGE_FAVORITES) emptyList() else shown).groupBy { it.room ?: noRoom }
+        .toSortedMap(compareBy<String> { it == noRoom }.thenBy { it.lowercase() })
+    // Hidden devices do not count for a group, as they do not for a room.
+    val groups = (if (page == PAGE_ALL || page == PAGE_GROUPS) state.groups else emptyList()).map { group ->
+        group to state.devices.filter {
+            it.hasPower && it.applianceId in group.devices && it.applianceId !in state.hidden
+        }
+    }.filter { it.second.isNotEmpty() }
+
+    if (shown.isEmpty() && groups.isEmpty() && !state.refreshing) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(str(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(156.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Running timers come first, the one closest to switching off at the top.
+        val timers = state.timers.entries.sortedBy { it.value }
+            .mapNotNull { (id, at) -> shown.find { it.applianceId == id }?.let { it to at } }
+        if (timers.isNotEmpty()) {
+            item(key = "timers", span = { GridItemSpan(maxLineSpan) }) {
+                SectionHeader(str(R.string.s_timers))
+            }
+            items(timers, key = { "timer:${it.first.applianceId}" }, span = { GridItemSpan(maxLineSpan) }) {
+                TimerRow(it.first, it.second) { vm.cancelTimer(it.first) }
+            }
+        }
+        // Favorites are repeated at the top and stay in their rooms too.
+        val favorites = shown.filter { it.applianceId in state.favorites }.sortedBy { it.name.lowercase() }
+        if (favorites.isNotEmpty() && (page == PAGE_ALL || page == PAGE_FAVORITES)) {
+            item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) {
+                SectionHeader(str(R.string.favorites))
+            }
+            items(favorites, key = { "favorite:${it.applianceId}" }) { DeviceTile(it, state, vm) }
+        }
+        if (groups.isNotEmpty()) {
+            item(key = "groups", span = { GridItemSpan(maxLineSpan) }) {
+                SectionHeader(str(R.string.s_groups))
+            }
+            items(groups, key = { "group:${it.first.id}" }) { (group, devices) ->
+                GroupTile(group, devices, state) { vm.toggleGroup(group) }
+            }
+        }
+        for ((name, devices) in rooms) {
+            item(key = "room:$name", span = { GridItemSpan(maxLineSpan) }) {
+                // The devices without a room are unrelated: switching them together makes no sense.
+                // Hidden devices stay out of it even while they are being shown.
+                val switchable = if (name == noRoom) emptyList() else {
+                    devices.filter { it.hasPower && it.applianceId !in state.hidden }
+                }
+                if (switchable.size > 1) {
+                    SectionHeader(name) { on -> vm.setRoomPower(switchable, on) }
+                } else {
+                    SectionHeader(name)
+                }
+            }
+            items(devices, key = { it.applianceId }) { DeviceTile(it, state, vm) }
         }
     }
 }
@@ -548,7 +634,7 @@ private fun DeviceSheet(
     onDismiss: () -> Unit,
 ) {
     val askNotifications = rememberNotificationRequest()
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    DetailsContainer(onDismiss) {
         Column(
             Modifier.verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
         ) {
@@ -664,6 +750,37 @@ private fun DeviceSheet(
             }
             TextButton(onClick = { vm.setHidden(device, !hidden); onDismiss() }) {
                 Text(str(if (hidden) R.string.unhide else R.string.hide))
+            }
+        }
+    }
+}
+
+/** A sheet from the bottom on a phone, a panel on the side where the screen is wide. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DetailsContainer(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    if (!LocalHomeLook.current.wide) {
+        ModalBottomSheet(onDismissRequest = onDismiss) { content() }
+        return
+    }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        val shown = remember { MutableTransitionState(false).apply { targetState = true } }
+        Box(
+            Modifier.fillMaxSize().clickable(interactionSource = null, indication = null, onClick = onDismiss),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            AnimatedVisibility(shown, enter = slideInHorizontally { it } + fadeIn()) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp),
+                    // Taps on the panel must not reach the area around it, which closes it.
+                    modifier = Modifier
+                        .width(420.dp)
+                        .fillMaxHeight()
+                        .clickable(interactionSource = null, indication = null, onClick = {}),
+                ) {
+                    Box(Modifier.padding(top = 24.dp)) { content() }
+                }
             }
         }
     }

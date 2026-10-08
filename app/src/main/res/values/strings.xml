@@ -255,6 +255,7 @@
     <string name="widget_order">Order</string>
     <string name="move_up">Move up</string>
     <string name="move_down">Move down</string>
+    <string name="page_all">Home</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

@@ -245,6 +245,7 @@
     <string name="widget_order">Ordine</string>
     <string name="move_up">Sposta su</string>
     <string name="move_down">Sposta giù</string>
+    <string name="page_all">Casa</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>

@@ -85,6 +85,9 @@ collegati al proprio account Alexa.
 - I gruppi accendono o spengono insieme più dispositivi di stanze diverse.
 - Sotto l'icona dell'app, tenendola premuta, compaiono i dispositivi e i
   gruppi scelti nelle Impostazioni, oppure i preferiti.
+- Sugli schermi larghi, come i tablet, una barra laterale divide la casa in
+  pagine (tutto, preferiti, gruppi e una per stanza) e il pannello di un
+  dispositivo si apre di lato.
 
 Non fa altro, di proposito: niente routine, niente assistente sempre in
 ascolto, niente musica. La voce la trascrive il riconoscimento vocale del
