@@ -322,6 +322,8 @@
     <string name="chart_reading" translatable="false">%1$s · %2$s</string>
     <string name="chart_hint">Hold a finger on the chart to read a value.</string>
     <string name="tile_label" translatable="false">%1$s · %2$s</string>
+    <string name="group_turn_off_in">Turn everything off in</string>
+    <string name="group_timers_some">Timer on %1$d of %2$d</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

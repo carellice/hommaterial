@@ -87,6 +87,8 @@ collegati al proprio account Alexa.
 - Le stanze si possono riorganizzare dentro l'app, creandone quante se ne
   vuole e scegliendo i dispositivi di ognuna, senza cambiare niente in Alexa.
 - I gruppi accendono o spengono insieme più dispositivi di stanze diverse.
+  Tenendo premuto un gruppo si apre il suo pannello: i dispositivi si
+  comandano uno per uno e il timer di spegnimento vale per tutto il gruppo.
 - Sotto l'icona dell'app, tenendola premuta, compaiono i dispositivi e i
   gruppi scelti nelle Impostazioni, oppure i preferiti.
 - Sugli schermi larghi, come i tablet, una barra laterale divide la casa in

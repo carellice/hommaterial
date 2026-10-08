@@ -311,6 +311,8 @@
     <string name="backup_monitor_no">Lascia quella attuale</string>
     <string name="min_avg_max">min %1$s · media %2$s · max %3$s</string>
     <string name="chart_hint">Tieni il dito sul grafico per leggere un valore.</string>
+    <string name="group_turn_off_in">Spegni tutto tra</string>
+    <string name="group_timers_some">Timer su %1$d di %2$d</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>

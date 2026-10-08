@@ -330,7 +330,7 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
                 SectionHeader(str(R.string.s_groups))
             }
             items(groups, key = { "group:${it.first.id}" }) { (group, devices) ->
-                GroupTile(group, devices, state) { vm.toggleGroup(group) }
+                GroupTile(group, devices, state, vm) { vm.toggleGroup(group) }
             }
         }
         for ((name, devices) in rooms) {
@@ -404,11 +404,17 @@ private fun DeviceTile(device: Device, state: UiState, vm: HomeViewModel) {
     )
 }
 
-/** A group as one tile: lit while any of its devices is on, and a tap switches them all. */
+/**
+ * A group as one tile: lit while any of its devices is on, and a tap switches them all. Holding
+ * it opens the devices one by one.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun GroupTile(group: Group, devices: List<Device>, state: UiState, onToggle: () -> Unit) {
+private fun GroupTile(group: Group, devices: List<Device>, state: UiState, vm: HomeViewModel, onToggle: () -> Unit) {
     val lit = devices.count { state.states[it.applianceId]?.power == true }
     val colors = MaterialTheme.colorScheme
+    var details by remember { mutableStateOf(false) }
+    if (details) GroupSheet(group, devices, state, vm, onDismiss = { details = false })
     Surface(
         color = if (lit > 0) colors.primaryContainer else colors.surfaceContainerHigh,
         contentColor = if (lit > 0) colors.onPrimaryContainer else colors.onSurface,
@@ -417,18 +423,112 @@ private fun GroupTile(group: Group, devices: List<Device>, state: UiState, onTog
             .fillMaxWidth()
             .height(LocalHomeLook.current.tileHeight)
             .clip(RoundedCornerShape(20.dp))
-            .clickable(onClick = onToggle),
+            .combinedClickable(onClick = onToggle, onLongClick = { details = true }),
     ) {
         TileBody(
             icon = Icons.Outlined.Layers,
             busy = devices.any { it.applianceId in state.busy },
             name = group.name,
-            status = when (lit) {
-                0 -> str(R.string.off)
-                devices.size -> str(R.string.on)
-                else -> str(R.string.group_some_on, lit, devices.size)
-            },
+            status = groupStatus(lit, devices.size),
         )
+    }
+}
+
+private fun groupStatus(lit: Int, size: Int): String = when (lit) {
+    0 -> str(R.string.off)
+    size -> str(R.string.on)
+    else -> str(R.string.group_some_on, lit, size)
+}
+
+/** A group opened up: everything on or off, a switch-off timer for all, and each device by itself. */
+@Composable
+private fun GroupSheet(group: Group, devices: List<Device>, state: UiState, vm: HomeViewModel, onDismiss: () -> Unit) {
+    val askNotifications = rememberNotificationRequest()
+    val now = System.currentTimeMillis()
+    val timers = devices.mapNotNull { state.timers[it.applianceId]?.takeIf { at -> at > now } }
+    DetailsContainer(onDismiss) {
+        Column(
+            Modifier.verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Layers, contentDescription = null, modifier = Modifier.size(28.dp))
+                Column(Modifier.padding(start = 16.dp)) {
+                    Text(group.name, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        groupStatus(devices.count { state.states[it.applianceId]?.power == true }, devices.size),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FilledTonalButton(onClick = { vm.setRoomPower(devices, true) }, modifier = Modifier.weight(1f)) {
+                    Text(str(R.string.all_on))
+                }
+                FilledTonalButton(onClick = { vm.setRoomPower(devices, false) }, modifier = Modifier.weight(1f)) {
+                    Text(str(R.string.all_off))
+                }
+            }
+
+            Text(
+                str(R.string.group_turn_off_in),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(top = 20.dp),
+            )
+            if (timers.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // The devices may carry timers of their own: the group says when the last one goes off.
+                    val text = if (timers.size == devices.size) {
+                        str(R.string.turns_off_at, clock(timers.max()))
+                    } else {
+                        str(R.string.group_timers_some, timers.size, devices.size)
+                    }
+                    Text(text, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { devices.forEach(vm::cancelTimer) }) { Text(str(R.string.cancel_timer)) }
+                }
+            }
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                for ((label, minutes) in TIMER_CHOICES) {
+                    AssistChip(
+                        onClick = { askNotifications(); devices.forEach { vm.setTimer(it, minutes) } },
+                        label = { Text(str(label)) },
+                    )
+                }
+            }
+
+            Text(
+                str(R.string.s_devices),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
+            )
+            for (device in devices.sortedBy { it.name.lowercase() }) {
+                val id = device.applianceId
+                val power = state.states[id]?.power
+                Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(iconFor(device), contentDescription = null, modifier = Modifier.size(24.dp))
+                    Column(Modifier.padding(start = 16.dp).weight(1f)) {
+                        Text(device.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val status = statusText(device, state.states[id])
+                        val timer = state.timers[id]?.takeIf { it > now }
+                        Text(
+                            if (timer == null) status else str(R.string.status_until, status, clock(timer)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (id in state.busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Switch(
+                        checked = power == true,
+                        onCheckedChange = { vm.setPower(device, it) },
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
