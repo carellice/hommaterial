@@ -96,6 +96,10 @@ collegati al proprio account Alexa.
 - In modalità monitor, dopo qualche minuto senza tocchi compare la schermata
   di riposo: schermo abbassato, orologio, data, sensori, dispositivi accesi
   e timer, a scelta. Di notte può restare solo l'orologio, al minimo.
+- Un PIN facoltativo protegge la modalità monitor: serve per aprire le
+  Impostazioni e per uscire, e chi tocca il pannello può solo comandare i
+  dispositivi. Il backup include la modalità monitor, senza il PIN, e
+  all'importazione chiede se ripristinarla.
 
 Non fa altro, di proposito: niente routine, niente assistente sempre in
 ascolto, niente musica. La voce la trascrive il riconoscimento vocale del

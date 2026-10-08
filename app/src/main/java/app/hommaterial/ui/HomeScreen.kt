@@ -131,7 +131,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 // By size of the tiles: compact, normal, large.
-private val TILE_MIN_WIDTHS = listOf(132.dp, 156.dp, 216.dp)
+private val TILE_MIN_WIDTHS = listOf(132.dp, 148.dp, 216.dp)
 private val TILE_HEIGHTS = listOf(92.dp, 116.dp, 156.dp)
 private const val WIDE_DP = 600
 private const val SIDE_BAR_DP = 840
@@ -184,7 +184,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                 onRefresh = vm::refresh,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             ) {
-                val look = HomeLook(wide, if (monitor.enabled) monitor.tileSize else 1)
+                val look = HomeLook(wide, if (monitor.enabled) monitor.tileSize else 1, state.locked)
                 CompositionLocalProvider(LocalHomeLook provides look) {
                     Crossfade(current, label = "page") { PageGrid(it, state, vm) }
                 }
@@ -194,7 +194,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
 }
 
 /** How the tiles look and behave, which depends on the screen the app is on and on the monitor mode. */
-private class HomeLook(val wide: Boolean = false, val tileSize: Int = 1) {
+private class HomeLook(val wide: Boolean = false, val tileSize: Int = 1, val locked: Boolean = false) {
     val tileMinWidth get() = TILE_MIN_WIDTHS[tileSize]
     val tileHeight get() = TILE_HEIGHTS[tileSize]
 }
@@ -593,6 +593,16 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
     var open by remember { mutableStateOf(false) }
     var confirmSignOut by remember { mutableStateOf(false) }
     if (confirmSignOut) SignOutDialog(onConfirm = vm::logout, onDismiss = { confirmSignOut = false })
+    // What waits for the PIN of the monitor before it happens.
+    var behindPin by remember { mutableStateOf<(() -> Unit)?>(null) }
+    behindPin?.let { action ->
+        PinDialog(
+            title = str(R.string.pin_ask_title),
+            onSubmit = { pin -> vm.checkPin(pin).also { if (it) { behindPin = null; action() } } },
+            onDismiss = { behindPin = null },
+        )
+    }
+    val guarded = { action: () -> Unit -> if (state.locked) behindPin = action else action() }
     IconButton(onClick = { open = true }) { Icon(Icons.Filled.MoreVert, contentDescription = str(R.string.menu)) }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
         DropdownMenuItem(text = { Text(str(R.string.refresh)) }, onClick = { open = false; vm.refresh() })
@@ -606,8 +616,11 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
             text = { Text(str(R.string.check_updates)) },
             onClick = { open = false; vm.checkForUpdate(manual = true) },
         )
-        DropdownMenuItem(text = { Text(str(R.string.settings)) }, onClick = { open = false; onSettings() })
-        DropdownMenuItem(text = { Text(str(R.string.sign_out)) }, onClick = { open = false; confirmSignOut = true })
+        DropdownMenuItem(text = { Text(str(R.string.settings)) }, onClick = { open = false; guarded(onSettings) })
+        DropdownMenuItem(
+            text = { Text(str(R.string.sign_out)) },
+            onClick = { open = false; guarded { confirmSignOut = true } },
+        )
     }
 }
 
@@ -779,6 +792,8 @@ private fun DeviceSheet(
                 }
             }
 
+            // Behind the PIN of the monitor the panel only controls: how the home is arranged stays put.
+            if (LocalHomeLook.current.locked) return@Column
             TextButton(
                 onClick = { vm.setFavorite(device, !favorite) },
                 modifier = Modifier.padding(top = 12.dp),

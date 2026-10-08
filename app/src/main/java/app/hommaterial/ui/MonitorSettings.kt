@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -68,6 +69,7 @@ internal fun MonitorSettings(state: UiState, vm: HomeViewModel) {
     // The page whose content is being chosen.
     var narrowing by remember { mutableStateOf<String?>(null) }
     var choosingSensors by remember { mutableStateOf(false) }
+    var settingPin by remember { mutableStateOf(false) }
 
     if (starting) {
         PresetDialog(
@@ -159,6 +161,27 @@ internal fun MonitorSettings(state: UiState, vm: HomeViewModel) {
     Chips(R.string.monitor_refresh, REFRESH_CHOICES.map { it to duration(it) }, monitor.refreshSeconds) {
         vm.setMonitor(monitor.copy(refreshSeconds = it))
     }
+
+    if (settingPin) {
+        PinDialog(
+            title = str(R.string.pin_new_title),
+            hint = str(R.string.pin_new_hint),
+            onSubmit = { vm.setPin(it); settingPin = false; true },
+            onDismiss = { settingPin = false },
+        )
+    }
+    Setting(
+        title = str(if (state.pin) R.string.monitor_pin_on else R.string.monitor_pin_set),
+        text = str(if (state.pin) R.string.monitor_pin_on_text else R.string.monitor_pin_set_text),
+        onClick = { settingPin = true },
+        trailing = {
+            if (state.pin) {
+                IconButton(onClick = { vm.setPin(null) }) {
+                    Icon(Icons.Outlined.Close, contentDescription = str(R.string.pin_remove))
+                }
+            }
+        },
+    )
 
     Toggle(R.string.monitor_rest, R.string.monitor_rest_text, monitor.rest) { vm.setMonitor(monitor.copy(rest = it)) }
     if (!monitor.rest) return

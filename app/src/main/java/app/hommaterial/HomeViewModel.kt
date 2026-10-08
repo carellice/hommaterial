@@ -35,6 +35,7 @@ import app.hommaterial.str
 import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
 import app.hommaterial.voice.parseVoice
+import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -86,6 +87,10 @@ data class UiState(
     val theme: Int = 0,
     /** How this tablet behaves as the panel of the home. */
     val monitor: MonitorConfig = MonitorConfig(),
+    /** Whether a PIN was chosen for the monitor mode. */
+    val pin: Boolean = false,
+    /** Whether a backup being imported is waiting to know if its monitor mode comes along. */
+    val askMonitorRestore: Boolean = false,
     val refreshing: Boolean = false,
     /** A spoken command understood only in part, waiting for the user to pick what was meant. */
     val voice: VoiceResult.Ask? = null,
@@ -103,9 +108,13 @@ data class UiState(
         get() = devices.map { device ->
             rooms[device.applianceId]?.let { device.copy(room = it.ifEmpty { null }) } ?: device
         }
+
+    /** Whether the settings and the choices about the devices are behind the PIN of the monitor. */
+    val locked: Boolean get() = monitor.enabled && pin
 }
 
 private const val BACKUP_APP = "hommaterial"
+private const val PIN_KEY = "monitorPin"
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
@@ -127,6 +136,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private var refreshJob: Job? = null
     private var updateJob: Job? = null
+    private var pendingBackup: JSONObject? = null
 
     init {
         // Shortcuts and widget may be stale after an update of the app or a change made elsewhere.
@@ -170,6 +180,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             monitor = runCatching {
                 MonitorConfig.fromJson(JSONObject(settings.getString("monitor", "{}")!!))
             }.getOrDefault(MonitorConfig()),
+            pin = settings.contains(PIN_KEY),
         )
     }
 
@@ -223,6 +234,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 autoUpdate = it.autoUpdate,
                 theme = it.theme,
                 monitor = it.monitor,
+                pin = it.pin,
                 update = it.update,
                 updatePrompt = it.updatePrompt,
                 updateProgress = it.updateProgress,
@@ -516,6 +528,28 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(monitor = config) }
     }
 
+    /**
+     * Sets the PIN of the monitor mode, or removes it with null. It keeps guests and children out
+     * of the settings; it is not meant to resist someone who can read the storage of the tablet.
+     */
+    fun setPin(pin: String?) {
+        if (pin == null) {
+            settings.edit().remove(PIN_KEY).apply()
+        } else {
+            val salt = UUID.randomUUID().toString()
+            settings.edit().putString(PIN_KEY, "$salt:${hash(salt, pin)}").apply()
+        }
+        _state.update { it.copy(pin = pin != null) }
+    }
+
+    fun checkPin(pin: String): Boolean {
+        val (salt, hashed) = settings.getString(PIN_KEY, null)?.split(':')?.takeIf { it.size == 2 } ?: return true
+        return hash(salt, pin) == hashed
+    }
+
+    private fun hash(salt: String, pin: String): String =
+        MessageDigest.getInstance("SHA-256").digest("$salt$pin".toByteArray()).joinToString("") { "%02x".format(it) }
+
     fun clearHistory() {
         history.clear()
         _messages.tryEmit(str(R.string.history_cleared))
@@ -545,6 +579,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("alerts", alerts)
             .put("autoUpdate", s.autoUpdate)
             .put("theme", s.theme)
+            // Without the PIN: a file that travels must not carry it, not even scrambled.
+            .put("monitor", s.monitor.toJson())
         viewModelScope.launch {
             val saved = runCatching {
                 withContext(Dispatchers.IO) {
@@ -570,59 +606,80 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 _messages.tryEmit(str(if (backup == null) R.string.backup_failed else R.string.backup_invalid))
                 return@launch
             }
-            fun strings(name: String) =
-                backup.optJSONArray(name)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty().toSet()
-            cache.edit()
-                .putStringSet("favorites", strings("favorites"))
-                .putStringSet("hidden", strings("hidden"))
-                .apply()
-            val rooms = backup.optJSONObject("rooms") ?: JSONObject()
-            local.putRooms(rooms.keys().asSequence().associateWith { rooms.getString(it) })
-            fun list(name: String) =
-                backup.optJSONArray(name)?.let { a -> (0 until a.length()).map { a.getString(it) } }
-            local.putRoomList(list("roomList").orEmpty())
-            local.putGroups(backup.optJSONArray("groups")?.mapObjects(Group::fromJson).orEmpty())
-            local.putShortcuts(list("shortcuts"))
-            local.putWidget(backup.optJSONObject("widget")?.let(WidgetConfig::fromJson) ?: WidgetConfig())
-            val tiles = backup.optJSONArray("tiles")
-            for (slot in 0 until PowerTile.SLOTS) {
-                local.putTileDevice(slot, tiles?.optString(slot)?.takeIf { it.isNotEmpty() && !tiles.isNull(slot) })
+            // The panel of a tablet may not suit the device the backup lands on: that is asked.
+            if (backup.has("monitor")) {
+                pendingBackup = backup
+                _state.update { it.copy(askMonitorRestore = true) }
+            } else {
+                restore(backup, monitor = false)
             }
-            val alerts = backup.optJSONObject("alerts") ?: JSONObject()
-            for (id in Alerts.all(app).keys) Alerts.set(app, id, Alert())
-            for (id in alerts.keys()) {
-                val o = alerts.getJSONObject(id)
-                Alerts.set(
-                    app,
-                    id,
-                    Alert(
-                        above = if (o.isNull("above")) null else o.optDouble("above"),
-                        below = if (o.isNull("below")) null else o.optDouble("below"),
-                    ),
-                )
-            }
-            settings.edit()
-                .putBoolean("autoUpdate", backup.optBoolean("autoUpdate", true))
-                .putInt("theme", backup.optInt("theme", 0).coerceIn(0, 2))
-                .apply()
-            _state.update {
-                it.copy(
-                    favorites = local.favorites(),
-                    hidden = local.hidden(),
-                    rooms = local.rooms(),
-                    roomList = local.roomList(),
-                    groups = local.groups(),
-                    shortcuts = local.shortcuts(),
-                    widget = local.widget(),
-                    tileDevices = local.tileDevices(),
-                    alerts = Alerts.all(app),
-                    autoUpdate = settings.getBoolean("autoUpdate", true),
-                    theme = settings.getInt("theme", 0),
-                )
-            }
-            Quick.refresh(app)
-            _messages.tryEmit(str(R.string.backup_imported))
         }
+    }
+
+    /** Applies a backup read by [importBackup]; the monitor mode only when [monitor] says so. */
+    private fun restore(backup: JSONObject, monitor: Boolean) {
+        val app = getApplication<Application>()
+        fun strings(name: String) =
+            backup.optJSONArray(name)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty().toSet()
+        cache.edit()
+            .putStringSet("favorites", strings("favorites"))
+            .putStringSet("hidden", strings("hidden"))
+            .apply()
+        val rooms = backup.optJSONObject("rooms") ?: JSONObject()
+        local.putRooms(rooms.keys().asSequence().associateWith { rooms.getString(it) })
+        fun list(name: String) =
+            backup.optJSONArray(name)?.let { a -> (0 until a.length()).map { a.getString(it) } }
+        local.putRoomList(list("roomList").orEmpty())
+        local.putGroups(backup.optJSONArray("groups")?.mapObjects(Group::fromJson).orEmpty())
+        local.putShortcuts(list("shortcuts"))
+        local.putWidget(backup.optJSONObject("widget")?.let(WidgetConfig::fromJson) ?: WidgetConfig())
+        val tiles = backup.optJSONArray("tiles")
+        for (slot in 0 until PowerTile.SLOTS) {
+            local.putTileDevice(slot, tiles?.optString(slot)?.takeIf { it.isNotEmpty() && !tiles.isNull(slot) })
+        }
+        val alerts = backup.optJSONObject("alerts") ?: JSONObject()
+        for (id in Alerts.all(app).keys) Alerts.set(app, id, Alert())
+        for (id in alerts.keys()) {
+            val o = alerts.getJSONObject(id)
+            Alerts.set(
+                app,
+                id,
+                Alert(
+                    above = if (o.isNull("above")) null else o.optDouble("above"),
+                    below = if (o.isNull("below")) null else o.optDouble("below"),
+                ),
+            )
+        }
+        settings.edit()
+            .putBoolean("autoUpdate", backup.optBoolean("autoUpdate", true))
+            .putInt("theme", backup.optInt("theme", 0).coerceIn(0, 2))
+            .apply()
+        _state.update {
+            it.copy(
+                favorites = local.favorites(),
+                hidden = local.hidden(),
+                rooms = local.rooms(),
+                roomList = local.roomList(),
+                groups = local.groups(),
+                shortcuts = local.shortcuts(),
+                widget = local.widget(),
+                tileDevices = local.tileDevices(),
+                alerts = Alerts.all(app),
+                autoUpdate = settings.getBoolean("autoUpdate", true),
+                theme = settings.getInt("theme", 0),
+            )
+        }
+        if (monitor) backup.optJSONObject("monitor")?.let { setMonitor(MonitorConfig.fromJson(it)) }
+        Quick.refresh(app)
+        _messages.tryEmit(str(R.string.backup_imported))
+    }
+
+    /** Answers whether the backup being read brings its monitor mode along; null gives the import up. */
+    fun finishImport(monitor: Boolean?) {
+        val backup = pendingBackup
+        pendingBackup = null
+        _state.update { it.copy(askMonitorRestore = false) }
+        if (backup != null && monitor != null) restore(backup, monitor)
     }
 
     fun readings(device: Device): List<Reading> = history.readings(device.applianceId)

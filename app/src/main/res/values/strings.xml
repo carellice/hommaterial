@@ -179,7 +179,7 @@
     <string name="s_alerts">Temperature alerts</string>
     <string name="alert_remove">Remove the alerts</string>
     <string name="s_backup" translatable="false">Backup</string>
-    <string name="backup_text">Favorites, hidden devices, rooms, groups, shortcuts, widget, tiles, alerts and settings. The Amazon sign-in, the timers and the sensor history are not included.</string>
+    <string name="backup_text">Favorites, hidden devices, rooms, groups, shortcuts, widget, tiles, alerts, monitor mode (without the PIN) and settings. The Amazon sign-in, the timers and the sensor history are not included.</string>
     <string name="backup_export">Export to a file</string>
     <string name="backup_import">Import from a file</string>
     <string name="backup_exported">Backup saved</string>
@@ -306,6 +306,21 @@
     <string name="hour_later">One hour later</string>
     <string name="rest_all_off">Everything is off</string>
     <string name="rest_timer">%1$s off in %2$s</string>
+    <string name="monitor_pin_set">Protect with a PIN</string>
+    <string name="monitor_pin_set_text">Needed to open the settings and to sign out. Whoever touches the panel can only control the devices.</string>
+    <string name="monitor_pin_on">PIN on</string>
+    <string name="monitor_pin_on_text">Tap to change it. If you forget it, the only way out is clearing the data of the app.</string>
+    <string name="pin_remove">Remove the PIN</string>
+    <string name="pin_new_title">New PIN</string>
+    <string name="pin_new_hint">4 to 8 digits</string>
+    <string name="pin_ask_title">Enter the PIN</string>
+    <string name="pin_label">PIN</string>
+    <string name="pin_wrong">Wrong PIN</string>
+    <string name="pin_confirm">Confirm</string>
+    <string name="backup_monitor_title">Restore the monitor mode too?</string>
+    <string name="backup_monitor_text">This backup holds the panel of a tablet: pages, rest screen and the rest. The PIN is never copied.</string>
+    <string name="backup_monitor_yes">Restore</string>
+    <string name="backup_monitor_no">Keep the current one</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

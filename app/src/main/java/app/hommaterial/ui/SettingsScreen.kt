@@ -40,6 +40,7 @@ import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -54,6 +55,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -184,6 +186,20 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
         )
     }
     if (confirmSignOut) SignOutDialog(onConfirm = vm::logout, onDismiss = { confirmSignOut = false })
+    if (state.askMonitorRestore) {
+        AlertDialog(
+            // Leaving without an answer gives the whole import up.
+            onDismissRequest = { vm.finishImport(null) },
+            title = { Text(str(R.string.backup_monitor_title)) },
+            text = { Text(str(R.string.backup_monitor_text)) },
+            confirmButton = {
+                TextButton(onClick = { vm.finishImport(true) }) { Text(str(R.string.backup_monitor_yes)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.finishImport(false) }) { Text(str(R.string.backup_monitor_no)) }
+            },
+        )
+    }
     if (confirmClear) {
         ConfirmDialog(
             title = str(R.string.history_clear_title),
