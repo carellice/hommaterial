@@ -67,6 +67,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationDrawerItem
@@ -170,7 +171,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                             modifier = Modifier.padding(horizontal = 12.dp),
                         )
                     }
-                    VoiceButton(vm)
+                    VoiceButton(vm, listening = state.wake)
                     OverflowMenu(state, vm, onSettings)
                 },
             )
@@ -643,7 +644,7 @@ private fun ageText(updatedAt: Long, now: Long): String {
 
 /** Asks the phone's speech recognizer for a sentence and passes on what it heard. */
 @Composable
-private fun VoiceButton(vm: HomeViewModel) {
+private fun VoiceButton(vm: HomeViewModel, listening: Boolean) {
     val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             vm.onSpeech(result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty())
@@ -663,7 +664,12 @@ private fun VoiceButton(vm: HomeViewModel) {
             }
         },
     ) {
-        Icon(Icons.Outlined.Mic, contentDescription = str(R.string.voice_button))
+        // Colored while the wake word is on: the app is listening without the button being touched.
+        Icon(
+            Icons.Outlined.Mic,
+            contentDescription = str(R.string.voice_button),
+            tint = if (listening) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+        )
     }
 }
 

@@ -88,6 +88,14 @@ class VoiceParserTest {
     }
 
     @Test
+    fun wakeWordIsFoundAndTakenOff() {
+        assertEquals(listOf("accendi la lampada"), wakeCommand(listOf("Ok casa, accendi la lampada"), "ok casa"))
+        assertEquals(listOf("spegni tutto"), wakeCommand(listOf("senti ok casa spegni tutto", "che caso"), "Ok Casa"))
+        assertEquals(listOf(""), wakeCommand(listOf("ok casa"), "ok casa"))
+        assertEquals(null, wakeCommand(listOf("accendi la lampada", "casa"), "ok casa"))
+    }
+
+    @Test
     fun englishIsUnderstoodToo() {
         val command = ran(run("turn off the Lampada, please"))
         assertEquals("Lampada", command.devices.single().name)

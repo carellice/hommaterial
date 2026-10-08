@@ -39,6 +39,21 @@ private fun words(text: String): List<String> =
         .split(Regex("[^a-z0-9]+"))
         .filter { it.isNotEmpty() }
 
+/**
+ * What follows the wake [word] in the sentences [heard], which are the guesses of the recognizer
+ * for one sentence: null when the word is in none of them, empty texts when it was said alone.
+ */
+fun wakeCommand(heard: List<String>, word: String): List<String>? {
+    val wake = words(word)
+    if (wake.isEmpty()) return null
+    val after = heard.mapNotNull { sentence ->
+        val said = words(sentence)
+        val at = (0..said.size - wake.size).firstOrNull { said.subList(it, it + wake.size) == wake }
+        at?.let { said.drop(it + wake.size).joinToString(" ") }
+    }
+    return after.takeIf { it.isNotEmpty() }
+}
+
 /** Same word, give or take the ending: "luce" and "luci", "presa" and "prese". */
 private fun alike(a: String, b: String): Boolean {
     if (a == b) return true

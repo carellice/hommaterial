@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Only for the wake word, which is off until the user turns it on. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Switch-off timers fire at the minute that was asked for and survive a restart of the phone. -->
     <uses-permission
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
@@ -12,6 +14,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Lets the app hand a downloaded update to Android's installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:name=".App"

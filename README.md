@@ -107,9 +107,15 @@ collegati al proprio account Alexa.
   dispositivi. Il backup include la modalità monitor, senza il PIN, e
   all'importazione chiede se ripristinarla.
 
-Non fa altro, di proposito: niente routine, niente assistente sempre in
-ascolto, niente musica. La voce la trascrive il riconoscimento vocale del
-telefono, non l'app.
+Non fa altro, di proposito: niente routine, niente musica. La voce la
+trascrive il riconoscimento vocale del telefono, non l'app.
+
+La parola di attivazione è spenta finché non la si accende dalle
+Impostazioni. Da accesa, l'app ascolta solo mentre è aperta sullo schermo
+(anche sulla schermata di riposo della modalità monitor): si dice "ok casa,
+accendi la lampada", oppure la parola da sola e poi il comando. La parola si
+può cambiare. Non ascolta ad app chiusa o a schermo spento, e usa il
+riconoscimento vocale sul dispositivo quando c'è.
 
 Il timer di spegnimento lo fa scattare il telefono: all'ora stabilita deve
 essere acceso e connesso. Una notifica dice com'è andata: dispositivo spento,

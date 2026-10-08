@@ -1,7 +1,9 @@
 package app.hommaterial.ui
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -49,6 +51,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -86,6 +89,7 @@ import app.hommaterial.quick.SHORTCUT_GROUP
 import app.hommaterial.quick.clock
 import app.hommaterial.quick.degrees
 import app.hommaterial.str
+import app.hommaterial.voice.WakeListener
 
 private const val SOURCE_URL = "https://github.com/carellice/hommaterial"
 private const val BACKUP_FILE = "hommaterial-backup.json"
@@ -215,6 +219,17 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { returns++ }
     val notifications = remember(returns) { Alerts.enabled(context) }
 
+    val microphone = remember(returns) {
+        context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    }
+    // Saying yes to the microphone is what turns the wake word on; a no leaves it off.
+    val askMicrophone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        if (it) vm.setWake(true)
+    }
+    var editingWake by remember { mutableStateOf(false) }
+    if (editingWake) {
+        WakeWordDialog(state.wakeWord, onSave = { vm.setWakeWord(it); editingWake = false }) { editingWake = false }
+    }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) {
         if (it != null) vm.exportBackup(it)
     }
@@ -319,6 +334,25 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                         )
                     },
                 )
+            }
+
+            Section(R.string.s_voice, R.string.wake_text) {
+                if (WakeListener.available(context)) {
+                    Toggle(R.string.wake_enable, R.string.wake_enable_text, state.wake && microphone) { on ->
+                        if (on && !microphone) {
+                            askMicrophone.launch(Manifest.permission.RECORD_AUDIO)
+                        } else {
+                            vm.setWake(on)
+                        }
+                    }
+                    Setting(
+                        title = str(R.string.wake_word),
+                        text = str(R.string.wake_word_text, state.wakeWord),
+                        onClick = { editingWake = true },
+                    )
+                } else {
+                    Setting(title = str(R.string.wake_enable), text = str(R.string.voice_unavailable))
+                }
             }
 
             Section(R.string.s_updates) {
@@ -514,6 +548,29 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun WakeWordDialog(word: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var typed by remember { mutableStateOf(word) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.wake_word)) },
+        text = {
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it },
+                supportingText = { Text(str(R.string.wake_word_hint)) },
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(typed.trim().lowercase()) }, enabled = typed.isNotBlank()) {
+                Text(str(R.string.save))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
+    )
 }
 
 /** A section of the settings that opens and closes on a tap of its title. */

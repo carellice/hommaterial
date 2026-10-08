@@ -313,6 +313,15 @@
     <string name="chart_hint">Tieni il dito sul grafico per leggere un valore.</string>
     <string name="group_turn_off_in">Spegni tutto tra</string>
     <string name="group_timers_some">Timer su %1$d di %2$d</string>
+    <string name="s_voice">Comandi vocali</string>
+    <string name="wake_text">Con la parola di attivazione l\'app ascolta mentre è aperta sullo schermo: di\' «ok casa, accendi la lampada», oppure solo la parola e poi il comando. Non ascolta ad app chiusa o a schermo spento. Le frasi le trascrive il riconoscimento vocale del dispositivo, sul dispositivo stesso dove è possibile.</string>
+    <string name="wake_enable">Parola di attivazione</string>
+    <string name="wake_enable_text">Prende i comandi a voce senza toccare il microfono</string>
+    <string name="wake_word">Parola da dire</string>
+    <string name="wake_word_text">Adesso: «%1$s»</string>
+    <string name="wake_word_hint">Due o tre parole comuni vengono riconosciute meglio</string>
+    <string name="wake_go_on">Ti ascolto…</string>
+    <string name="wake_word_default">ok casa</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>
