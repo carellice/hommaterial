@@ -271,6 +271,31 @@
     <string name="monitor_refresh">Aggiorna gli stati ogni</string>
     <string name="monitor_seconds">%1$d s</string>
     <string name="monitor_minutes">%1$d min</string>
+    <string name="monitor_rest">Schermata di riposo</string>
+    <string name="monitor_rest_text">Quando nessuno tocca lo schermo, lo abbassa e mostra l\'orologio e uno sguardo sulla casa. Un tocco riporta al pannello.</string>
+    <string name="monitor_rest_after">Dopo</string>
+    <string name="monitor_rest_items">Cosa mostra</string>
+    <string name="rest_item_clock">Orologio</string>
+    <string name="rest_item_date">Data</string>
+    <string name="rest_item_sensors">Sensori</string>
+    <string name="rest_item_power">Dispositivi accesi</string>
+    <string name="rest_item_timers">Timer</string>
+    <string name="monitor_rest_sensors">Sensori da mostrare</string>
+    <string name="monitor_rest_sensors_all">Adesso: tutti</string>
+    <string name="monitor_all_sensors">Tutti</string>
+    <string name="monitor_rest_brightness">Luminosità a riposo</string>
+    <string name="brightness_lowest">Minima</string>
+    <string name="brightness_low">Bassa</string>
+    <string name="brightness_medium">Media</string>
+    <string name="brightness_same">Invariata</string>
+    <string name="monitor_night">Fascia notturna</string>
+    <string name="monitor_night_text">In queste ore la schermata di riposo mostra solo l\'orologio, al minimo della luminosità</string>
+    <string name="monitor_night_from">Dalle %1$s</string>
+    <string name="monitor_night_to">Alle %1$s</string>
+    <string name="hour_earlier">Un\'ora prima</string>
+    <string name="hour_later">Un\'ora dopo</string>
+    <string name="rest_all_off">Tutto spento</string>
+    <string name="rest_timer">%1$s si spegne tra %2$s</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>
@@ -282,5 +307,9 @@
     <plurals name="updated_hours">
         <item quantity="one">Aggiornato %d ora fa</item>
         <item quantity="other">Aggiornato %d ore fa</item>
+    </plurals>
+    <plurals name="rest_on">
+        <item quantity="one">%d dispositivo acceso</item>
+        <item quantity="other">%d dispositivi accesi</item>
     </plurals>
 </resources>

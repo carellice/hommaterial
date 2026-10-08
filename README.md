@@ -93,6 +93,9 @@ collegati al proprio account Alexa.
   ognuna, la dimensione dei riquadri e l'orologio; lo schermo resta acceso e
   a tutto schermo e gli stati si aggiornano da soli. Ogni tablet ha il suo
   pannello, anche con lo stesso account.
+- In modalità monitor, dopo qualche minuto senza tocchi compare la schermata
+  di riposo: schermo abbassato, orologio, data, sensori, dispositivi accesi
+  e timer, a scelta. Di notte può restare solo l'orologio, al minimo.
 
 Non fa altro, di proposito: niente routine, niente assistente sempre in
 ascolto, niente musica. La voce la trascrive il riconoscimento vocale del

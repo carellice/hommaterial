@@ -1,12 +1,22 @@
 package app.hommaterial.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -24,9 +34,29 @@ import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.UiState
 import app.hommaterial.data.MonitorConfig
+import app.hommaterial.data.REST_CLOCK
+import app.hommaterial.data.REST_DATE
+import app.hommaterial.data.REST_POWER
+import app.hommaterial.data.REST_SENSORS
+import app.hommaterial.data.REST_TIMERS
 import app.hommaterial.str
 
 private val REFRESH_CHOICES = listOf(30, 60, 120, 300)
+private val REST_CHOICES = listOf(1, 2, 5, 10)
+private val REST_LABELS = listOf(
+    REST_CLOCK to R.string.rest_item_clock,
+    REST_DATE to R.string.rest_item_date,
+    REST_SENSORS to R.string.rest_item_sensors,
+    REST_POWER to R.string.rest_item_power,
+    REST_TIMERS to R.string.rest_item_timers,
+)
+// In percent; 0 leaves the brightness of the tablet alone.
+private val BRIGHTNESS_CHOICES = listOf(
+    1 to R.string.brightness_lowest,
+    15 to R.string.brightness_low,
+    40 to R.string.brightness_medium,
+    0 to R.string.brightness_same,
+)
 
 /** Everything about the tablet used as the panel of the home: what it shows and how it behaves. */
 @Composable
@@ -37,6 +67,7 @@ internal fun MonitorSettings(state: UiState, vm: HomeViewModel) {
     var choosingPages by remember { mutableStateOf(false) }
     // The page whose content is being chosen.
     var narrowing by remember { mutableStateOf<String?>(null) }
+    var choosingSensors by remember { mutableStateOf(false) }
 
     if (starting) {
         PresetDialog(
@@ -128,6 +159,81 @@ internal fun MonitorSettings(state: UiState, vm: HomeViewModel) {
     Chips(R.string.monitor_refresh, REFRESH_CHOICES.map { it to duration(it) }, monitor.refreshSeconds) {
         vm.setMonitor(monitor.copy(refreshSeconds = it))
     }
+
+    Toggle(R.string.monitor_rest, R.string.monitor_rest_text, monitor.rest) { vm.setMonitor(monitor.copy(rest = it)) }
+    if (!monitor.rest) return
+    Chips(R.string.monitor_rest_after, REST_CHOICES.map { it to duration(it * 60) }, monitor.restMinutes) {
+        vm.setMonitor(monitor.copy(restMinutes = it))
+    }
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(str(R.string.monitor_rest_items), style = MaterialTheme.typography.bodyLarge)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((item, label) in REST_LABELS) {
+                val shown = item in monitor.restItems
+                FilterChip(
+                    selected = shown,
+                    onClick = {
+                        val items = if (shown) monitor.restItems - item else monitor.restItems + item
+                        vm.setMonitor(monitor.copy(restItems = items))
+                    },
+                    label = { Text(str(label)) },
+                )
+            }
+        }
+    }
+    val sensors = state.placed.filter { it.isSensor && it.applianceId !in state.hidden }
+    if (REST_SENSORS in monitor.restItems && sensors.size > 1) {
+        val chosen = monitor.restSensors
+        Setting(
+            title = str(R.string.monitor_rest_sensors),
+            text = if (chosen == null) {
+                str(R.string.monitor_rest_sensors_all)
+            } else {
+                sensors.filter { it.applianceId in chosen }.joinToString { it.name }
+            },
+            onClick = { choosingSensors = true },
+        )
+    }
+    if (choosingSensors) {
+        PicksDialog(
+            title = str(R.string.monitor_rest_sensors),
+            picks = sensors.map { Pick(it.applianceId, it.name, it.room ?: str(R.string.room_none)) },
+            initial = monitor.restSensors ?: sensors.map { it.applianceId },
+            limit = null,
+            reset = str(R.string.monitor_all_sensors),
+            onSave = { vm.setMonitor(monitor.copy(restSensors = it)); choosingSensors = false },
+            onDismiss = { choosingSensors = false },
+        )
+    }
+    val levels = BRIGHTNESS_CHOICES.map { it.first to str(it.second) }
+    Chips(R.string.monitor_rest_brightness, levels, monitor.restBrightness) {
+        vm.setMonitor(monitor.copy(restBrightness = it))
+    }
+    Toggle(R.string.monitor_night, R.string.monitor_night_text, monitor.night) {
+        vm.setMonitor(monitor.copy(night = it))
+    }
+    if (monitor.night) {
+        HourRow(R.string.monitor_night_from, monitor.nightFrom) { vm.setMonitor(monitor.copy(nightFrom = it)) }
+        HourRow(R.string.monitor_night_to, monitor.nightTo) { vm.setMonitor(monitor.copy(nightTo = it)) }
+    }
+}
+
+/** An hour of the day, moved one hour at a time and around midnight. */
+@Composable
+private fun HourRow(@StringRes label: Int, hour: Int, onChange: (Int) -> Unit) {
+    Setting(
+        title = str(label, "%02d:00".format(hour)),
+        trailing = {
+            Row {
+                IconButton(onClick = { onChange((hour + 23) % 24) }) {
+                    Icon(Icons.Outlined.Remove, contentDescription = str(R.string.hour_earlier))
+                }
+                IconButton(onClick = { onChange((hour + 1) % 24) }) {
+                    Icon(Icons.Outlined.Add, contentDescription = str(R.string.hour_later))
+                }
+            }
+        },
+    )
 }
 
 private fun duration(seconds: Int): String =

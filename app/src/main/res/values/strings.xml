@@ -281,6 +281,31 @@
     <string name="monitor_refresh">Fetch the states every</string>
     <string name="monitor_seconds">%1$d s</string>
     <string name="monitor_minutes">%1$d min</string>
+    <string name="monitor_rest">Rest screen</string>
+    <string name="monitor_rest_text">When nobody touches the screen, dims it and shows the clock and a glance at the home. A touch brings the panel back.</string>
+    <string name="monitor_rest_after">After</string>
+    <string name="monitor_rest_items">What it shows</string>
+    <string name="rest_item_clock">Clock</string>
+    <string name="rest_item_date">Date</string>
+    <string name="rest_item_sensors">Sensors</string>
+    <string name="rest_item_power">Devices on</string>
+    <string name="rest_item_timers">Timers</string>
+    <string name="monitor_rest_sensors">Sensors to show</string>
+    <string name="monitor_rest_sensors_all">Now: all of them</string>
+    <string name="monitor_all_sensors">All</string>
+    <string name="monitor_rest_brightness">Brightness at rest</string>
+    <string name="brightness_lowest">Lowest</string>
+    <string name="brightness_low">Low</string>
+    <string name="brightness_medium">Medium</string>
+    <string name="brightness_same">Unchanged</string>
+    <string name="monitor_night">Night hours</string>
+    <string name="monitor_night_text">During these hours the rest screen shows the clock alone, as dark as the screen goes</string>
+    <string name="monitor_night_from">From %1$s</string>
+    <string name="monitor_night_to">Until %1$s</string>
+    <string name="hour_earlier">One hour earlier</string>
+    <string name="hour_later">One hour later</string>
+    <string name="rest_all_off">Everything is off</string>
+    <string name="rest_timer">%1$s off in %2$s</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>
@@ -292,5 +317,9 @@
     <plurals name="updated_hours">
         <item quantity="one">Updated %d hour ago</item>
         <item quantity="other">Updated %d hours ago</item>
+    </plurals>
+    <plurals name="rest_on">
+        <item quantity="one">%d device on</item>
+        <item quantity="other">%d devices on</item>
     </plurals>
 </resources>

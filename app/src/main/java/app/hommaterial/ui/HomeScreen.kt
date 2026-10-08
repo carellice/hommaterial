@@ -504,7 +504,7 @@ private fun TimerRow(device: Device, at: Long, onCancel: () -> Unit) {
 }
 
 /** Time left as 1:05:09 or 05:09; a timer that is late, waiting for the network, stays at zero. */
-private fun countdown(millis: Long): String {
+internal fun countdown(millis: Long): String {
     val seconds = millis.coerceAtLeast(0) / 1000
     val (h, m, s) = Triple(seconds / 3600, seconds / 60 % 60, seconds % 60)
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
