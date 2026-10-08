@@ -321,6 +321,7 @@
     <string name="min_avg_max">min %1$s · avg %2$s · max %3$s</string>
     <string name="chart_reading" translatable="false">%1$s · %2$s</string>
     <string name="chart_hint">Hold a finger on the chart to read a value.</string>
+    <string name="tile_label" translatable="false">%1$s · %2$s</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

@@ -63,6 +63,8 @@ collegati al proprio account Alexa.
   riquadri, intestazione e sfondo.
 - Fino a cinque dispositivi a scelta si comandano dalle Impostazioni rapide di
   Android, ognuno con il suo riquadro.
+  Sotto il nome del dispositivo il riquadro mostra la stanza in cui si
+  trova, o un gruppo che lo contiene se non ha una stanza.
 - Dall'intestazione di una stanza si accende o spegne tutto in una volta.
 - Col microfono in alto si dice "accendi la lampada" o "spegni tutto in
   salotto". Capisce solo accensione e spegnimento, e chiede conferma quando il

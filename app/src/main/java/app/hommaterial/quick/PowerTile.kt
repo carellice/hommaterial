@@ -81,13 +81,27 @@ abstract class PowerTile(private val slot: Int) : TileService() {
         val cache = Cache(this)
         val device = cache.devices().find { it.applianceId == cache.tileDevices()[slot] }
         val state = device?.let { cache.states()[it.applianceId] }
-        tile.label = device?.name ?: "${getString(R.string.app_name)} ${slot + 1}"
+        // Where the device is tells apart the lamps of two rooms: its room, or else a group it is in.
+        val place = device?.let {
+            val moved = cache.rooms()[it.applianceId]
+            (if (moved != null) moved.ifEmpty { null } else it.room)
+                ?: cache.groups().firstOrNull { group -> it.applianceId in group.devices }?.name
+        }
+        val subtitles = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        tile.label = when {
+            device == null -> "${getString(R.string.app_name)} ${slot + 1}"
+            // Before Android 10 a tile has one line only.
+            place != null && !subtitles -> str(R.string.tile_label, device.name, place)
+            else -> device.name
+        }
         tile.state = if (state?.power == true) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (subtitles) {
             tile.subtitle = when {
                 device == null -> str(R.string.tile_choose)
                 state == null || state.power == null -> str(R.string.unknown_state)
                 !state.reachable -> str(R.string.unreachable)
+                // The tile itself looks on or off: the second line is free to say where the device is.
+                place != null -> place
                 state.power -> str(R.string.on)
                 else -> str(R.string.off)
             }
