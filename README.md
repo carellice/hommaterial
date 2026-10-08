@@ -70,6 +70,8 @@ collegati al proprio account Alexa.
 - Mostra temperatura e umidità dei sensori, con il grafico dell'ultimo giorno
   o dell'ultima settimana. I dati li raccoglie il telefono quando l'app o il
   widget si aggiornano, quindi il grafico parte vuoto e può avere dei buchi.
+  Il grafico ha la scala dei valori, gli orari o i giorni, minimo, media e
+  massimo; tenendo il dito su un punto se ne legge il valore e l'ora.
 - Avvisa con una notifica quando un sensore supera o scende sotto una
   temperatura scelta.
 - Permette di nascondere i dispositivi che non interessano.

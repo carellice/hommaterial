@@ -80,12 +80,9 @@
     <string name="update_later">Later</string>
     <string name="span_day">24 hours</string>
     <string name="span_week">7 days</string>
-    <string name="history_ago">%1$s ago</string>
-    <string name="now">now</string>
     <string name="history_empty">Not enough data yet: the history fills up every time the app or the widget refresh the states.</string>
     <string name="temperature">Temperature</string>
     <string name="humidity">Humidity</string>
-    <string name="min_max" translatable="false">min %1$s · max %2$s</string>
     <string name="timer_15" translatable="false">15 min</string>
     <string name="timer_30" translatable="false">30 min</string>
     <string name="timer_60">1 hour</string>
@@ -321,6 +318,9 @@
     <string name="backup_monitor_text">This backup holds the panel of a tablet: pages, rest screen and the rest. The PIN is never copied.</string>
     <string name="backup_monitor_yes">Restore</string>
     <string name="backup_monitor_no">Keep the current one</string>
+    <string name="min_avg_max">min %1$s · avg %2$s · max %3$s</string>
+    <string name="chart_reading" translatable="false">%1$s · %2$s</string>
+    <string name="chart_hint">Hold a finger on the chart to read a value.</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

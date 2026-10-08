@@ -76,8 +76,6 @@
     <string name="update_later">Più tardi</string>
     <string name="span_day">24 ore</string>
     <string name="span_week">7 giorni</string>
-    <string name="history_ago">%1$s fa</string>
-    <string name="now">adesso</string>
     <string name="history_empty">Ancora pochi dati: la cronologia si riempie ogni volta che l\'app o il widget aggiornano gli stati.</string>
     <string name="temperature">Temperatura</string>
     <string name="humidity">Umidità</string>
@@ -311,6 +309,8 @@
     <string name="backup_monitor_text">Questo backup contiene il pannello di un tablet: pagine, schermata di riposo e il resto. Il PIN non viene mai copiato.</string>
     <string name="backup_monitor_yes">Ripristina</string>
     <string name="backup_monitor_no">Lascia quella attuale</string>
+    <string name="min_avg_max">min %1$s · media %2$s · max %3$s</string>
+    <string name="chart_hint">Tieni il dito sul grafico per leggere un valore.</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>
