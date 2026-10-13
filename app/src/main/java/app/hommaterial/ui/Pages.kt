@@ -26,7 +26,7 @@ fun availablePages(state: UiState): List<String> {
         add(PAGE_ALL)
         if (visible.any { it.applianceId in state.favorites }) add(PAGE_FAVORITES)
         if (state.groups.isNotEmpty()) add(PAGE_GROUPS)
-        if (state.remotes.isNotEmpty()) add(PAGE_REMOTES)
+        if (state.shownRemotes.isNotEmpty()) add(PAGE_REMOTES)
         rooms.forEach { add(PAGE_ROOM + it) }
         // An empty name stands for the devices without a room.
         if (rooms.isNotEmpty() && visible.any { it.room == null }) add(PAGE_ROOM)

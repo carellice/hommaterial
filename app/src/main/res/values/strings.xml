@@ -377,6 +377,7 @@
     <string name="ac_fan_medium">Medium</string>
     <string name="ac_fan_high">High</string>
     <string name="ac_send">Turn on / send</string>
+    <string name="remote_buttons_many">Several buttons at once: one per line, or with commas between them. Names exactly as in the SwitchBot app.</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

@@ -115,6 +115,10 @@ collegati al proprio account Alexa.
   aggiungere scrivendone il nome com'è nell'app SwitchBot. Passano dall'API
   ufficiale di SwitchBot, con il token e la chiave segreta presi dalla sua
   app, che restano sul telefono.
+  I tasti si aggiungono anche più alla volta e sono disegnati come su un
+  telecomando, con il simbolo o il colore quando il nome lo dice. Un
+  telecomando che non serve si nasconde dalla lista, come gli altri
+  dispositivi.
 
 Non fa altro, di proposito: niente routine, niente musica. La voce la
 trascrive il riconoscimento vocale del telefono, non l'app.

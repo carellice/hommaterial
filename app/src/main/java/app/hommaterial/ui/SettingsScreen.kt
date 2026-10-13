@@ -378,6 +378,22 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                         title = str(R.string.switchbot_linked),
                         text = plural(R.plurals.remotes_found, state.remotes.size),
                     )
+                    for (remote in state.remotes) {
+                        val hidden = remote.id in state.hiddenRemotes
+                        Setting(
+                            title = remote.name,
+                            text = remote.type,
+                            trailing = {
+                                IconButton(onClick = { vm.setRemoteHidden(remote, !hidden) }) {
+                                    Icon(
+                                        if (hidden) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                        contentDescription = str(if (hidden) R.string.unhide else R.string.hide),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
+                        )
+                    }
                     Setting(title = str(R.string.switchbot_unlink), onClick = { confirmSwitchBot = true })
                 } else {
                     Setting(

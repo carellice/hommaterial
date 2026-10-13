@@ -112,6 +112,11 @@ class SwitchBot(context: Context, private val http: OkHttpClient) {
         prefs.edit().putString("buttons", json.toString()).apply()
     }
 
+    /** The ids of the remotes the user does not want in the list. */
+    fun hidden(): Set<String> = prefs.getStringSet("hidden", emptySet())!!.toSet()
+
+    fun putHidden(hidden: Set<String>) = prefs.edit().putStringSet("hidden", hidden).apply()
+
     fun acSettings(): Map<String, AcSetting> = runCatching {
         val json = JSONObject(prefs.getString("ac", "{}")!!)
         json.keys().asSequence().associateWith { AcSetting.fromJson(json.getJSONObject(it)) }

@@ -98,6 +98,7 @@ data class UiState(
     /** The buttons added by hand to each remote, by remote. See [SwitchBot.buttons]. */
     val remoteButtons: Map<String, List<String>> = emptyMap(),
     val acSettings: Map<String, AcSetting> = emptyMap(),
+    val hiddenRemotes: Set<String> = emptySet(),
     /** Whether the app listens for [wakeWord] while it is open, to take spoken commands hands-free. */
     val wake: Boolean = false,
     val wakeWord: String = "",
@@ -122,6 +123,9 @@ data class UiState(
         get() = devices.map { device ->
             rooms[device.applianceId]?.let { device.copy(room = it.ifEmpty { null }) } ?: device
         }
+
+    /** The remotes in the list: all but the hidden ones. */
+    val shownRemotes: List<Remote> get() = remotes.filter { it.id !in hiddenRemotes }
 
     /** Whether the settings and the choices about the devices are behind the PIN of the monitor. */
     val locked: Boolean get() = monitor.enabled && pin
@@ -203,6 +207,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             remotes = switchBot.remotes(),
             remoteButtons = switchBot.buttons(),
             acSettings = switchBot.acSettings(),
+            hiddenRemotes = switchBot.hidden(),
             wake = settings.getBoolean("wake", false),
             wakeWord = settings.getString("wakeWord", null) ?: str(R.string.wake_word_default),
         )
@@ -266,6 +271,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 remotes = it.remotes,
                 remoteButtons = it.remoteButtons,
                 acSettings = it.acSettings,
+                hiddenRemotes = it.hiddenRemotes,
                 update = it.update,
                 updatePrompt = it.updatePrompt,
                 updateProgress = it.updateProgress,
@@ -632,7 +638,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun disconnectSwitchBot() {
         switchBot.disconnect()
         _state.update {
-            it.copy(switchBot = false, remotes = emptyList(), remoteButtons = emptyMap(), acSettings = emptyMap())
+            it.copy(
+                switchBot = false,
+                remotes = emptyList(),
+                remoteButtons = emptyMap(),
+                acSettings = emptyMap(),
+                hiddenRemotes = emptySet(),
+            )
         }
     }
 
@@ -655,6 +667,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun setAc(remote: Remote, setting: AcSetting) {
         switchBot.putAcSetting(remote.id, setting)
         _state.update { it.copy(acSettings = switchBot.acSettings()) }
+    }
+
+    fun setRemoteHidden(remote: Remote, hidden: Boolean) {
+        val all = _state.value.hiddenRemotes.let { if (hidden) it + remote.id else it - remote.id }
+        switchBot.putHidden(all)
+        _state.update { it.copy(hiddenRemotes = all) }
     }
 
     fun setRemoteButtons(remote: Remote, names: List<String>) {
@@ -694,6 +712,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("theme", s.theme)
             // The names typed for the buttons of the remotes, never the keys of the SwitchBot account.
             .put("remoteButtons", JSONObject(s.remoteButtons.mapValues { JSONArray(it.value) }))
+            .put("hiddenRemotes", JSONArray(s.hiddenRemotes))
             // Without the PIN: a file that travels must not carry it, not even scrambled.
             .put("monitor", s.monitor.toJson())
         viewModelScope.launch {
@@ -790,6 +809,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
             switchBot.putButtons(buttons)
             _state.update { it.copy(remoteButtons = buttons) }
+        }
+        if (backup.has("hiddenRemotes")) {
+            switchBot.putHidden(strings("hiddenRemotes"))
+            _state.update { it.copy(hiddenRemotes = switchBot.hidden()) }
         }
         if (monitor) backup.optJSONObject("monitor")?.let { setMonitor(MonitorConfig.fromJson(it)) }
         Quick.refresh(app)

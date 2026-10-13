@@ -366,6 +366,7 @@
     <string name="ac_fan_medium">Media</string>
     <string name="ac_fan_high">Alta</string>
     <string name="ac_send">Accendi / invia</string>
+    <string name="remote_buttons_many">Più tasti insieme: uno per riga, o separati da virgole. Nomi esattamente come nell\'app SwitchBot.</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>

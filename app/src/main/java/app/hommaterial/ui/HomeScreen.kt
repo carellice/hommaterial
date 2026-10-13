@@ -295,9 +295,10 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
         }
     }.filter { it.second.isNotEmpty() }
 
+    val inList = if (state.showHidden) state.remotes else state.shownRemotes
     val remotes = when (page) {
-        PAGE_ALL -> state.remotes
-        PAGE_REMOTES -> state.remotes.filter { only == null || it.id in only }
+        PAGE_ALL -> inList
+        PAGE_REMOTES -> inList.filter { only == null || it.id in only }
         else -> emptyList()
     }
 
@@ -724,7 +725,7 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
     IconButton(onClick = { open = true }) { Icon(Icons.Filled.MoreVert, contentDescription = str(R.string.menu)) }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
         DropdownMenuItem(text = { Text(str(R.string.refresh)) }, onClick = { open = false; vm.refresh() })
-        if (state.hidden.isNotEmpty()) {
+        if (state.hidden.isNotEmpty() || state.hiddenRemotes.isNotEmpty()) {
             DropdownMenuItem(
                 text = { Text(str(if (state.showHidden) R.string.hide_hidden else R.string.show_hidden)) },
                 onClick = { open = false; vm.toggleShowHidden() },
