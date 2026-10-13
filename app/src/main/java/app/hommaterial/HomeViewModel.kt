@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.hommaterial.R
+import app.hommaterial.data.AcSetting
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
 import app.hommaterial.data.ColorChoice
@@ -21,11 +22,14 @@ import app.hommaterial.data.Marketplace
 import app.hommaterial.data.MonitorConfig
 import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Reading
+import app.hommaterial.data.Remote
+import app.hommaterial.data.SwitchBot
 import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
 import app.hommaterial.data.WidgetConfig
 import app.hommaterial.data.mapObjects
 import app.hommaterial.data.toJsonArray
+import app.hommaterial.plural
 import app.hommaterial.quick.Alert
 import app.hommaterial.quick.Alerts
 import app.hommaterial.quick.PowerTile
@@ -88,6 +92,12 @@ data class UiState(
     val theme: Int = 0,
     /** How this tablet behaves as the panel of the home. */
     val monitor: MonitorConfig = MonitorConfig(),
+    /** Whether the SwitchBot account is linked, for the infrared [remotes] of its hubs. */
+    val switchBot: Boolean = false,
+    val remotes: List<Remote> = emptyList(),
+    /** The buttons added by hand to each remote, by remote. See [SwitchBot.buttons]. */
+    val remoteButtons: Map<String, List<String>> = emptyMap(),
+    val acSettings: Map<String, AcSetting> = emptyMap(),
     /** Whether the app listens for [wakeWord] while it is open, to take spoken commands hands-free. */
     val wake: Boolean = false,
     val wakeWord: String = "",
@@ -127,6 +137,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val auth = alexa.auth
     private val api = alexa.api
     private val updater = Updater(app, alexa.http)
+    private val switchBot = SwitchBot(app, alexa.http)
     private val local = Cache(app)
     private val cache = local.prefs
     private val history = History(app)
@@ -188,6 +199,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 MonitorConfig.fromJson(JSONObject(settings.getString("monitor", "{}")!!))
             }.getOrDefault(MonitorConfig()),
             pin = settings.contains(PIN_KEY),
+            switchBot = switchBot.connected,
+            remotes = switchBot.remotes(),
+            remoteButtons = switchBot.buttons(),
+            acSettings = switchBot.acSettings(),
             wake = settings.getBoolean("wake", false),
             wakeWord = settings.getString("wakeWord", null) ?: str(R.string.wake_word_default),
         )
@@ -246,6 +261,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 pin = it.pin,
                 wake = it.wake,
                 wakeWord = it.wakeWord,
+                // SwitchBot is another account: signing out of Amazon leaves it linked.
+                switchBot = it.switchBot,
+                remotes = it.remotes,
+                remoteButtons = it.remoteButtons,
+                acSettings = it.acSettings,
                 update = it.update,
                 updatePrompt = it.updatePrompt,
                 updateProgress = it.updateProgress,
@@ -255,6 +275,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refresh() {
         if (!_state.value.loggedIn || refreshJob?.isActive == true) return
+        // The remotes change rarely and have no state: they are fetched on the side, without a word.
+        if (switchBot.connected) {
+            viewModelScope.launch {
+                guarded(quiet = true) { _state.update { it.copy(remotes = switchBot.fetchRemotes()) } }
+            }
+        }
         refreshJob = viewModelScope.launch {
             _state.update { it.copy(refreshing = true) }
             guarded {
@@ -590,6 +616,53 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private fun hash(salt: String, pin: String): String =
         MessageDigest.getInstance("SHA-256").digest("$salt$pin".toByteArray()).joinToString("") { "%02x".format(it) }
 
+    /** Links the SwitchBot account, keeping the keys only if SwitchBot accepts them. */
+    fun connectSwitchBot(token: String, secret: String) {
+        switchBot.connect(token.trim(), secret.trim())
+        viewModelScope.launch {
+            val linked = guarded {
+                val remotes = switchBot.fetchRemotes()
+                _state.update { it.copy(switchBot = true, remotes = remotes) }
+                _messages.tryEmit(plural(R.plurals.remotes_found, remotes.size))
+            }
+            if (!linked) switchBot.disconnect()
+        }
+    }
+
+    fun disconnectSwitchBot() {
+        switchBot.disconnect()
+        _state.update {
+            it.copy(switchBot = false, remotes = emptyList(), remoteButtons = emptyMap(), acSettings = emptyMap())
+        }
+    }
+
+    /** Presses a button of [remote]. Nothing comes back from an appliance: only a failure is told. */
+    fun sendRemote(remote: Remote, command: String, parameter: String = "default", custom: Boolean = false) {
+        _state.update { it.copy(busy = it.busy + remote.id) }
+        viewModelScope.launch {
+            guarded { switchBot.send(remote, command, parameter, custom) }
+            _state.update { it.copy(busy = it.busy - remote.id) }
+        }
+    }
+
+    /** Sends an air conditioner everything at once, as its remote would, and remembers it. */
+    fun sendAc(remote: Remote, setting: AcSetting, on: Boolean) {
+        setAc(remote, setting)
+        val power = if (on) "on" else "off"
+        sendRemote(remote, "setAll", "${setting.temperature},${setting.mode},${setting.fan},$power")
+    }
+
+    fun setAc(remote: Remote, setting: AcSetting) {
+        switchBot.putAcSetting(remote.id, setting)
+        _state.update { it.copy(acSettings = switchBot.acSettings()) }
+    }
+
+    fun setRemoteButtons(remote: Remote, names: List<String>) {
+        val buttons = _state.value.remoteButtons + (remote.id to names)
+        switchBot.putButtons(buttons)
+        _state.update { it.copy(remoteButtons = buttons) }
+    }
+
     fun clearHistory() {
         history.clear()
         _messages.tryEmit(str(R.string.history_cleared))
@@ -619,6 +692,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("alerts", alerts)
             .put("autoUpdate", s.autoUpdate)
             .put("theme", s.theme)
+            // The names typed for the buttons of the remotes, never the keys of the SwitchBot account.
+            .put("remoteButtons", JSONObject(s.remoteButtons.mapValues { JSONArray(it.value) }))
             // Without the PIN: a file that travels must not carry it, not even scrambled.
             .put("monitor", s.monitor.toJson())
         viewModelScope.launch {
@@ -708,6 +783,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 autoUpdate = settings.getBoolean("autoUpdate", true),
                 theme = settings.getInt("theme", 0),
             )
+        }
+        backup.optJSONObject("remoteButtons")?.let { saved ->
+            val buttons = saved.keys().asSequence().associateWith { id ->
+                saved.getJSONArray(id).let { a -> (0 until a.length()).map(a::getString) }
+            }
+            switchBot.putButtons(buttons)
+            _state.update { it.copy(remoteButtons = buttons) }
         }
         if (monitor) backup.optJSONObject("monitor")?.let { setMonitor(MonitorConfig.fromJson(it)) }
         Quick.refresh(app)

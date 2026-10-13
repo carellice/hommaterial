@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.MeetingRoom
+import androidx.compose.material.icons.outlined.SettingsRemote
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.ui.graphics.vector.ImageVector
 import app.hommaterial.R
@@ -14,6 +15,7 @@ import app.hommaterial.str
 const val PAGE_ALL = "all"
 const val PAGE_FAVORITES = "favorites"
 const val PAGE_GROUPS = "groups"
+const val PAGE_REMOTES = "remotes"
 const val PAGE_ROOM = "room:"
 
 /** Every page there is something to show in, in the order the side bar lists them by default. */
@@ -24,6 +26,7 @@ fun availablePages(state: UiState): List<String> {
         add(PAGE_ALL)
         if (visible.any { it.applianceId in state.favorites }) add(PAGE_FAVORITES)
         if (state.groups.isNotEmpty()) add(PAGE_GROUPS)
+        if (state.remotes.isNotEmpty()) add(PAGE_REMOTES)
         rooms.forEach { add(PAGE_ROOM + it) }
         // An empty name stands for the devices without a room.
         if (rooms.isNotEmpty() && visible.any { it.room == null }) add(PAGE_ROOM)
@@ -45,6 +48,7 @@ fun pageLabel(page: String): String = when (page) {
     PAGE_ALL -> str(R.string.page_all)
     PAGE_FAVORITES -> str(R.string.favorites)
     PAGE_GROUPS -> str(R.string.s_groups)
+    PAGE_REMOTES -> str(R.string.s_remotes)
     else -> page.removePrefix(PAGE_ROOM).ifEmpty { str(R.string.no_room) }
 }
 
@@ -52,5 +56,6 @@ fun pageIcon(page: String): ImageVector = when (page) {
     PAGE_ALL -> Icons.Outlined.Home
     PAGE_FAVORITES -> Icons.Outlined.StarBorder
     PAGE_GROUPS -> Icons.Outlined.Layers
+    PAGE_REMOTES -> Icons.Outlined.SettingsRemote
     else -> Icons.Outlined.MeetingRoom
 }

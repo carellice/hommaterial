@@ -109,6 +109,13 @@ collegati al proprio account Alexa.
   dispositivi. Il backup include la modalità monitor, senza il PIN, e
   all'importazione chiede se ripristinarla.
 
+- Collegando l'account SwitchBot dalle Impostazioni compaiono i telecomandi a
+  infrarossi creati sull'hub: TV (accensione, volume, canali), condizionatore
+  (temperatura, modalità, ventola) e i tasti dei telecomandi fai da te, da
+  aggiungere scrivendone il nome com'è nell'app SwitchBot. Passano dall'API
+  ufficiale di SwitchBot, con il token e la chiave segreta presi dalla sua
+  app, che restano sul telefono.
+
 Non fa altro, di proposito: niente routine, niente musica. La voce la
 trascrive il riconoscimento vocale del telefono, non l'app.
 
@@ -144,6 +151,8 @@ più di rado quando è fermo da un po': non sono un allarme in tempo reale.
 - L'app parla con i server di Amazon e, solo per cercare e scaricare gli
   aggiornamenti, con GitHub, a cui non invia alcun dato dell'account. Non ci
   sono server intermedi, statistiche né pubblicità.
+- Solo se colleghi SwitchBot, l'app parla anche con i server di SwitchBot, per
+  elencare i telecomandi e inviare i loro comandi.
 - La password viene inserita nella pagina di Amazon e non viene letta né
   salvata dall'app.
 - Sul telefono, nell'area privata dell'app, restano il token di accesso,

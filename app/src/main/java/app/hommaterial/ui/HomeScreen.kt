@@ -195,12 +195,12 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
 }
 
 /** How the tiles look and behave, which depends on the screen the app is on and on the monitor mode. */
-private class HomeLook(val wide: Boolean = false, val tileSize: Int = 1, val locked: Boolean = false) {
+internal class HomeLook(val wide: Boolean = false, val tileSize: Int = 1, val locked: Boolean = false) {
     val tileMinWidth get() = TILE_MIN_WIDTHS[tileSize]
     val tileHeight get() = TILE_HEIGHTS[tileSize]
 }
 
-private val LocalHomeLook = compositionLocalOf { HomeLook() }
+internal val LocalHomeLook = compositionLocalOf { HomeLook() }
 
 /** The pages to move between, with their names where the screen has room for them. */
 @Composable
@@ -295,7 +295,13 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
         }
     }.filter { it.second.isNotEmpty() }
 
-    if (shown.isEmpty() && groups.isEmpty() && !state.refreshing) {
+    val remotes = when (page) {
+        PAGE_ALL -> state.remotes
+        PAGE_REMOTES -> state.remotes.filter { only == null || it.id in only }
+        else -> emptyList()
+    }
+
+    if (shown.isEmpty() && groups.isEmpty() && remotes.isEmpty() && !state.refreshing) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(str(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -333,6 +339,12 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
             items(groups, key = { "group:${it.first.id}" }) { (group, devices) ->
                 GroupTile(group, devices, state, vm) { vm.toggleGroup(group) }
             }
+        }
+        if (remotes.isNotEmpty()) {
+            item(key = "remotes", span = { GridItemSpan(maxLineSpan) }) {
+                SectionHeader(str(R.string.s_remotes))
+            }
+            items(remotes, key = { "remote:${it.id}" }) { RemoteTile(it, state, vm) }
         }
         for ((name, devices) in rooms) {
             item(key = "room:$name", span = { GridItemSpan(maxLineSpan) }) {
@@ -535,7 +547,7 @@ private fun GroupSheet(group: Group, devices: List<Device>, state: UiState, vm: 
 
 /** What every tile shows, sized as the screen it is on asks. */
 @Composable
-private fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: String) {
+internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: String) {
     val size = LocalHomeLook.current.tileSize
     val type = MaterialTheme.typography
     Column(Modifier.padding(listOf(12.dp, 14.dp, 18.dp)[size])) {
@@ -928,7 +940,7 @@ private fun DeviceSheet(
 /** A sheet from the bottom on a phone, a panel on the side where the screen is wide. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DetailsContainer(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun DetailsContainer(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     if (!LocalHomeLook.current.wide) {
         ModalBottomSheet(onDismissRequest = onDismiss) { content() }
         return

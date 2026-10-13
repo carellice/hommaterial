@@ -227,6 +227,23 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
         if (it) vm.setWake(true)
     }
     var editingWake by remember { mutableStateOf(false) }
+    var linkingSwitchBot by remember { mutableStateOf(false) }
+    var confirmSwitchBot by remember { mutableStateOf(false) }
+    if (linkingSwitchBot) {
+        SwitchBotDialog(
+            onConnect = { token, secret -> vm.connectSwitchBot(token, secret); linkingSwitchBot = false },
+            onDismiss = { linkingSwitchBot = false },
+        )
+    }
+    if (confirmSwitchBot) {
+        ConfirmDialog(
+            title = str(R.string.switchbot_unlink_title),
+            text = str(R.string.switchbot_unlink_text),
+            confirm = str(R.string.switchbot_unlink),
+            onConfirm = vm::disconnectSwitchBot,
+            onDismiss = { confirmSwitchBot = false },
+        )
+    }
     if (editingWake) {
         WakeWordDialog(state.wakeWord, onSave = { vm.setWakeWord(it); editingWake = false }) { editingWake = false }
     }
@@ -352,6 +369,22 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                     )
                 } else {
                     Setting(title = str(R.string.wake_enable), text = str(R.string.voice_unavailable))
+                }
+            }
+
+            Section(R.string.s_switchbot, R.string.switchbot_text) {
+                if (state.switchBot) {
+                    Setting(
+                        title = str(R.string.switchbot_linked),
+                        text = plural(R.plurals.remotes_found, state.remotes.size),
+                    )
+                    Setting(title = str(R.string.switchbot_unlink), onClick = { confirmSwitchBot = true })
+                } else {
+                    Setting(
+                        title = str(R.string.switchbot_connect),
+                        text = str(R.string.switchbot_connect_text),
+                        onClick = { linkingSwitchBot = true },
+                    )
                 }
             }
 

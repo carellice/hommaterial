@@ -265,6 +265,7 @@ private fun duration(seconds: Int): String =
 /** What a page can be narrowed to: its devices, or the groups for the page that lists them. */
 private fun pagePicks(state: UiState, page: String): List<Pick> {
     if (page == PAGE_GROUPS) return state.groups.map { Pick(it.id, it.name) }
+    if (page == PAGE_REMOTES) return state.remotes.map { Pick(it.id, it.name) }
     val visible = state.placed.filter { it.applianceId !in state.hidden }
     val room = page.removePrefix(PAGE_ROOM).ifEmpty { null }
     val devices = when (page) {
