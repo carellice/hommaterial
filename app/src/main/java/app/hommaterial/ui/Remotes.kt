@@ -74,7 +74,9 @@ import androidx.compose.ui.unit.dp
 import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.UiState
+import app.hommaterial.data.ACTION_REMOTE
 import app.hommaterial.data.AcSetting
+import app.hommaterial.data.MacroAction
 import app.hommaterial.data.Remote
 import app.hommaterial.data.RemoteKind
 import app.hommaterial.quick.Quick
@@ -137,6 +139,9 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
     var adding by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf(false) }
+    // The minutes of a timer, while the key it presses is being chosen.
+    var timing by remember { mutableStateOf<Int?>(null) }
+    val askNotifications = rememberNotificationRequest()
     if (adding) {
         ButtonDialog(
             onAdd = { vm.setRemoteButtons(remote, (buttons + it).distinct()); adding = false },
@@ -173,6 +178,29 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
                         }
                     }
                     if (remote.kind == RemoteKind.TV) TvControls(remote, vm)
+                }
+            }
+
+            // The timer: switching off for the remotes that can, a key to choose for those learnt by hand.
+            if (remote.kind != RemoteKind.CUSTOM || buttons.isNotEmpty()) {
+                Column(Modifier.padding(top = 20.dp)) {
+                    val title = if (remote.kind == RemoteKind.CUSTOM) R.string.timer_key_in else R.string.turn_off_in
+                    TimerChips(str(title), remote.id, state, vm) { minutes ->
+                        askNotifications()
+                        if (remote.kind == RemoteKind.CUSTOM) {
+                            timing = minutes
+                        } else {
+                            val action = MacroAction(ACTION_REMOTE, remote.id, "turnOff")
+                            vm.addTimer(action, describe(action, state), minutes)
+                        }
+                    }
+                }
+            }
+            timing?.let { minutes ->
+                ListDialog(str(R.string.timer_key_in), buttons.map { it to null }, onDismiss = { timing = null }) {
+                    val action = MacroAction(ACTION_REMOTE, remote.id, buttons[it], custom = true)
+                    vm.addTimer(action, describe(action, state), minutes)
+                    timing = null
                 }
             }
 
@@ -219,7 +247,11 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
             // Behind the PIN of the monitor the panel only controls: what is listed stays put.
             if (!LocalHomeLook.current.locked) {
                 val key = Quick.remoteKey(remote.id)
-                TextButton(onClick = { moving = true }, modifier = Modifier.padding(top = 4.dp)) {
+                val favorite = key in state.favorites
+                TextButton(onClick = { vm.setFavorite(key, !favorite) }, modifier = Modifier.padding(top = 4.dp)) {
+                    Text(str(if (favorite) R.string.favorite_remove else R.string.favorite_add))
+                }
+                TextButton(onClick = { moving = true }) {
                     Text(state.placeOf(key)?.let { str(R.string.room_in, it) } ?: str(R.string.room_move))
                 }
                 if (moving) {

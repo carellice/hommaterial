@@ -427,6 +427,10 @@
     <string name="schedule_delete">Delete the scheduled action</string>
     <string name="schedule_done_text">Scheduled action carried out at %1$s</string>
     <string name="schedule_failed_title">Failed: %1$s</string>
+    <string name="timer_key_in">Press a key in</string>
+    <string name="macro_run_in">Run in</string>
+    <string name="schedule_due">At %1$s</string>
+    <string name="rest_schedule">%1$s in %2$s</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

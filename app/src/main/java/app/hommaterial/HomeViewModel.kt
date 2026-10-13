@@ -25,6 +25,7 @@ import app.hommaterial.data.MonitorConfig
 import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Reading
 import app.hommaterial.data.Remote
+import app.hommaterial.data.RemoteKind
 import app.hommaterial.data.Schedule
 import app.hommaterial.data.SwitchBot
 import app.hommaterial.data.Update
@@ -41,8 +42,10 @@ import app.hommaterial.quick.Quick
 import app.hommaterial.quick.Schedules
 import app.hommaterial.quick.Timers
 import app.hommaterial.str
+import app.hommaterial.voice.ExtraCommand
 import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
+import app.hommaterial.voice.parseExtras
 import app.hommaterial.voice.parseVoice
 import app.hommaterial.voice.wakeCommand
 import java.security.MessageDigest
@@ -423,10 +426,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         Quick.refresh(getApplication())
     }
 
-    fun setFavorite(device: Device, favorite: Boolean) {
-        _state.update {
-            it.copy(favorites = if (favorite) it.favorites + device.applianceId else it.favorites - device.applianceId)
-        }
+    fun setFavorite(device: Device, favorite: Boolean) = setFavorite(device.applianceId, favorite)
+
+    /** The same for a remote or a custom device, by its key. */
+    fun setFavorite(key: String, favorite: Boolean) {
+        _state.update { it.copy(favorites = if (favorite) it.favorites + key else it.favorites - key) }
         cache.edit().putStringSet("favorites", _state.value.favorites).apply()
         Quick.refresh(getApplication())
     }
@@ -449,7 +453,24 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     /** Acts on what the speech recognizer [heard], its guesses best first. */
     fun onSpeech(heard: List<String>) {
         val s = _state.value
-        when (val result = parseVoice(heard, s.placed.filter { it.applianceId !in s.hidden })) {
+        val result = parseVoice(heard, s.placed.filter { it.applianceId !in s.hidden })
+        // What Alexa does not know is tried when no device of hers was clearly meant.
+        if (result !is VoiceResult.Run) {
+            // A remote learnt key by key has no power key to be told about.
+            val remotes = s.shownRemotes.filter { it.kind != RemoteKind.CUSTOM }
+            val extra = parseExtras(heard, s.macros.map { it.id to it.name }, remotes.map { it.id to it.name })
+            if (extra is ExtraCommand.Run) {
+                val macro = s.macros.first { it.id == extra.macroId }
+                _messages.tryEmit(str(R.string.schedule_run, macro.name))
+                return runMacro(macro)
+            }
+            if (extra is ExtraCommand.Remote) {
+                val remote = remotes.first { it.id == extra.remoteId }
+                _messages.tryEmit(str(if (extra.on) R.string.voice_on else R.string.voice_off, remote.name))
+                return sendRemote(remote, if (extra.on) "turnOn" else "turnOff")
+            }
+        }
+        when (result) {
             is VoiceResult.Run -> runVoice(result.command)
             is VoiceResult.Ask -> _state.update { it.copy(voice = result) }
             is VoiceResult.Unknown -> _messages.tryEmit(
@@ -582,6 +603,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         Schedules.put(getApplication(), schedule)
         _state.update { it.copy(schedules = Schedules.all(getApplication())) }
     }
+
+    /** Sets [action] to happen once, in [minutes] minutes: the timer of what is not a device of Alexa. */
+    fun addTimer(action: MacroAction, label: String, minutes: Int) =
+        addSchedule(action, label, System.currentTimeMillis() + minutes * 60_000L, emptySet())
 
     /** Switches a repeating schedule off, or on again from its next time. */
     fun setScheduleEnabled(schedule: Schedule, enabled: Boolean) {

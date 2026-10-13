@@ -136,6 +136,7 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
     var otherwise by remember { mutableStateOf(macro?.otherwise.orEmpty()) }
     var choosingCondition by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf(false) }
+    val askNotifications = rememberNotificationRequest()
     val switchable = state.placed.filter { it.hasPower }
     val watched = switchable.find { it.applianceId == condition }
 
@@ -224,6 +225,25 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
                                 rooms = state.allRooms,
                                 onPick = { vm.setPlace(key, it); moving = false },
                                 onDismiss = { moving = false },
+                            )
+                        }
+                        SectionCard {
+                            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                                TimerChips(str(R.string.macro_run_in), macro.id, state, vm) { minutes ->
+                                    askNotifications()
+                                    val action = MacroAction(ACTION_MACRO, macro.id)
+                                    vm.addTimer(action, describe(action, state), minutes)
+                                }
+                            }
+                        }
+                        SectionCard {
+                            val favorite = key in state.favorites
+                            ListItem(
+                                headlineContent = {
+                                    Text(str(if (favorite) R.string.favorite_remove else R.string.favorite_add))
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                modifier = Modifier.clickable { vm.setFavorite(key, !favorite) },
                             )
                         }
                         SectionCard {
@@ -392,7 +412,7 @@ internal fun ActionPicker(
 
 /** A list to pick one entry from; each has a label and may have a line under it. */
 @Composable
-private fun ListDialog(
+internal fun ListDialog(
     title: String,
     items: List<Pair<String, String?>>,
     onDismiss: () -> Unit,

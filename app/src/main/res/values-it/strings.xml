@@ -416,6 +416,10 @@
     <string name="schedule_delete">Elimina l\'azione programmata</string>
     <string name="schedule_done_text">Azione programmata eseguita alle %1$s</string>
     <string name="schedule_failed_title">Non riuscita: %1$s</string>
+    <string name="timer_key_in">Premi un tasto tra</string>
+    <string name="macro_run_in">Esegui tra</string>
+    <string name="schedule_due">Alle %1$s</string>
+    <string name="rest_schedule">%1$s tra %2$s</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>

@@ -55,6 +55,7 @@ import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.Tv
@@ -137,7 +138,7 @@ private val TILE_MIN_WIDTHS = listOf(132.dp, 148.dp, 216.dp)
 private val TILE_HEIGHTS = listOf(92.dp, 116.dp, 156.dp)
 private const val WIDE_DP = 600
 private const val SIDE_BAR_DP = 840
-private val TIMER_CHOICES =
+internal val TIMER_CHOICES =
     listOf(R.string.timer_15 to 15, R.string.timer_30 to 30, R.string.timer_60 to 60, R.string.timer_120 to 120)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -314,7 +315,13 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
     val extraRooms = (roomRemotes.keys + roomMacros.keys).filterNotNull().filter { page == PAGE_ALL || it == room }
     val sections = (rooms.keys + extraRooms).toSortedSet(compareBy<String> { it == noRoom }.thenBy { it.lowercase() })
 
-    val empty = shown.isEmpty() && groups.isEmpty() && remotes.isEmpty() && macros.isEmpty() && sections.isEmpty()
+    // Favorites are repeated at the top, remotes and custom devices as the devices.
+    val starred = page == PAGE_ALL || page == PAGE_FAVORITES
+    val favoriteMacros = state.macros.filter { starred && Quick.macroKey(it.id) in state.favorites }
+    val favoriteRemotes = inList.filter { starred && Quick.remoteKey(it.id) in state.favorites }
+
+    val empty = shown.isEmpty() && groups.isEmpty() && remotes.isEmpty() && macros.isEmpty() &&
+        sections.isEmpty() && favoriteMacros.isEmpty() && favoriteRemotes.isEmpty()
     if (empty && !state.refreshing) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(str(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -330,21 +337,30 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
         // Running timers come first, the one closest to switching off at the top.
         val timers = state.timers.entries.sortedBy { it.value }
             .mapNotNull { (id, at) -> shown.find { it.applianceId == id }?.let { it to at } }
-        if (timers.isNotEmpty()) {
+        // With them, what was set to happen once: the timers of remotes and custom devices among it.
+        val due = if (page == PAGE_ALL) state.schedules.filter { it.days.isEmpty() && it.enabled } else emptyList()
+        if (timers.isNotEmpty() || due.isNotEmpty()) {
             item(key = "timers", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(str(R.string.s_timers))
             }
             items(timers, key = { "timer:${it.first.applianceId}" }, span = { GridItemSpan(maxLineSpan) }) {
-                TimerRow(it.first, it.second) { vm.cancelTimer(it.first) }
+                val text = str(R.string.turns_off_at, clock(it.second))
+                TimerRow(iconFor(it.first), it.first.name, text, it.second) { vm.cancelTimer(it.first) }
+            }
+            items(due, key = { "schedule:${it.id}" }, span = { GridItemSpan(maxLineSpan) }) {
+                val text = str(R.string.schedule_due, clock(it.at))
+                TimerRow(Icons.Outlined.Schedule, it.label, text, it.at) { vm.deleteSchedule(it.id) }
             }
         }
         // Favorites are repeated at the top and stay in their rooms too.
-        val favorites = shown.filter { it.applianceId in state.favorites }.sortedBy { it.name.lowercase() }
-        if (favorites.isNotEmpty() && (page == PAGE_ALL || page == PAGE_FAVORITES)) {
+        val favorites = shown.filter { it.applianceId in state.favorites && starred }.sortedBy { it.name.lowercase() }
+        if (favorites.isNotEmpty() || favoriteMacros.isNotEmpty() || favoriteRemotes.isNotEmpty()) {
             item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(str(R.string.favorites))
             }
             items(favorites, key = { "favorite:${it.applianceId}" }) { DeviceTile(it, state, vm) }
+            items(favoriteMacros, key = { "favorite:macro:${it.id}" }) { MacroTile(it, state, vm) }
+            items(favoriteRemotes, key = { "favorite:remote:${it.id}" }) { RemoteTile(it, state, vm) }
         }
         if (groups.isNotEmpty()) {
             item(key = "groups", span = { GridItemSpan(maxLineSpan) }) {
@@ -606,9 +622,9 @@ internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: St
     }
 }
 
-/** A device with a switch-off timer and the time left, counted down second by second. */
+/** Something due at a time, such as a device with a switch-off timer, with the time left counted down. */
 @Composable
-private fun TimerRow(device: Device, at: Long, onCancel: () -> Unit) {
+private fun TimerRow(icon: ImageVector, name: String, text: String, at: Long, onCancel: () -> Unit) {
     val now by produceState(System.currentTimeMillis(), at) {
         while (true) {
             value = System.currentTimeMillis()
@@ -620,20 +636,16 @@ private fun TimerRow(device: Device, at: Long, onCancel: () -> Unit) {
             Modifier.padding(start = 14.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(iconFor(device), contentDescription = null, modifier = Modifier.size(26.dp))
+            Icon(icon, contentDescription = null, modifier = Modifier.size(26.dp))
             Column(Modifier.padding(start = 14.dp).weight(1f)) {
                 Text(
-                    device.name,
+                    name,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    str(R.string.turns_off_at, clock(at)),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.alpha(0.75f),
-                )
+                Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.alpha(0.75f))
             }
             // Digits of equal width keep the countdown from jittering as it ticks.
             Text(

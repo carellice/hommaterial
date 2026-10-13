@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 
 internal const val EXTRA_APPLIANCE_ID = "applianceId"
 internal const val EXTRA_GROUP_ID = "groupId"
+internal const val EXTRA_MACRO_ID = "macroId"
 
 /** How a command sent from outside the app ended, with the sentence to show for it. */
 class Outcome(
@@ -236,12 +237,17 @@ class ToggleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val device = intent.getStringExtra(EXTRA_APPLIANCE_ID)
         val group = intent.getStringExtra(EXTRA_GROUP_ID)
-        if (device == null && group == null) return
+        val macro = intent.getStringExtra(EXTRA_MACRO_ID)
+        if (device == null && group == null && macro == null) return
         val app = context.applicationContext
         val pending = goAsync()
         Quick.scope.launch {
             try {
-                val outcome = if (device != null) Quick.toggle(app, device) else Quick.toggleGroup(app, group!!)
+                val outcome = when {
+                    device != null -> Quick.toggle(app, device)
+                    group != null -> Quick.toggleGroup(app, group)
+                    else -> Quick.runMacro(app, macro!!)
+                }
                 Toast.makeText(app, outcome.message, Toast.LENGTH_SHORT).show()
             } finally {
                 pending.finish()

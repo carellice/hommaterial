@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -36,6 +37,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -97,6 +99,34 @@ private fun duration(minutes: Int): String = when (minutes) {
     60 -> str(R.string.timer_60)
     120 -> str(R.string.timer_120)
     else -> str(R.string.monitor_minutes, minutes)
+}
+
+/**
+ * The timer of a remote or of a custom device, [target]: the usual delays to choose from, or the
+ * one that is running with what cancels it. [onChoose] receives the minutes.
+ */
+@Composable
+internal fun TimerChips(title: String, target: String, state: UiState, vm: HomeViewModel, onChoose: (Int) -> Unit) {
+    val running = state.schedules.find { it.days.isEmpty() && it.enabled && it.action.target == target }
+    Text(title, style = MaterialTheme.typography.labelLarge)
+    if (running != null) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                str(R.string.schedule_once, running.label, clock(running.at)),
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = { vm.deleteSchedule(running.id) }) { Text(str(R.string.cancel_timer)) }
+        }
+    } else {
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            for ((label, minutes) in TIMER_CHOICES) {
+                AssistChip(onClick = { onChoose(minutes) }, label = { Text(str(label)) })
+            }
+        }
+    }
 }
 
 /** The actions set to happen at a time: what is waiting, and how to add one. */

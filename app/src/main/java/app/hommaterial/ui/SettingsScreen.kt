@@ -168,7 +168,8 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     if (choosingShortcuts) {
         PicksDialog(
             title = str(R.string.shortcuts_choose),
-            picks = state.groups.map { Pick(SHORTCUT_GROUP + it.id, it.name, str(R.string.group_edit_title)) } +
+            picks = state.macros.map { Pick(SHORTCUT_MACRO + it.id, it.name, str(R.string.macro_edit)) } +
+                state.groups.map { Pick(SHORTCUT_GROUP + it.id, it.name, str(R.string.group_edit_title)) } +
                 switchable.map { Pick(SHORTCUT_DEVICE + it.applianceId, it.name, it.room ?: noRoom) },
             initial = state.shortcuts.orEmpty(),
             limit = MAX_SHORTCUTS,

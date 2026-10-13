@@ -128,6 +128,11 @@ collegati al proprio account Alexa.
   Si avviano anche dal widget e dai riquadri delle Impostazioni rapide.
 - Telecomandi e dispositivi personalizzati si possono mettere nelle stanze,
   accanto agli altri dispositivi.
+- Telecomandi e dispositivi personalizzati hanno le stesse comodità degli
+  altri dispositivi: il timer (spegnere un telecomando, premere un suo tasto
+  o eseguire un dispositivo personalizzato tra un po'), i preferiti, i
+  comandi vocali ("esegui la postazione", "spegni la TV del salotto") e, per
+  i dispositivi personalizzati, le scorciatoie sotto l'icona dell'app.
 - Dal menu si impostano le azioni programmate: accendere o spegnere un
   dispositivo, eseguire un dispositivo personalizzato o premere un tasto di
   un telecomando a una certa ora, una volta sola o nei giorni scelti, oppure

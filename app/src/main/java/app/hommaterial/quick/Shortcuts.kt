@@ -30,6 +30,7 @@ internal fun publishShortcuts(context: Context) {
     val hidden = cache.hidden()
     val devices = cache.devices().filter { it.hasPower && it.applianceId !in hidden }
     val groups = cache.groups()
+    val macros = cache.macros()
     val chosen = cache.shortcuts() ?: run {
         val favorites = cache.favorites()
         devices.filter { it.applianceId in favorites }.map { SHORTCUT_DEVICE + it.applianceId }
@@ -39,7 +40,9 @@ internal fun publishShortcuts(context: Context) {
             // Devices and groups that are gone leave their place to the next ones.
             val id = key.substringAfter(':')
             val intent = Intent(context, ToggleActivity::class.java).setAction(ACTION_TOGGLE)
-            if (key.startsWith(SHORTCUT_GROUP)) {
+            if (key.startsWith(SHORTCUT_MACRO)) {
+                macros.find { it.id == id }?.let { Triple(key, it.name, intent.putExtra(EXTRA_MACRO_ID, id)) }
+            } else if (key.startsWith(SHORTCUT_GROUP)) {
                 groups.find { it.id == id }?.let { Triple(key, it.name, intent.putExtra(EXTRA_GROUP_ID, id)) }
             } else {
                 devices.find { it.applianceId == id }
@@ -67,7 +70,8 @@ class ToggleActivity : Activity() {
         sendBroadcast(
             Intent(this, ToggleReceiver::class.java)
                 .putExtra(EXTRA_APPLIANCE_ID, intent.getStringExtra(EXTRA_APPLIANCE_ID))
-                .putExtra(EXTRA_GROUP_ID, intent.getStringExtra(EXTRA_GROUP_ID)),
+                .putExtra(EXTRA_GROUP_ID, intent.getStringExtra(EXTRA_GROUP_ID))
+                .putExtra(EXTRA_MACRO_ID, intent.getStringExtra(EXTRA_MACRO_ID)),
         )
         finish()
     }

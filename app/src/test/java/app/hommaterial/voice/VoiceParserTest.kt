@@ -96,6 +96,20 @@ class VoiceParserTest {
     }
 
     @Test
+    fun customDevicesAndRemotesAreUnderstoodByTheirWholeName() {
+        val macros = listOf("m1" to "Postazione", "m2" to "Buonanotte casa")
+        val remotes = listOf("r1" to "TV Salotto")
+        assertEquals(ExtraCommand.Run("m1"), parseExtras(listOf("esegui la postazione"), macros, remotes))
+        val guesses = listOf("avvia buonanotte", "avvia buonanotte casa")
+        assertEquals(ExtraCommand.Run("m2"), parseExtras(guesses, macros, remotes))
+        assertEquals(ExtraCommand.Remote("r1", false), parseExtras(listOf("Spegni la TV del salotto"), macros, remotes))
+        assertEquals(ExtraCommand.Remote("r1", true), parseExtras(listOf("turn on the tv salotto"), macros, remotes))
+        // A custom device is never "switched off", and half a name is not enough.
+        assertEquals(null, parseExtras(listOf("spegni postazione"), macros, remotes))
+        assertEquals(null, parseExtras(listOf("accendi la tv"), macros, remotes))
+    }
+
+    @Test
     fun englishIsUnderstoodToo() {
         val command = ran(run("turn off the Lampada, please"))
         assertEquals("Lampada", command.devices.single().name)

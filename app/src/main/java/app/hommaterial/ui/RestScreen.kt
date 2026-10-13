@@ -112,6 +112,13 @@ fun RestScreen(state: UiState, night: Boolean, onWake: () -> Unit) {
                             style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                         )
                     }
+                    // What else is about to happen once, such as the timer of a remote.
+                    for (schedule in state.schedules.filter { it.days.isEmpty() && it.enabled && it.at > now }) {
+                        Text(
+                            str(R.string.rest_schedule, schedule.label, countdown(schedule.at - now)),
+                            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                        )
+                    }
                 }
             }
         }

@@ -72,6 +72,42 @@ private fun score(said: List<String>, name: List<String>, room: List<String>): D
     return named.toDouble() / name.size * explained / said.size
 }
 
+/** What a sentence asks of what Alexa does not know: a custom device to run, a remote to switch. */
+sealed interface ExtraCommand {
+    data class Run(val macroId: String) : ExtraCommand
+
+    data class Remote(val remoteId: String, val on: Boolean) : ExtraCommand
+}
+
+private val RUN_WORDS = setOf("esegui", "avvia", "lancia", "fai", "run", "start", "launch")
+
+/**
+ * Looks in what was [heard] for a custom device to run, or a remote to switch on or off. Both are
+ * given as id and name, and the name must be said whole: these are tried only when no device of
+ * Alexa was meant, and a loose match would steal sentences from them.
+ */
+fun parseExtras(
+    heard: List<String>,
+    macros: List<Pair<String, String>>,
+    remotes: List<Pair<String, String>>,
+): ExtraCommand? {
+    for (sentence in heard) {
+        val said = words(sentence)
+        val verb = said.firstOrNull { it in RUN_WORDS || it in ON_WORDS || it in OFF_WORDS } ?: continue
+        val rest = said.filter { it != verb && it !in FILLER_WORDS }
+        fun named(name: String): Boolean {
+            val wanted = words(name).filter { it !in FILLER_WORDS }
+            return wanted.isNotEmpty() && wanted.size == rest.size && wanted.all { w -> rest.any { alike(it, w) } }
+        }
+        // "Accendi" starts a custom device as well as "esegui" does; "spegni" never does.
+        if (verb !in OFF_WORDS) macros.firstOrNull { named(it.second) }?.let { return ExtraCommand.Run(it.first) }
+        if (verb !in RUN_WORDS) {
+            remotes.firstOrNull { named(it.second) }?.let { return ExtraCommand.Remote(it.first, verb in ON_WORDS) }
+        }
+    }
+    return null
+}
+
 /**
  * Turns what the speech recognizer [heard], its guesses best first, into a command for one of the
  * [devices] or for a whole room. Only switching on and off is understood.
