@@ -906,7 +906,8 @@ private fun DeviceSheet(
             ) {
                 Text(str(if (favorite) R.string.favorite_remove else R.string.favorite_add))
             }
-            if (device.hasPower) {
+            // A sensor goes on a tile too: there it shows its temperature.
+            if (device.hasPower || device.isSensor) {
                 TextButton(onClick = { vm.setOnTile(device, tile == null) }, enabled = tile != null || !tilesFull) {
                     Text(
                         when {

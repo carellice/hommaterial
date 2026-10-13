@@ -14,6 +14,7 @@ import app.hommaterial.MainActivity
 import app.hommaterial.R
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
+import app.hommaterial.data.Device
 import app.hommaterial.str
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Job
@@ -41,13 +42,19 @@ abstract class PowerTile(private val slot: Int) : TileService() {
         val device = cache.devices().find { it.applianceId == cache.tileDevices()[slot] } ?: return
         if (System.currentTimeMillis() - lastCommandAt < SETTLE_MS) return
         // The remembered state may be old: the panel shows it at once and corrects it if needed.
-        fetch = Quick.scope.launch {
-            val fresh = runCatching { Alexa.get(applicationContext).api.states(listOf(device)) }.getOrNull()
-            if (!fresh.isNullOrEmpty() && System.currentTimeMillis() - lastCommandAt >= SETTLE_MS) {
-                cache.putStates(cache.states() + fresh)
-                render()
-            }
+        fetch = Quick.scope.launch { refresh(device) }
+    }
+
+    /** Asks Alexa for the state of [device] and shows it; says whether an answer came. */
+    private suspend fun refresh(device: Device): Boolean {
+        val fresh = runCatching { Alexa.get(applicationContext).api.states(listOf(device)) }.getOrNull()
+        if (fresh.isNullOrEmpty()) return false
+        if (System.currentTimeMillis() - lastCommandAt >= SETTLE_MS) {
+            val cache = Cache(this)
+            cache.putStates(cache.states() + fresh)
+            render()
         }
+        return true
     }
 
     override fun onStopListening() {
@@ -55,19 +62,28 @@ abstract class PowerTile(private val slot: Int) : TileService() {
     }
 
     override fun onClick() {
-        val id = Cache(this).tileDevices()[slot]
+        val cache = Cache(this)
+        val id = cache.tileDevices()[slot]
         if (id == null) {
             openApp()
             return
         }
         fetch?.cancel()
+        val app = applicationContext
+        // There is nothing to switch on a sensor: a tap reads it again.
+        val sensor = cache.devices().find { it.applianceId == id }?.takeIf { !it.hasPower }
+        if (sensor != null) {
+            fetch = Quick.scope.launch {
+                if (!refresh(sensor)) Toast.makeText(app, str(R.string.no_connection), Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         lastCommandAt = System.currentTimeMillis()
         // Shown switched right away; render() puts back the truth once the command has ended.
         qsTile?.let { tile ->
             tile.state = if (tile.state == Tile.STATE_ACTIVE) Tile.STATE_INACTIVE else Tile.STATE_ACTIVE
             tile.updateTile()
         }
-        val app = applicationContext
         Quick.scope.launch {
             val outcome = Quick.toggle(app, id)
             lastCommandAt = System.currentTimeMillis()
@@ -88,18 +104,32 @@ abstract class PowerTile(private val slot: Int) : TileService() {
                 ?: cache.groups().firstOrNull { group -> it.applianceId in group.devices }?.name
         }
         val subtitles = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        // A thermostat or a sensor is on a tile to be read: its temperature takes the place of on and off.
+        val reading = state?.takeIf { it.reachable && it.temperature?.isNaN() == false }?.let { read ->
+            degrees(read.temperature!!) + (read.humidity?.let { " · $it%" } ?: "")
+        }
+        val named = device?.let { if (place == null) it.name else str(R.string.tile_label, it.name, place) }
         tile.label = when {
             device == null -> "${getString(R.string.app_name)} ${slot + 1}"
+            // With nothing to switch, the reading is the tile: it goes on the first line, the largest.
+            reading != null && !device.hasPower && subtitles -> reading
+            reading != null && !device.hasPower -> str(R.string.tile_label, device.name, reading)
             // Before Android 10 a tile has one line only.
-            place != null && !subtitles -> str(R.string.tile_label, device.name, place)
+            !subtitles -> named
             else -> device.name
         }
+        tile.icon = Icon.createWithResource(
+            this,
+            if (device != null && !device.hasPower) R.drawable.ic_thermostat else R.drawable.ic_power,
+        )
         tile.state = if (state?.power == true) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         if (subtitles) {
             tile.subtitle = when {
                 device == null -> str(R.string.tile_choose)
-                state == null || state.power == null -> str(R.string.unknown_state)
+                state == null -> str(R.string.unknown_state)
                 !state.reachable -> str(R.string.unreachable)
+                reading != null -> if (device.hasPower) reading else named
+                state.power == null -> str(R.string.unknown_state)
                 // The tile itself looks on or off: the second line is free to say where the device is.
                 place != null -> place
                 state.power -> str(R.string.on)
