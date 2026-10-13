@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import app.hommaterial.R
 import app.hommaterial.data.AcSetting
 import app.hommaterial.data.Alexa
+import app.hommaterial.data.Automation
 import app.hommaterial.data.Cache
 import app.hommaterial.data.ColorChoice
 import app.hommaterial.data.Device
@@ -37,6 +38,7 @@ import app.hommaterial.data.toJsonArray
 import app.hommaterial.plural
 import app.hommaterial.quick.Alert
 import app.hommaterial.quick.Alerts
+import app.hommaterial.quick.Automations
 import app.hommaterial.quick.PowerTile
 import app.hommaterial.quick.Quick
 import app.hommaterial.quick.Schedules
@@ -97,6 +99,8 @@ data class UiState(
     val timers: Map<String, Long> = emptyMap(),
     /** The actions set to be carried out at a time, the next one first. */
     val schedules: List<Schedule> = emptyList(),
+    /** What is done by itself when a device gets to a state. */
+    val automations: List<Automation> = emptyList(),
     /** Temperature thresholds each sensor notifies about. */
     val alerts: Map<String, Alert> = emptyMap(),
     /** Whether the app looks for a newer release by itself, once a day. */
@@ -221,6 +225,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             tileDevices = local.tileDevices(),
             timers = Timers.all(getApplication()),
             schedules = Schedules.all(getApplication()),
+            automations = Automations.all(getApplication()),
             alerts = Alerts.all(getApplication()),
             autoUpdate = settings.getBoolean("autoUpdate", true),
             theme = settings.getInt("theme", 0),
@@ -277,6 +282,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         auth.logout()
         Timers.cancelAll(getApplication())
         Schedules.cancelAll(getApplication())
+        // The automations go with the cache cleared here; the check they lean on stops right after.
         cache.edit().clear().apply()
         Alerts.schedule(getApplication())
         history.clear()
@@ -348,6 +354,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private fun received(states: Map<String, DeviceState>) {
         history.record(states)
         Alerts.check(getApplication(), states)
+        Automations.check(getApplication(), states)
         // Devices with a command in flight keep their optimistic state.
         val now = System.currentTimeMillis()
         _state.update { s -> s.copy(states = s.states + states.filterKeys { it !in s.busy }, updatedAt = now) }
@@ -602,6 +609,34 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         )
         Schedules.put(getApplication(), schedule)
         _state.update { it.copy(schedules = Schedules.all(getApplication())) }
+    }
+
+    /** Creates an automation: [action] when [device] gets to what [trigger] and [threshold] say. */
+    fun addAutomation(
+        device: Device,
+        trigger: String,
+        threshold: Double,
+        action: MacroAction,
+        title: String,
+        label: String,
+    ) {
+        val id = UUID.randomUUID().toString()
+        val automation = Automation(id, device.applianceId, trigger, threshold, action, title, label)
+        // Already so: it waits for the next time, instead of going off for what was there before it.
+        val holds = _state.value.states[device.applianceId]?.let(automation::holds) == true
+        Automations.put(getApplication(), automation, holds)
+        _state.update { it.copy(automations = Automations.all(getApplication())) }
+    }
+
+    fun setAutomationEnabled(automation: Automation, enabled: Boolean) {
+        val holds = _state.value.states[automation.device]?.let(automation::holds) == true
+        Automations.put(getApplication(), automation.copy(enabled = enabled), holds)
+        _state.update { it.copy(automations = Automations.all(getApplication())) }
+    }
+
+    fun deleteAutomation(id: String) {
+        Automations.delete(getApplication(), id)
+        _state.update { it.copy(automations = Automations.all(getApplication())) }
     }
 
     /** Sets [action] to happen once, in [minutes] minutes: the timer of what is not a device of Alexa. */

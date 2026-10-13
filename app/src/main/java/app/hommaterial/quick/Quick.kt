@@ -204,9 +204,12 @@ object Quick {
             val id = key.substringAfter(':')
             if (key.startsWith(SHORTCUT_GROUP)) groups[id]?.devices.orEmpty() else listOf(id)
         }.toSet()
+        // What an automation watches is needed too, whatever it is.
+        val watched = Automations.all(context).filter { it.enabled }.map { it.device }.toSet()
         // Sensors come along whether shown or not, to keep their history going.
         val devices = cache.devices().filter {
-            it.applianceId !in hidden && (it.applianceId in favorites || it.applianceId in shown || it.isSensor)
+            val id = it.applianceId
+            id in watched || (id !in hidden && (id in favorites || id in shown || it.isSensor))
         }
         if (devices.isEmpty()) return
         val fresh = try {
@@ -220,6 +223,7 @@ object Quick {
         cache.prefs.edit().putLong("widgetUpdatedAt", System.currentTimeMillis()).apply()
         History(context).record(fresh)
         Alerts.check(context, fresh)
+        Automations.check(context, fresh)
         refresh(context)
     }
 

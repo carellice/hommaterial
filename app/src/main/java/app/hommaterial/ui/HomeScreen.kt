@@ -754,6 +754,8 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
     var open by remember { mutableStateOf(false) }
     var confirmSignOut by remember { mutableStateOf(false) }
     if (confirmSignOut) SignOutDialog(onConfirm = vm::logout, onDismiss = { confirmSignOut = false })
+    var automating by remember { mutableStateOf(false) }
+    if (automating) AutomationsDialog(state, vm, onDismiss = { automating = false })
     var scheduling by remember { mutableStateOf(false) }
     if (scheduling) SchedulesDialog(state, vm, onDismiss = { scheduling = false })
     // What waits for the PIN of the monitor before it happens.
@@ -778,6 +780,10 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
         DropdownMenuItem(
             text = { Text(str(R.string.check_updates)) },
             onClick = { open = false; vm.checkForUpdate(manual = true) },
+        )
+        DropdownMenuItem(
+            text = { Text(str(R.string.s_automations)) },
+            onClick = { open = false; guarded { automating = true } },
         )
         DropdownMenuItem(
             text = { Text(str(R.string.s_schedules)) },

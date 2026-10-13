@@ -15,6 +15,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import app.hommaterial.MainActivity
 import app.hommaterial.R
+import app.hommaterial.data.Automation
 import app.hommaterial.data.Cache
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.Schedule
@@ -64,7 +65,8 @@ object Alerts {
     /** Keeps the periodic check running only while there is something to check. */
     fun schedule(context: Context) {
         val work = WorkManager.getInstance(context)
-        if (all(context).isEmpty()) {
+        // The automations lean on the same check: it is what brings them fresh states.
+        if (all(context).isEmpty() && Automations.all(context).none { it.enabled }) {
             work.cancelUniqueWork(WORK)
             return
         }
@@ -108,6 +110,20 @@ object Alerts {
         }
         cache.prefs.edit().putStringSet("alertsTripped", tripped).apply()
     }
+
+    fun automationDone(context: Context, automation: Automation) = notify(
+        context,
+        "${automation.id}|automation".hashCode(),
+        automation.label,
+        str(R.string.automation_done_text, automation.title),
+    )
+
+    fun automationFailed(context: Context, automation: Automation, reason: String) = notify(
+        context,
+        "${automation.id}|automation".hashCode(),
+        str(R.string.schedule_failed_title, automation.label),
+        reason,
+    )
 
     fun scheduleDone(context: Context, schedule: Schedule) = notify(
         context,

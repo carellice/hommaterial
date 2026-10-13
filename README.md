@@ -133,6 +133,10 @@ collegati al proprio account Alexa.
   o eseguire un dispositivo personalizzato tra un po'), i preferiti, i
   comandi vocali ("esegui la postazione", "spegni la TV del salotto") e, per
   i dispositivi personalizzati, le scorciatoie sotto l'icona dell'app.
+- Dal menu si creano le automazioni: quando un sensore supera o scende sotto
+  una temperatura o un'umidità, oppure quando un dispositivo si accende o si
+  spegne, l'app accende o spegne un dispositivo, esegue un dispositivo
+  personalizzato o preme un tasto di un telecomando.
 - Dal menu si impostano le azioni programmate: accendere o spegnere un
   dispositivo, eseguire un dispositivo personalizzato o premere un tasto di
   un telecomando a una certa ora, una volta sola o nei giorni scelti, oppure
@@ -155,6 +159,9 @@ Il timer di spegnimento lo fa scattare il telefono: all'ora stabilita deve
 essere acceso e connesso. Una notifica dice com'è andata: dispositivo spento,
 oppure timer non riuscito. Se non c'è rete riprova per dieci minuti prima di
 rinunciare.
+
+Le automazioni seguono gli stessi tempi degli avvisi di temperatura: scattano
+quando il telefono legge lo stato, non nell'istante in cui cambia.
 
 Gli avvisi di temperatura li controlla il telefono, circa ogni 15 minuti e
 più di rado quando è fermo da un po': non sono un allarme in tempo reale.
