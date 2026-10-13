@@ -55,6 +55,7 @@ import app.hommaterial.data.MacroAction
 import app.hommaterial.data.Remote
 import app.hommaterial.data.RemoteKind
 import app.hommaterial.plural
+import app.hommaterial.quick.Quick
 import app.hommaterial.str
 
 private val WAIT_SECONDS = listOf(1, 2, 3, 5, 10, 30, 60)
@@ -205,6 +206,29 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             modifier = Modifier.clickable { choosingCondition = true },
                         )
+                    }
+                    // Only once it exists: a tile runs what is saved.
+                    if (macro != null) {
+                        val tile = state.tileDevices.indexOf(Quick.macroKey(macro.id)).takeIf { it >= 0 }
+                        val full = null !in state.tileDevices
+                        Card {
+                            ListItem(
+                                headlineContent = {
+                                    Text(
+                                        when {
+                                            tile != null -> str(R.string.tile_remove, tile + 1)
+                                            full -> str(R.string.tiles_full)
+                                            else -> str(R.string.tile_add)
+                                        },
+                                    )
+                                },
+                                supportingContent = { Text(str(R.string.macro_surfaces)) },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                modifier = Modifier.clickable(enabled = tile != null || !full) {
+                                    vm.setOnTile(macro, tile == null)
+                                },
+                            )
+                        }
                     }
                     if (watched == null) {
                         ActionList(str(R.string.macro_steps), steps, state) { steps = it }

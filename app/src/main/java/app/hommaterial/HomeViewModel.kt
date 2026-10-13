@@ -9,9 +9,6 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.hommaterial.R
-import app.hommaterial.data.ACTION_POWER
-import app.hommaterial.data.ACTION_REMOTE
-import app.hommaterial.data.ACTION_WAIT
 import app.hommaterial.data.AcSetting
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
@@ -51,7 +48,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -417,13 +413,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Gives [device] the first free quick settings tile, or takes its tile away. */
-    fun setOnTile(device: Device, onTile: Boolean) {
+    fun setOnTile(device: Device, onTile: Boolean) = setOnTile(device.applianceId, device.name, onTile)
+
+    /** The same for a custom device, which is on a tile to be run. */
+    fun setOnTile(macro: Macro, onTile: Boolean) = setOnTile(Quick.macroKey(macro.id), macro.name, onTile)
+
+    private fun setOnTile(key: String, name: String, onTile: Boolean) {
         val tiles = _state.value.tileDevices
-        val slot = tiles.indexOf(if (onTile) null else device.applianceId)
-        if (slot < 0 || (onTile && device.applianceId in tiles)) return
-        local.putTileDevice(slot, device.applianceId.takeIf { onTile })
+        val slot = tiles.indexOf(if (onTile) null else key)
+        if (slot < 0 || (onTile && key in tiles)) return
+        local.putTileDevice(slot, key.takeIf { onTile })
         _state.update { it.copy(tileDevices = local.tileDevices()) }
-        if (onTile) PowerTile.offer(getApplication(), slot, device.name)
+        if (onTile) PowerTile.offer(getApplication(), slot, name)
     }
 
     /** Acts on what the speech recognizer [heard], its guesses best first. */
@@ -578,64 +579,30 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    fun deleteMacro(id: String) = saveMacros(_state.value.macros.filter { it.id != id })
+    fun deleteMacro(id: String) {
+        // Its tile goes back to being free.
+        _state.value.macros.find { it.id == id }?.let { setOnTile(it, onTile = false) }
+        saveMacros(_state.value.macros.filter { it.id != id })
+    }
 
     private fun saveMacros(macros: List<Macro>) {
         local.putMacros(macros)
         _state.update { it.copy(macros = macros) }
+        Quick.refresh(getApplication())
     }
 
-    /**
-     * Runs the actions of a custom device, one after the other, and stops at the first that fails.
-     * The device it depends on is asked to Alexa first: what the phone remembers may be old.
-     */
+    /** Runs a custom device as the widget and the tiles do, and says how it went. */
     fun runMacro(macro: Macro) {
         if (macro.id in _state.value.busy) return
         _state.update { it.copy(busy = it.busy + macro.id) }
         viewModelScope.launch {
-            try {
-                fun device(id: String) = _state.value.devices.find { it.applianceId == id }
-                    ?: throw Exception(str(R.string.macro_gone))
-                val actions = if (macro.condition == null) macro.steps else {
-                    val watched = device(macro.condition)
-                    val on = api.states(listOf(watched))[watched.applianceId]?.takeIf { it.reachable }?.power
-                        ?: throw Exception(str(R.string.quick_unknown_state, watched.name))
-                    if (on) macro.steps else macro.otherwise
-                }
-                for (action in actions) {
-                    when (action.type) {
-                        ACTION_WAIT -> delay((action.value.toLongOrNull() ?: 0) * 1000)
-                        ACTION_POWER -> {
-                            val target = device(action.target)
-                            val on = action.value == "on"
-                            // A device switched off no longer needs its timer.
-                            if (!on) cancelTimer(target)
-                            api.setPower(target, on)
-                            _state.update { s ->
-                                val known = s.states[target.applianceId] ?: DeviceState()
-                                s.copy(states = s.states + (target.applianceId to known.copy(power = on)))
-                            }
-                        }
-                        ACTION_REMOTE -> {
-                            val remote = _state.value.remotes.find { it.id == action.target }
-                                ?: throw Exception(str(R.string.macro_gone))
-                            switchBot.send(remote, action.value, custom = action.custom)
-                        }
-                    }
-                }
-                saveCache()
-                _messages.tryEmit(str(R.string.macro_done, macro.name))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: NotLoggedInException) {
-                _state.update { it.copy(loggedIn = false, loginMessage = e.message) }
-            } catch (e: java.io.IOException) {
-                _messages.tryEmit(str(R.string.macro_failed, macro.name, str(R.string.no_connection)))
-            } catch (e: Exception) {
-                _messages.tryEmit(str(R.string.macro_failed, macro.name, e.message ?: str(R.string.something_wrong)))
-            } finally {
-                _state.update { it.copy(busy = it.busy - macro.id) }
+            val outcome = Quick.runMacro(getApplication(), macro.id)
+            if (outcome.loginExpired) {
+                _state.update { it.copy(loggedIn = false, loginMessage = str(R.string.login_expired)) }
+            } else {
+                _messages.tryEmit(outcome.message)
             }
+            _state.update { it.copy(busy = it.busy - macro.id) }
         }
     }
 

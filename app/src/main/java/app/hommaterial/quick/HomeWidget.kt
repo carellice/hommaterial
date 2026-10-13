@@ -50,6 +50,7 @@ import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.WidgetConfig
 import app.hommaterial.data.statusText
+import app.hommaterial.plural
 import app.hommaterial.str
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -57,6 +58,7 @@ import kotlinx.coroutines.withContext
 
 private val APPLIANCE_ID = ActionParameters.Key<String>(EXTRA_APPLIANCE_ID)
 private val GROUP_ID = ActionParameters.Key<String>(EXTRA_GROUP_ID)
+private val MACRO_ID = ActionParameters.Key<String>("macroId")
 
 // Height of a tile and size of its name for each size setting, compact to large.
 private val TILE_HEIGHTS = listOf(44.dp, 60.dp, 76.dp)
@@ -94,9 +96,17 @@ private fun entries(cache: Cache, config: WidgetConfig): List<Entry> {
         val favorites = cache.favorites()
         devices.filter { it.applianceId in favorites }.map { SHORTCUT_DEVICE + it.applianceId }
     }
+    val macros = cache.macros()
     return keys.mapNotNull { key ->
         val id = key.substringAfter(':')
-        if (key.startsWith(SHORTCUT_GROUP)) {
+        if (key.startsWith(SHORTCUT_MACRO)) {
+            val macro = macros.find { it.id == id } ?: return@mapNotNull null
+            // It has no state: the second line says what it depends on, or how much it does.
+            val watched = devices.find { it.applianceId == macro.condition }
+            val status = watched?.let { str(R.string.macro_depends, it.name) }
+                ?: plural(R.plurals.macro_actions, macro.steps.size)
+            Entry(key, macro.name, status, false, actionRunCallback<RunMacroAction>(actionParametersOf(MACRO_ID to id)))
+        } else if (key.startsWith(SHORTCUT_GROUP)) {
             val group = groups.find { it.id == id } ?: return@mapNotNull null
             val members = devices.filter { it.hasPower && it.applianceId in group.devices }
             if (members.isEmpty()) return@mapNotNull null
@@ -215,6 +225,14 @@ class ToggleGroupAction : ActionCallback {
         if (!outcome.ok) {
             withContext(Dispatchers.Main) { Toast.makeText(context, outcome.message, Toast.LENGTH_SHORT).show() }
         }
+    }
+}
+
+class RunMacroAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        val outcome = Quick.runMacro(context, parameters[MACRO_ID] ?: return)
+        // Nothing on the tile changes when it is done: it is always told how it went.
+        withContext(Dispatchers.Main) { Toast.makeText(context, outcome.message, Toast.LENGTH_SHORT).show() }
     }
 }
 

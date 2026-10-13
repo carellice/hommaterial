@@ -17,6 +17,8 @@ internal const val MAX_SHORTCUTS = 4
 
 internal const val SHORTCUT_DEVICE = "device:"
 internal const val SHORTCUT_GROUP = "group:"
+/** A custom device, on the widget and on the quick settings tiles. */
+internal const val SHORTCUT_MACRO = "macro:"
 
 /**
  * Lists under the app icon the devices and groups the user chose, or the favorites until a choice

@@ -15,6 +15,8 @@ import app.hommaterial.R
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
 import app.hommaterial.data.Device
+import app.hommaterial.data.Macro
+import app.hommaterial.plural
 import app.hommaterial.str
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Job
@@ -61,6 +63,12 @@ abstract class PowerTile(private val slot: Int) : TileService() {
         fetch?.cancel()
     }
 
+    /** The custom device this tile runs, when it was given one instead of a device. */
+    private fun macro(cache: Cache): Macro? {
+        val id = cache.tileDevices()[slot]?.takeIf { it.startsWith(SHORTCUT_MACRO) } ?: return null
+        return cache.macros().find { it.id == id.removePrefix(SHORTCUT_MACRO) }
+    }
+
     override fun onClick() {
         val cache = Cache(this)
         val id = cache.tileDevices()[slot]
@@ -70,6 +78,18 @@ abstract class PowerTile(private val slot: Int) : TileService() {
         }
         fetch?.cancel()
         val app = applicationContext
+        val macro = macro(cache)
+        if (macro != null) {
+            if (!running.add(slot)) return
+            render()
+            Quick.scope.launch {
+                val outcome = Quick.runMacro(app, macro.id)
+                running.remove(slot)
+                Toast.makeText(app, outcome.message, Toast.LENGTH_SHORT).show()
+                render()
+            }
+            return
+        }
         // There is nothing to switch on a sensor: a tap reads it again.
         val sensor = cache.devices().find { it.applianceId == id }?.takeIf { !it.hasPower }
         if (sensor != null) {
@@ -95,6 +115,20 @@ abstract class PowerTile(private val slot: Int) : TileService() {
     private fun render() {
         val tile = qsTile ?: return
         val cache = Cache(this)
+        val macro = macro(cache)
+        if (macro != null) {
+            // Lit only while its actions run: it has no state of its own.
+            tile.label = macro.name
+            tile.icon = Icon.createWithResource(this, R.drawable.ic_macro)
+            tile.state = if (slot in running) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                tile.subtitle = cache.devices().find { it.applianceId == macro.condition }
+                    ?.let { str(R.string.macro_depends, it.name) }
+                    ?: plural(R.plurals.macro_actions, macro.steps.size)
+            }
+            tile.updateTile()
+            return
+        }
         val device = cache.devices().find { it.applianceId == cache.tileDevices()[slot] }
         val state = device?.let { cache.states()[it.applianceId] }
         // Where the device is tells apart the lamps of two rooms: its room, or else a group it is in.
@@ -159,6 +193,9 @@ abstract class PowerTile(private val slot: Int) : TileService() {
             PowerTile4::class.java,
             PowerTile5::class.java,
         )
+
+        /** The slots whose custom device is running. */
+        private val running = ConcurrentHashMap.newKeySet<Int>()
 
         /** When each slot last sent a command. */
         private val commandTimes = ConcurrentHashMap<Int, Long>()

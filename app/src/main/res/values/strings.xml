@@ -403,6 +403,7 @@
     <string name="macro_failed">%1$s stopped: %2$s</string>
     <string name="macro_delete_title">Delete %1$s?</string>
     <string name="macro_delete_text">The tile and its actions are deleted. The devices stay as they are.</string>
+    <string name="macro_surfaces">The widget takes it from Settings, under “Home screen widget”.</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

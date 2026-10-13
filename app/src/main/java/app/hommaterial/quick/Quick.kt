@@ -6,18 +6,23 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.glance.appwidget.updateAll
 import app.hommaterial.R
+import app.hommaterial.data.ACTION_POWER
+import app.hommaterial.data.ACTION_REMOTE
+import app.hommaterial.data.ACTION_WAIT
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.History
 import app.hommaterial.data.NotLoggedInException
+import app.hommaterial.data.SwitchBot
 import app.hommaterial.str
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -27,7 +32,12 @@ internal const val EXTRA_APPLIANCE_ID = "applianceId"
 internal const val EXTRA_GROUP_ID = "groupId"
 
 /** How a command sent from outside the app ended, with the sentence to show for it. */
-class Outcome(val ok: Boolean, val message: String, val noConnection: Boolean = false)
+class Outcome(
+    val ok: Boolean,
+    val message: String,
+    val noConnection: Boolean = false,
+    val loginExpired: Boolean = false,
+)
 
 /** Commands for the surfaces that live outside the app: shortcuts, quick settings tile, widget. */
 object Quick {
@@ -38,6 +48,9 @@ object Quick {
 
     /** Ticks whenever what is remembered on the phone changes. */
     val changes = _changes.asStateFlow()
+
+    /** How a custom device is named where devices are named by their applianceId. */
+    fun macroKey(id: String) = SHORTCUT_MACRO + id
 
     /** Inverts the power of a device, asking Alexa for its real state first. */
     suspend fun toggle(context: Context, applianceId: String): Outcome = command(context, applianceId) { device ->
@@ -105,13 +118,60 @@ object Quick {
         }
     }
 
+    /**
+     * Runs the actions of a custom device, one after the other, and stops at the first that fails.
+     * The device it depends on is asked to Alexa first: what the phone remembers may be old.
+     */
+    suspend fun runMacro(context: Context, macroId: String): Outcome {
+        val cache = Cache(context)
+        val macro = cache.macros().find { it.id == macroId } ?: return Outcome(false, str(R.string.quick_not_found))
+        val devices = cache.devices()
+        fun device(id: String) = devices.find { it.applianceId == id } ?: throw Exception(str(R.string.macro_gone))
+        val outcome = attempt {
+            val alexa = Alexa.get(context)
+            val switchBot = SwitchBot(context, alexa.http)
+            val actions = if (macro.condition == null) macro.steps else {
+                val watched = device(macro.condition)
+                val on = alexa.api.states(listOf(watched))[watched.applianceId]?.takeIf { it.reachable }?.power
+                    ?: throw Exception(str(R.string.quick_unknown_state, watched.name))
+                if (on) macro.steps else macro.otherwise
+            }
+            for (action in actions) {
+                when (action.type) {
+                    ACTION_WAIT -> delay((action.value.toLongOrNull() ?: 0) * 1000)
+                    ACTION_POWER -> {
+                        val target = device(action.target)
+                        val on = action.value == "on"
+                        // A device switched off no longer needs its timer.
+                        if (!on) Timers.cancel(context, target.applianceId)
+                        alexa.api.setPower(target, on)
+                        val known = cache.states()
+                        val state = (known[target.applianceId] ?: DeviceState()).copy(power = on, reachable = true)
+                        cache.putStates(known + (target.applianceId to state))
+                    }
+                    ACTION_REMOTE -> {
+                        val remote = switchBot.remotes().find { it.id == action.target }
+                            ?: throw Exception(str(R.string.macro_gone))
+                        switchBot.send(remote, action.value, custom = action.custom)
+                    }
+                }
+            }
+            Outcome(true, str(R.string.macro_done, macro.name))
+        }
+        // What was switched before a failure is switched all the same.
+        refresh(context)
+        if (outcome.ok) return outcome
+        val message = str(R.string.macro_failed, macro.name, outcome.message)
+        return Outcome(false, message, outcome.noConnection, outcome.loginExpired)
+    }
+
     private suspend fun attempt(block: suspend () -> Outcome): Outcome =
         try {
             block()
         } catch (e: CancellationException) {
             throw e
         } catch (e: NotLoggedInException) {
-            Outcome(false, str(R.string.login_expired_open_app))
+            Outcome(false, str(R.string.login_expired_open_app), loginExpired = true)
         } catch (e: IOException) {
             Outcome(false, str(R.string.no_connection), noConnection = true)
         } catch (e: Exception) {

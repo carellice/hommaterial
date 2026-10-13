@@ -87,6 +87,7 @@ import app.hommaterial.quick.Alerts
 import app.hommaterial.quick.MAX_SHORTCUTS
 import app.hommaterial.quick.SHORTCUT_DEVICE
 import app.hommaterial.quick.SHORTCUT_GROUP
+import app.hommaterial.quick.SHORTCUT_MACRO
 import app.hommaterial.quick.clock
 import app.hommaterial.quick.degrees
 import app.hommaterial.str
@@ -173,7 +174,8 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
         val shown = placed.filter { it.applianceId !in state.hidden }
         PicksDialog(
             title = str(R.string.widget_items),
-            picks = state.groups.map { Pick(SHORTCUT_GROUP + it.id, it.name, str(R.string.group_edit_title)) } +
+            picks = state.macros.map { Pick(SHORTCUT_MACRO + it.id, it.name, str(R.string.macro_edit)) } +
+                state.groups.map { Pick(SHORTCUT_GROUP + it.id, it.name, str(R.string.group_edit_title)) } +
                 shown.map { Pick(SHORTCUT_DEVICE + it.applianceId, it.name, it.room ?: noRoom) },
             initial = state.widget.items.orEmpty(),
             limit = null,
@@ -263,7 +265,11 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     // The name behind an entry of the shortcuts or of the widget, null when it no longer exists.
     fun nameOf(key: String): String? {
         val id = key.substringAfter(':')
-        return if (key.startsWith(SHORTCUT_GROUP)) state.groups.find { it.id == id }?.name else names[id]
+        return when {
+            key.startsWith(SHORTCUT_GROUP) -> state.groups.find { it.id == id }?.name
+            key.startsWith(SHORTCUT_MACRO) -> state.macros.find { it.id == id }?.name
+            else -> names[id]
+        }
     }
     val favoriteKeys = state.devices
         .filter { it.applianceId in state.favorites && it.applianceId !in state.hidden }
@@ -541,7 +547,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
 
             Section(R.string.s_tiles, R.string.tiles_text) {
                 state.tileDevices.forEachIndexed { slot, id ->
-                    val name = names[id]
+                    val name = id?.let(::nameOf)
                     Setting(
                         title = str(R.string.tile_slot, slot + 1),
                         text = name ?: str(R.string.tile_free),

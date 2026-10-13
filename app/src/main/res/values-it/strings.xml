@@ -392,6 +392,7 @@
     <string name="macro_failed">%1$s interrotto: %2$s</string>
     <string name="macro_delete_title">Eliminare %1$s?</string>
     <string name="macro_delete_text">Il riquadro e le sue azioni vengono eliminati. I dispositivi restano come sono.</string>
+    <string name="macro_surfaces">Nel widget si mette dalle Impostazioni, in «Widget in home».</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>
