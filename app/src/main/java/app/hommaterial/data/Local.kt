@@ -67,6 +67,13 @@ class Cache(context: Context) {
     fun putGroups(groups: List<Group>) =
         prefs.edit().putString("groups", JSONArray(groups.map { it.toJson() }).toString()).apply()
 
+    fun macros(): List<Macro> = runCatching {
+        JSONArray(prefs.getString("macros", "[]")).mapObjects(Macro::fromJson)
+    }.getOrDefault(emptyList())
+
+    fun putMacros(macros: List<Macro>) =
+        prefs.edit().putString("macros", JSONArray(macros.map { it.toJson() }).toString()).apply()
+
     /**
      * What is listed under the app icon, in order: "device:" or "group:" followed by an id. Null
      * until the user chooses, and the favorites are listed instead.

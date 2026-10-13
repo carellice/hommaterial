@@ -378,6 +378,31 @@
     <string name="ac_fan_high">High</string>
     <string name="ac_send">Turn on / send</string>
     <string name="remote_buttons_many">Several buttons at once: one per line, or with commas between them. Names exactly as in the SwitchBot app.</string>
+    <string name="s_macros">Custom</string>
+    <string name="s_macros_settings">Custom devices</string>
+    <string name="macros_text">Tiles that run a series of actions at a tap: switching devices, pressing keys of the remotes, waiting. They can do different things depending on whether a device is on or off. Holding one in the list opens it.</string>
+    <string name="macro_new">New custom device</string>
+    <string name="macro_edit">Custom device</string>
+    <string name="macro_condition">Depends on</string>
+    <string name="macro_condition_none">Nothing: always the same actions</string>
+    <string name="macro_depends">Depends on %1$s</string>
+    <string name="macro_steps">Actions</string>
+    <string name="macro_when_on">When %1$s is on</string>
+    <string name="macro_when_off">When %1$s is off</string>
+    <string name="macro_add_action">Add an action</string>
+    <string name="macro_remove_action">Remove the action</string>
+    <string name="macro_kind_power">Switch a device on or off</string>
+    <string name="macro_kind_remote">Press a key of a remote</string>
+    <string name="macro_kind_wait">Wait</string>
+    <string name="macro_pick_device">Which device?</string>
+    <string name="macro_pick_remote">Which remote?</string>
+    <string name="macro_no_keys">This remote has no keys yet: add them from its panel first.</string>
+    <string name="macro_press">Press “%1$s” on %2$s</string>
+    <string name="macro_gone">no longer there</string>
+    <string name="macro_done">%1$s: done</string>
+    <string name="macro_failed">%1$s stopped: %2$s</string>
+    <string name="macro_delete_title">Delete %1$s?</string>
+    <string name="macro_delete_text">The tile and its actions are deleted. The devices stay as they are.</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>
@@ -397,5 +422,13 @@
     <plurals name="remotes_found">
         <item quantity="one">%d remote</item>
         <item quantity="other">%d remotes</item>
+    </plurals>
+    <plurals name="macro_wait">
+        <item quantity="one">Wait %d second</item>
+        <item quantity="other">Wait %d seconds</item>
+    </plurals>
+    <plurals name="macro_actions">
+        <item quantity="one">%d action</item>
+        <item quantity="other">%d actions</item>
     </plurals>
 </resources>

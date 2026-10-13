@@ -1,6 +1,7 @@
 package app.hommaterial.ui
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.MeetingRoom
@@ -15,6 +16,7 @@ import app.hommaterial.str
 const val PAGE_ALL = "all"
 const val PAGE_FAVORITES = "favorites"
 const val PAGE_GROUPS = "groups"
+const val PAGE_MACROS = "macros"
 const val PAGE_REMOTES = "remotes"
 const val PAGE_ROOM = "room:"
 
@@ -26,6 +28,7 @@ fun availablePages(state: UiState): List<String> {
         add(PAGE_ALL)
         if (visible.any { it.applianceId in state.favorites }) add(PAGE_FAVORITES)
         if (state.groups.isNotEmpty()) add(PAGE_GROUPS)
+        if (state.macros.isNotEmpty()) add(PAGE_MACROS)
         if (state.shownRemotes.isNotEmpty()) add(PAGE_REMOTES)
         rooms.forEach { add(PAGE_ROOM + it) }
         // An empty name stands for the devices without a room.
@@ -48,6 +51,7 @@ fun pageLabel(page: String): String = when (page) {
     PAGE_ALL -> str(R.string.page_all)
     PAGE_FAVORITES -> str(R.string.favorites)
     PAGE_GROUPS -> str(R.string.s_groups)
+    PAGE_MACROS -> str(R.string.s_macros)
     PAGE_REMOTES -> str(R.string.s_remotes)
     else -> page.removePrefix(PAGE_ROOM).ifEmpty { str(R.string.no_room) }
 }
@@ -56,6 +60,7 @@ fun pageIcon(page: String): ImageVector = when (page) {
     PAGE_ALL -> Icons.Outlined.Home
     PAGE_FAVORITES -> Icons.Outlined.StarBorder
     PAGE_GROUPS -> Icons.Outlined.Layers
+    PAGE_MACROS -> Icons.Outlined.AutoAwesome
     PAGE_REMOTES -> Icons.Outlined.SettingsRemote
     else -> Icons.Outlined.MeetingRoom
 }

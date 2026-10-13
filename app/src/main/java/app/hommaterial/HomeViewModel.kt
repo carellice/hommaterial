@@ -9,6 +9,9 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.hommaterial.R
+import app.hommaterial.data.ACTION_POWER
+import app.hommaterial.data.ACTION_REMOTE
+import app.hommaterial.data.ACTION_WAIT
 import app.hommaterial.data.AcSetting
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Cache
@@ -18,6 +21,7 @@ import app.hommaterial.data.DeviceState
 import app.hommaterial.data.Group
 import app.hommaterial.data.History
 import app.hommaterial.data.LoginAttempt
+import app.hommaterial.data.Macro
 import app.hommaterial.data.Marketplace
 import app.hommaterial.data.MonitorConfig
 import app.hommaterial.data.NotLoggedInException
@@ -47,6 +51,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -74,6 +79,8 @@ data class UiState(
     /** The rooms the user created, which exist even while no device is in them. */
     val roomList: List<String> = emptyList(),
     val groups: List<Group> = emptyList(),
+    /** The custom devices: tiles that run a series of actions. */
+    val macros: List<Macro> = emptyList(),
     /** What is listed under the app icon, or null for the favorites. See [Cache.shortcuts]. */
     val shortcuts: List<String>? = null,
     val widget: WidgetConfig = WidgetConfig(),
@@ -191,6 +198,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             rooms = local.rooms(),
             roomList = local.roomList(),
             groups = local.groups(),
+            macros = local.macros(),
             shortcuts = local.shortcuts(),
             widget = local.widget(),
             favorites = local.favorites(),
@@ -558,6 +566,79 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         Quick.refresh(getApplication())
     }
 
+    /** Creates a custom device, when its id is empty, or replaces the one with the same id. */
+    fun saveMacro(macro: Macro) {
+        val macros = _state.value.macros
+        saveMacros(
+            if (macro.id.isEmpty()) {
+                macros + macro.copy(id = UUID.randomUUID().toString())
+            } else {
+                macros.map { if (it.id == macro.id) macro else it }
+            },
+        )
+    }
+
+    fun deleteMacro(id: String) = saveMacros(_state.value.macros.filter { it.id != id })
+
+    private fun saveMacros(macros: List<Macro>) {
+        local.putMacros(macros)
+        _state.update { it.copy(macros = macros) }
+    }
+
+    /**
+     * Runs the actions of a custom device, one after the other, and stops at the first that fails.
+     * The device it depends on is asked to Alexa first: what the phone remembers may be old.
+     */
+    fun runMacro(macro: Macro) {
+        if (macro.id in _state.value.busy) return
+        _state.update { it.copy(busy = it.busy + macro.id) }
+        viewModelScope.launch {
+            try {
+                fun device(id: String) = _state.value.devices.find { it.applianceId == id }
+                    ?: throw Exception(str(R.string.macro_gone))
+                val actions = if (macro.condition == null) macro.steps else {
+                    val watched = device(macro.condition)
+                    val on = api.states(listOf(watched))[watched.applianceId]?.takeIf { it.reachable }?.power
+                        ?: throw Exception(str(R.string.quick_unknown_state, watched.name))
+                    if (on) macro.steps else macro.otherwise
+                }
+                for (action in actions) {
+                    when (action.type) {
+                        ACTION_WAIT -> delay((action.value.toLongOrNull() ?: 0) * 1000)
+                        ACTION_POWER -> {
+                            val target = device(action.target)
+                            val on = action.value == "on"
+                            // A device switched off no longer needs its timer.
+                            if (!on) cancelTimer(target)
+                            api.setPower(target, on)
+                            _state.update { s ->
+                                val known = s.states[target.applianceId] ?: DeviceState()
+                                s.copy(states = s.states + (target.applianceId to known.copy(power = on)))
+                            }
+                        }
+                        ACTION_REMOTE -> {
+                            val remote = _state.value.remotes.find { it.id == action.target }
+                                ?: throw Exception(str(R.string.macro_gone))
+                            switchBot.send(remote, action.value, custom = action.custom)
+                        }
+                    }
+                }
+                saveCache()
+                _messages.tryEmit(str(R.string.macro_done, macro.name))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: NotLoggedInException) {
+                _state.update { it.copy(loggedIn = false, loginMessage = e.message) }
+            } catch (e: java.io.IOException) {
+                _messages.tryEmit(str(R.string.macro_failed, macro.name, str(R.string.no_connection)))
+            } catch (e: Exception) {
+                _messages.tryEmit(str(R.string.macro_failed, macro.name, e.message ?: str(R.string.something_wrong)))
+            } finally {
+                _state.update { it.copy(busy = it.busy - macro.id) }
+            }
+        }
+    }
+
     /** Switches a group off if any of its devices is on, on otherwise. */
     fun toggleGroup(group: Group) {
         val s = _state.value
@@ -704,6 +785,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("rooms", JSONObject(s.rooms))
             .put("roomList", JSONArray(s.roomList))
             .put("groups", JSONArray(s.groups.map { it.toJson() }))
+            .put("macros", JSONArray(s.macros.map { it.toJson() }))
             .put("shortcuts", s.shortcuts?.let { JSONArray(it) } ?: JSONObject.NULL)
             .put("widget", s.widget.toJson())
             .put("tiles", JSONArray(s.tileDevices.map { it ?: JSONObject.NULL }))
@@ -765,6 +847,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             backup.optJSONArray(name)?.let { a -> (0 until a.length()).map { a.getString(it) } }
         local.putRoomList(list("roomList").orEmpty())
         local.putGroups(backup.optJSONArray("groups")?.mapObjects(Group::fromJson).orEmpty())
+        local.putMacros(backup.optJSONArray("macros")?.mapObjects(Macro::fromJson).orEmpty())
         local.putShortcuts(list("shortcuts"))
         local.putWidget(backup.optJSONObject("widget")?.let(WidgetConfig::fromJson) ?: WidgetConfig())
         val tiles = backup.optJSONArray("tiles")
@@ -795,6 +878,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 rooms = local.rooms(),
                 roomList = local.roomList(),
                 groups = local.groups(),
+                macros = local.macros(),
                 shortcuts = local.shortcuts(),
                 widget = local.widget(),
                 tileDevices = local.tileDevices(),

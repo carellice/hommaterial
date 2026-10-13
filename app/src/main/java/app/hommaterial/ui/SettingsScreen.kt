@@ -81,6 +81,7 @@ import app.hommaterial.R
 import app.hommaterial.UiState
 import app.hommaterial.data.Device
 import app.hommaterial.data.Group
+import app.hommaterial.data.Macro
 import app.hommaterial.plural
 import app.hommaterial.quick.Alerts
 import app.hommaterial.quick.MAX_SHORTCUTS
@@ -228,6 +229,11 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     }
     var editingWake by remember { mutableStateOf(false) }
     var linkingSwitchBot by remember { mutableStateOf(false) }
+    var editingMacro by remember { mutableStateOf<Macro?>(null) }
+    var creatingMacro by remember { mutableStateOf(false) }
+    if (creatingMacro || editingMacro != null) {
+        MacroEditor(editingMacro, state, vm, onDismiss = { creatingMacro = false; editingMacro = null })
+    }
     var confirmSwitchBot by remember { mutableStateOf(false) }
     if (linkingSwitchBot) {
         SwitchBotDialog(
@@ -449,6 +455,21 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                     Setting(
                         title = str(R.string.group_new),
                         onClick = { creatingGroup = true },
+                        trailing = { AddIcon() },
+                    )
+                }
+
+                Section(R.string.s_macros_settings, R.string.macros_text) {
+                    for (macro in state.macros) {
+                        Setting(
+                            title = macro.name,
+                            text = macroStatus(macro, state),
+                            onClick = { editingMacro = macro },
+                        )
+                    }
+                    Setting(
+                        title = str(R.string.macro_new),
+                        onClick = { creatingMacro = true },
                         trailing = { AddIcon() },
                     )
                 }

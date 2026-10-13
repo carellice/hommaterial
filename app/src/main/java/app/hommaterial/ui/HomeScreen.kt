@@ -302,7 +302,13 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
         else -> emptyList()
     }
 
-    if (shown.isEmpty() && groups.isEmpty() && remotes.isEmpty() && !state.refreshing) {
+    val macros = when (page) {
+        PAGE_ALL -> state.macros
+        PAGE_MACROS -> state.macros.filter { only == null || it.id in only }
+        else -> emptyList()
+    }
+
+    if (shown.isEmpty() && groups.isEmpty() && remotes.isEmpty() && macros.isEmpty() && !state.refreshing) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(str(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -340,6 +346,12 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
             items(groups, key = { "group:${it.first.id}" }) { (group, devices) ->
                 GroupTile(group, devices, state, vm) { vm.toggleGroup(group) }
             }
+        }
+        if (macros.isNotEmpty()) {
+            item(key = "macros", span = { GridItemSpan(maxLineSpan) }) {
+                SectionHeader(str(R.string.s_macros))
+            }
+            items(macros, key = { "macro:${it.id}" }) { MacroTile(it, state, vm) }
         }
         if (remotes.isNotEmpty()) {
             item(key = "remotes", span = { GridItemSpan(maxLineSpan) }) {

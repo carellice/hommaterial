@@ -120,6 +120,12 @@ collegati al proprio account Alexa.
   telecomando che non serve si nasconde dalla lista, come gli altri
   dispositivi.
 
+- I dispositivi personalizzati sono riquadri che con un tocco eseguono una
+  serie di azioni, una dopo l'altra: accendere o spegnere dispositivi,
+  premere tasti dei telecomandi, aspettare qualche secondo. Possono dipendere
+  da un dispositivo, con azioni diverse se è acceso o spento. Si creano dalle
+  Impostazioni e si aprono tenendoli premuti.
+
 Non fa altro, di proposito: niente routine, niente musica. La voce la
 trascrive il riconoscimento vocale del telefono, non l'app.
 

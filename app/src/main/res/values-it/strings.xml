@@ -367,6 +367,31 @@
     <string name="ac_fan_high">Alta</string>
     <string name="ac_send">Accendi / invia</string>
     <string name="remote_buttons_many">Più tasti insieme: uno per riga, o separati da virgole. Nomi esattamente come nell\'app SwitchBot.</string>
+    <string name="s_macros">Personalizzati</string>
+    <string name="s_macros_settings">Dispositivi personalizzati</string>
+    <string name="macros_text">Riquadri che con un tocco eseguono una serie di azioni: accendere o spegnere dispositivi, premere tasti dei telecomandi, aspettare. Possono fare cose diverse a seconda che un dispositivo sia acceso o spento. Tenendone premuto uno nella lista lo si apre.</string>
+    <string name="macro_new">Nuovo dispositivo personalizzato</string>
+    <string name="macro_edit">Dispositivo personalizzato</string>
+    <string name="macro_condition">Dipende da</string>
+    <string name="macro_condition_none">Niente: fa sempre le stesse azioni</string>
+    <string name="macro_depends">Dipende da %1$s</string>
+    <string name="macro_steps">Azioni</string>
+    <string name="macro_when_on">%1$s in stato «Acceso»</string>
+    <string name="macro_when_off">%1$s in stato «Spento»</string>
+    <string name="macro_add_action">Aggiungi un\'azione</string>
+    <string name="macro_remove_action">Togli l\'azione</string>
+    <string name="macro_kind_power">Accendi o spegni un dispositivo</string>
+    <string name="macro_kind_remote">Premi un tasto di un telecomando</string>
+    <string name="macro_kind_wait">Aspetta</string>
+    <string name="macro_pick_device">Quale dispositivo?</string>
+    <string name="macro_pick_remote">Quale telecomando?</string>
+    <string name="macro_no_keys">Questo telecomando non ha ancora tasti: aggiungili prima dal suo pannello.</string>
+    <string name="macro_press">Premi «%1$s» su %2$s</string>
+    <string name="macro_gone">non più presente</string>
+    <string name="macro_done">%1$s: fatto</string>
+    <string name="macro_failed">%1$s interrotto: %2$s</string>
+    <string name="macro_delete_title">Eliminare %1$s?</string>
+    <string name="macro_delete_text">Il riquadro e le sue azioni vengono eliminati. I dispositivi restano come sono.</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>
@@ -386,5 +411,13 @@
     <plurals name="remotes_found">
         <item quantity="one">%d telecomando</item>
         <item quantity="other">%d telecomandi</item>
+    </plurals>
+    <plurals name="macro_wait">
+        <item quantity="one">Aspetta %d secondo</item>
+        <item quantity="other">Aspetta %d secondi</item>
+    </plurals>
+    <plurals name="macro_actions">
+        <item quantity="one">%d azione</item>
+        <item quantity="other">%d azioni</item>
     </plurals>
 </resources>
