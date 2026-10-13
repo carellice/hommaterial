@@ -24,6 +24,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -411,6 +413,7 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
                 key = { "remote:${it.id}" },
             ) { RemoteTile(it, state, vm) }
         }
+        if (!empty) item(key = "legend", span = { GridItemSpan(maxLineSpan) }) { Legend() }
     }
 }
 
@@ -600,11 +603,35 @@ private fun GroupSheet(group: Group, devices: List<Device>, state: UiState, vm: 
  * What a tile tells about itself in its corner. Tiles look alike but do not answer a touch alike:
  * some switch, some run, some open, and only some do something more when held.
  */
-internal enum class TileHint(val icon: ImageVector, @StringRes val text: Int) {
-    TOGGLE(Icons.Outlined.PowerSettingsNew, R.string.hint_toggle),
-    RUN(Icons.Outlined.PlayArrow, R.string.hint_run),
-    OPEN(Icons.AutoMirrored.Outlined.KeyboardArrowRight, R.string.hint_open),
-    HOLD(Icons.Outlined.MoreHoriz, R.string.hint_hold),
+internal enum class TileHint(val icon: ImageVector, @StringRes val text: Int, @StringRes val short: Int) {
+    TOGGLE(Icons.Outlined.PowerSettingsNew, R.string.hint_toggle, R.string.hint_toggle_short),
+    RUN(Icons.Outlined.PlayArrow, R.string.hint_run, R.string.hint_run_short),
+    OPEN(Icons.AutoMirrored.Outlined.KeyboardArrowRight, R.string.hint_open, R.string.hint_open_short),
+    HOLD(Icons.Outlined.MoreHoriz, R.string.hint_hold, R.string.hint_hold_short),
+}
+
+/** What the symbols in the corners mean, in a few words: it closes the list, small, for who wonders. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Legend() {
+    val faint = MaterialTheme.colorScheme.onSurfaceVariant
+    FlowRow(
+        Modifier.fillMaxWidth().padding(top = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        for (hint in TileHint.entries) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(hint.icon, contentDescription = null, tint = faint, modifier = Modifier.size(16.dp))
+                Text(
+                    str(hint.short),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = faint,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+        }
+    }
 }
 
 private val SWITCH_HINTS = listOf(TileHint.TOGGLE, TileHint.HOLD)

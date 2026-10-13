@@ -445,6 +445,10 @@
     <string name="hint_run">Un tocco esegue le azioni</string>
     <string name="hint_open">Un tocco apre il pannello</string>
     <string name="hint_hold">Tenendo premuto si apre il pannello con il resto</string>
+    <string name="hint_toggle_short">accende o spegne</string>
+    <string name="hint_run_short">esegue</string>
+    <string name="hint_open_short">apre il pannello</string>
+    <string name="hint_hold_short">tieni premuto per il resto</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>

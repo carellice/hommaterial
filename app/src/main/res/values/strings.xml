@@ -456,6 +456,10 @@
     <string name="hint_run">A touch runs the actions</string>
     <string name="hint_open">A touch opens the panel</string>
     <string name="hint_hold">Holding opens the panel with the rest</string>
+    <string name="hint_toggle_short">switches on or off</string>
+    <string name="hint_run_short">runs</string>
+    <string name="hint_open_short">opens the panel</string>
+    <string name="hint_hold_short">hold for the rest</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>
