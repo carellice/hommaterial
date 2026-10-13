@@ -625,6 +625,16 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 )
             }
 
+            Section(R.string.s_hints, R.string.hints_text) {
+                for (hint in TileHint.entries) {
+                    ListItem(
+                        headlineContent = { Text(str(hint.text)) },
+                        leadingContent = { Icon(hint.icon, contentDescription = null) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                }
+            }
+
             Section(R.string.s_about) {
                 Setting(
                     title = str(R.string.about_source),

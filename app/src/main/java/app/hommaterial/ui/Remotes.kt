@@ -128,7 +128,13 @@ internal fun RemoteTile(remote: Remote, state: UiState, vm: HomeViewModel) {
             .clip(RoundedCornerShape(20.dp))
             .clickable { open = true },
     ) {
-        TileBody(iconFor(remote), busy = remote.id in state.busy, name = remote.name, status = kindLabel(remote))
+        TileBody(
+            icon = iconFor(remote),
+            busy = remote.id in state.busy,
+            name = remote.name,
+            status = kindLabel(remote),
+            hints = listOf(TileHint.OPEN),
+        )
     }
 }
 

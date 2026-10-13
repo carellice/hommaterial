@@ -53,6 +53,9 @@ collegati al proprio account Alexa.
 
 - Mostra i dispositivi raggruppati per stanza, come configurati in Alexa.
 - Un tocco accende o spegne.
+- Nell'angolo di ogni riquadro un simbolo dice come risponde: se un tocco
+  accende e spegne, esegue delle azioni o apre il pannello, e se tenendolo
+  premuto si apre il resto. La legenda è nelle Impostazioni.
 - Tenendo premuto si apre il pannello con accensione, spegnimento esplicito,
   timer di spegnimento, luminosità e colore per le luci che li supportano.
 - I timer in corso stanno in una sezione in cima alla lista, con il conto

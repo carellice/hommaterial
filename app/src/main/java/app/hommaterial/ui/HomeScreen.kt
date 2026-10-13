@@ -44,6 +44,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CleaningServices
@@ -52,6 +53,8 @@ import androidx.compose.material.icons.outlined.DevicesOther
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.Remove
@@ -490,6 +493,7 @@ private fun GroupTile(group: Group, devices: List<Device>, state: UiState, vm: H
             busy = devices.any { it.applianceId in state.busy },
             name = group.name,
             status = groupStatus(lit, devices.size),
+            hints = SWITCH_HINTS,
         )
     }
 }
@@ -592,16 +596,40 @@ private fun GroupSheet(group: Group, devices: List<Device>, state: UiState, vm: 
     }
 }
 
+/**
+ * What a tile tells about itself in its corner. Tiles look alike but do not answer a touch alike:
+ * some switch, some run, some open, and only some do something more when held.
+ */
+internal enum class TileHint(val icon: ImageVector, @StringRes val text: Int) {
+    TOGGLE(Icons.Outlined.PowerSettingsNew, R.string.hint_toggle),
+    RUN(Icons.Outlined.PlayArrow, R.string.hint_run),
+    OPEN(Icons.AutoMirrored.Outlined.KeyboardArrowRight, R.string.hint_open),
+    HOLD(Icons.Outlined.MoreHoriz, R.string.hint_hold),
+}
+
+private val SWITCH_HINTS = listOf(TileHint.TOGGLE, TileHint.HOLD)
+
 /** What every tile shows, sized as the screen it is on asks. */
 @Composable
-internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: String) {
+internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: String, hints: List<TileHint>) {
     val size = LocalHomeLook.current.tileSize
     val type = MaterialTheme.typography
     Column(Modifier.padding(listOf(12.dp, 14.dp, 18.dp)[size])) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(listOf(22.dp, 26.dp, 36.dp)[size]))
             Spacer(Modifier.weight(1f))
-            if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            if (busy) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            } else {
+                // In the corner, small: what a touch does, and whether holding does something else.
+                for (hint in hints) {
+                    Icon(
+                        hint.icon,
+                        contentDescription = str(hint.text),
+                        modifier = Modifier.padding(start = 4.dp).size(listOf(14.dp, 16.dp, 20.dp)[size]).alpha(0.6f),
+                    )
+                }
+            }
         }
         Spacer(Modifier.weight(1f))
         Text(
@@ -828,7 +856,8 @@ private fun DeviceTile(
             .combinedClickable(
                 onClick = {
                     when {
-                        !device.hasPower -> Unit
+                        // A sensor has nothing to switch: a touch opens it, as holding does.
+                        !device.hasPower -> details = true
                         powerKnown -> vm.setPower(device, !on)
                         // Without a reported state (infrared devices, unreachable ones) a toggle would be a guess.
                         else -> details = true
@@ -844,6 +873,8 @@ private fun DeviceTile(
             status = statusText(device, state).let { status ->
                 if (timer == null) status else str(R.string.status_until, status, clock(timer))
             },
+            // Where a touch switches, holding opens the rest; where it cannot switch, it opens.
+            hints = if (device.hasPower && powerKnown) SWITCH_HINTS else listOf(TileHint.OPEN),
         )
     }
 

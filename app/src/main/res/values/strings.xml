@@ -450,6 +450,12 @@
     <string name="automation_on">When %1$s is switched on</string>
     <string name="automation_off">When %1$s is switched off</string>
     <string name="automation_done_text">Automation: %1$s</string>
+    <string name="s_hints">Symbols on the tiles</string>
+    <string name="hints_text">The corner of each tile says how it answers a touch.</string>
+    <string name="hint_toggle">A touch switches on or off</string>
+    <string name="hint_run">A touch runs the actions</string>
+    <string name="hint_open">A touch opens the panel</string>
+    <string name="hint_hold">Holding opens the panel with the rest</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

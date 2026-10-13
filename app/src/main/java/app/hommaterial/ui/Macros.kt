@@ -88,7 +88,13 @@ internal fun MacroTile(macro: Macro, state: UiState, vm: HomeViewModel) {
             // Behind the PIN of the monitor the panel only runs them.
             .combinedClickable(onClick = { vm.runMacro(macro) }, onLongClick = { if (!locked) editing = true }),
     ) {
-        TileBody(Icons.Outlined.AutoAwesome, macro.id in state.busy, macro.name, macroStatus(macro, state))
+        TileBody(
+            icon = Icons.Outlined.AutoAwesome,
+            busy = macro.id in state.busy,
+            name = macro.name,
+            status = macroStatus(macro, state),
+            hints = if (locked) listOf(TileHint.RUN) else listOf(TileHint.RUN, TileHint.HOLD),
+        )
     }
 }
 

@@ -439,6 +439,12 @@
     <string name="automation_on">Quando %1$s si accende</string>
     <string name="automation_off">Quando %1$s si spegne</string>
     <string name="automation_done_text">Automazione: %1$s</string>
+    <string name="s_hints">Simboli sui riquadri</string>
+    <string name="hints_text">Nell\'angolo di ogni riquadro c\'è scritto come risponde al tocco.</string>
+    <string name="hint_toggle">Un tocco accende o spegne</string>
+    <string name="hint_run">Un tocco esegue le azioni</string>
+    <string name="hint_open">Un tocco apre il pannello</string>
+    <string name="hint_hold">Tenendo premuto si apre il pannello con il resto</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>
