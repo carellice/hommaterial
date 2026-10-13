@@ -47,6 +47,7 @@ import androidx.compose.ui.window.DialogProperties
 import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.UiState
+import app.hommaterial.data.ACTION_MACRO
 import app.hommaterial.data.ACTION_POWER
 import app.hommaterial.data.ACTION_REMOTE
 import app.hommaterial.data.ACTION_WAIT
@@ -92,7 +93,11 @@ internal fun MacroTile(macro: Macro, state: UiState, vm: HomeViewModel) {
 }
 
 /** What an action does, as a sentence. */
-private fun describe(action: MacroAction, state: UiState): String = when (action.type) {
+internal fun describe(action: MacroAction, state: UiState): String = when (action.type) {
+    ACTION_MACRO -> str(
+        R.string.schedule_run,
+        state.macros.find { it.id == action.target }?.name ?: str(R.string.macro_gone),
+    )
     ACTION_WAIT -> plural(R.plurals.macro_wait, action.value.toIntOrNull() ?: 0)
     ACTION_POWER -> {
         val name = state.devices.find { it.applianceId == action.target }?.name ?: str(R.string.macro_gone)
@@ -130,6 +135,7 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
     var steps by remember { mutableStateOf(macro?.steps.orEmpty()) }
     var otherwise by remember { mutableStateOf(macro?.otherwise.orEmpty()) }
     var choosingCondition by remember { mutableStateOf(false) }
+    var moving by remember { mutableStateOf(false) }
     val switchable = state.placed.filter { it.hasPower }
     val watched = switchable.find { it.applianceId == condition }
 
@@ -199,7 +205,7 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Card {
+                    SectionCard {
                         ListItem(
                             headlineContent = { Text(str(R.string.macro_condition)) },
                             supportingContent = { Text(watched?.name ?: str(R.string.macro_condition_none)) },
@@ -209,9 +215,28 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
                     }
                     // Only once it exists: a tile runs what is saved.
                     if (macro != null) {
+                        val key = Quick.macroKey(macro.id)
+                        if (moving) {
+                            RoomPicker(
+                                name = macro.name,
+                                follow = null,
+                                current = state.placeOf(key).orEmpty(),
+                                rooms = state.allRooms,
+                                onPick = { vm.setPlace(key, it); moving = false },
+                                onDismiss = { moving = false },
+                            )
+                        }
+                        SectionCard {
+                            ListItem(
+                                headlineContent = { Text(str(R.string.room_label)) },
+                                supportingContent = { Text(state.placeOf(key) ?: str(R.string.room_none)) },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                modifier = Modifier.clickable { moving = true },
+                            )
+                        }
                         val tile = state.tileDevices.indexOf(Quick.macroKey(macro.id)).takeIf { it >= 0 }
                         val full = null !in state.tileDevices
-                        Card {
+                        SectionCard {
                             ListItem(
                                 headlineContent = {
                                     Text(
@@ -243,7 +268,7 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
 }
 
 @Composable
-private fun Card(content: @Composable () -> Unit) {
+internal fun SectionCard(content: @Composable () -> Unit) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(20.dp), content = content)
 }
 
@@ -257,7 +282,7 @@ private fun ActionList(
 ) {
     var adding by remember { mutableStateOf(false) }
     if (adding) ActionPicker(state, onPick = { onChange(actions + it); adding = false }, onDismiss = { adding = false })
-    Card {
+    SectionCard {
         Column(Modifier.padding(bottom = 8.dp)) {
             Text(
                 title,
@@ -298,25 +323,36 @@ private fun ActionList(
     }
 }
 
-/** Builds an action one question at a time: what kind, on what, and what exactly. */
+/** Builds an action of one of the [kinds], one question at a time: what kind, on what, and what exactly. */
 @Composable
-private fun ActionPicker(state: UiState, onPick: (MacroAction) -> Unit, onDismiss: () -> Unit) {
+internal fun ActionPicker(
+    state: UiState,
+    kinds: List<String> = listOf(ACTION_POWER, ACTION_REMOTE, ACTION_WAIT),
+    onPick: (MacroAction) -> Unit,
+    onDismiss: () -> Unit,
+) {
     var kind by remember { mutableStateOf<String?>(null) }
     var target by remember { mutableStateOf<String?>(null) }
     val switchable = state.placed.filter { it.hasPower }
     val remote = state.remotes.find { it.id == target }
     when {
         kind == null -> {
-            // Remotes are offered only to who has linked some.
-            val kinds = listOfNotNull(
+            // Remotes and custom devices are offered only to who has some.
+            val offered = listOfNotNull(
                 ACTION_POWER to R.string.macro_kind_power,
+                (ACTION_MACRO to R.string.schedule_kind_macro).takeIf { state.macros.isNotEmpty() },
                 (ACTION_REMOTE to R.string.macro_kind_remote).takeIf { state.remotes.isNotEmpty() },
                 ACTION_WAIT to R.string.macro_kind_wait,
-            )
-            ListDialog(str(R.string.macro_add_action), kinds.map { str(it.second) to null }, onDismiss) {
-                kind = kinds[it].first
+            ).filter { it.first in kinds }
+            ListDialog(str(R.string.macro_add_action), offered.map { str(it.second) to null }, onDismiss) {
+                kind = offered[it].first
             }
         }
+        kind == ACTION_MACRO -> ListDialog(
+            title = str(R.string.schedule_pick_macro),
+            items = state.macros.map { it.name to macroStatus(it, state) },
+            onDismiss = onDismiss,
+        ) { onPick(MacroAction(ACTION_MACRO, state.macros[it].id)) }
         kind == ACTION_WAIT -> ListDialog(
             title = str(R.string.macro_kind_wait),
             items = WAIT_SECONDS.map { plural(R.plurals.macro_wait, it) to null },

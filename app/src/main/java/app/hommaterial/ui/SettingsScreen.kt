@@ -85,6 +85,7 @@ import app.hommaterial.data.Macro
 import app.hommaterial.plural
 import app.hommaterial.quick.Alerts
 import app.hommaterial.quick.MAX_SHORTCUTS
+import app.hommaterial.quick.Quick
 import app.hommaterial.quick.SHORTCUT_DEVICE
 import app.hommaterial.quick.SHORTCUT_GROUP
 import app.hommaterial.quick.SHORTCUT_MACRO
@@ -120,11 +121,15 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     var choosingWidget by remember { mutableStateOf(false) }
     val placed = state.placed
     val noRoom = str(R.string.room_none)
-    val rooms = (placed.mapNotNull { it.room } + state.roomList).distinct().sortedBy { it.lowercase() }
+    val rooms = state.allRooms
+    // Remotes and custom devices, as what can be put in a room next to the devices.
+    val extras = state.macros.map { Pick(Quick.macroKey(it.id), it.name, str(R.string.macro_edit)) } +
+        state.remotes.map { Pick(Quick.remoteKey(it.id), it.name, str(R.string.remote_generic)) }
     val switchable = placed.filter { it.hasPower }
     moving?.let { device ->
         RoomPicker(
-            device = device,
+            name = device.name,
+            follow = str(R.string.room_as_alexa, device.room ?: str(R.string.room_none)),
             current = state.rooms[device.applianceId],
             rooms = rooms,
             onPick = { vm.setRoom(device, it); moving = null },
@@ -137,8 +142,9 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             title = str(if (old == null) R.string.room_new else R.string.room_edit_title),
             hint = str(R.string.room_devices_hint),
             name = room,
-            picks = placed.map { Pick(it.applianceId, it.name, it.room ?: noRoom) },
-            members = placed.filter { old != null && it.room == old }.map { it.applianceId }.toSet(),
+            picks = placed.map { Pick(it.applianceId, it.name, it.room ?: noRoom) } + extras,
+            members = placed.filter { old != null && it.room == old }.map { it.applianceId }.toSet() +
+                extras.filter { old != null && state.placeOf(it.key) == old }.map { it.key },
             onSave = { name, members -> vm.saveRoom(old, name, members); editingRoom = null },
             // Only the rooms made here can go: those of Alexa come back as long as devices are in them.
             onDelete = if (room in state.roomList) { { vm.deleteRoom(room); editingRoom = null } } else null,
@@ -430,7 +436,10 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                     for (room in rooms) {
                         Setting(
                             title = room,
-                            text = plural(R.plurals.devices, placed.count { it.room == room }),
+                            text = plural(
+                                R.plurals.devices,
+                                placed.count { it.room == room } + extras.count { state.placeOf(it.key) == room },
+                            ),
                             onClick = { editingRoom = room },
                         )
                     }

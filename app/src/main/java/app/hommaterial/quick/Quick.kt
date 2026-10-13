@@ -52,6 +52,20 @@ object Quick {
     /** How a custom device is named where devices are named by their applianceId. */
     fun macroKey(id: String) = SHORTCUT_MACRO + id
 
+    /** The same for a remote, which like a custom device can be put in a room. */
+    fun remoteKey(id: String) = "remote:$id"
+
+    /** Presses a key of a remote, one of those the user added by name when [custom]. */
+    suspend fun pressRemote(context: Context, remoteId: String, command: String, custom: Boolean): Outcome {
+        val switchBot = SwitchBot(context, Alexa.get(context).http)
+        val remote = switchBot.remotes().find { it.id == remoteId }
+            ?: return Outcome(false, str(R.string.quick_not_found))
+        return attempt {
+            switchBot.send(remote, command, custom = custom)
+            Outcome(true, remote.name)
+        }
+    }
+
     /** Inverts the power of a device, asking Alexa for its real state first. */
     suspend fun toggle(context: Context, applianceId: String): Outcome = command(context, applianceId) { device ->
         val state = Alexa.get(context).api.states(listOf(device))[applianceId]

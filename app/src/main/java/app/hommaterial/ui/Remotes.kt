@@ -77,6 +77,7 @@ import app.hommaterial.UiState
 import app.hommaterial.data.AcSetting
 import app.hommaterial.data.Remote
 import app.hommaterial.data.RemoteKind
+import app.hommaterial.quick.Quick
 import app.hommaterial.str
 
 private val POWER_BUTTONS = listOf(R.string.turn_on to "turnOn", R.string.turn_off to "turnOff")
@@ -135,6 +136,7 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
     val buttons = state.remoteButtons[remote.id].orEmpty()
     var adding by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
+    var moving by remember { mutableStateOf(false) }
     if (adding) {
         ButtonDialog(
             onAdd = { vm.setRemoteButtons(remote, (buttons + it).distinct()); adding = false },
@@ -216,11 +218,22 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
             )
             // Behind the PIN of the monitor the panel only controls: what is listed stays put.
             if (!LocalHomeLook.current.locked) {
+                val key = Quick.remoteKey(remote.id)
+                TextButton(onClick = { moving = true }, modifier = Modifier.padding(top = 4.dp)) {
+                    Text(state.placeOf(key)?.let { str(R.string.room_in, it) } ?: str(R.string.room_move))
+                }
+                if (moving) {
+                    RoomPicker(
+                        name = remote.name,
+                        follow = null,
+                        current = state.placeOf(key).orEmpty(),
+                        rooms = state.allRooms,
+                        onPick = { vm.setPlace(key, it); moving = false },
+                        onDismiss = { moving = false },
+                    )
+                }
                 val hidden = remote.id in state.hiddenRemotes
-                TextButton(
-                    onClick = { vm.setRemoteHidden(remote, !hidden); onDismiss() },
-                    modifier = Modifier.padding(top = 4.dp),
-                ) {
+                TextButton(onClick = { vm.setRemoteHidden(remote, !hidden); onDismiss() }) {
                     Text(str(if (hidden) R.string.unhide else R.string.hide))
                 }
             }

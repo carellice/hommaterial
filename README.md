@@ -126,6 +126,12 @@ collegati al proprio account Alexa.
   da un dispositivo, con azioni diverse se è acceso o spento. Si creano dalle
   Impostazioni e si aprono tenendoli premuti.
   Si avviano anche dal widget e dai riquadri delle Impostazioni rapide.
+- Telecomandi e dispositivi personalizzati si possono mettere nelle stanze,
+  accanto agli altri dispositivi.
+- Dal menu si impostano le azioni programmate: accendere o spegnere un
+  dispositivo, eseguire un dispositivo personalizzato o premere un tasto di
+  un telecomando a una certa ora, una volta sola o nei giorni scelti, oppure
+  tra qualche minuto. Una notifica dice com'è andata.
 
 Non fa altro, di proposito: niente routine, niente musica. La voce la
 trascrive il riconoscimento vocale del telefono, non l'app.
@@ -136,6 +142,9 @@ Impostazioni. Da accesa, l'app ascolta solo mentre è aperta sullo schermo
 accendi la lampada", oppure la parola da sola e poi il comando. La parola si
 può cambiare. Non ascolta ad app chiusa o a schermo spento, e usa il
 riconoscimento vocale sul dispositivo quando c'è.
+
+Anche le azioni programmate le fa scattare il telefono, come i timer: all'ora
+stabilita deve essere acceso e connesso, e senza rete riprova per dieci minuti.
 
 Il timer di spegnimento lo fa scattare il telefono: all'ora stabilita deve
 essere acceso e connesso. Una notifica dice com'è andata: dispositivo spento,

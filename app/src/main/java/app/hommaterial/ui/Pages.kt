@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.ui.graphics.vector.ImageVector
 import app.hommaterial.R
 import app.hommaterial.UiState
+import app.hommaterial.quick.Quick
 import app.hommaterial.str
 
 /** The pages of the side bar: the whole home, the favorites, the groups, or a room by its name. */
@@ -23,7 +24,10 @@ const val PAGE_ROOM = "room:"
 /** Every page there is something to show in, in the order the side bar lists them by default. */
 fun availablePages(state: UiState): List<String> {
     val visible = state.placed.filter { it.applianceId !in state.hidden }
-    val rooms = visible.mapNotNull { it.room }.distinct().sortedBy { it.lowercase() }
+    // A room may hold nothing but remotes and custom devices.
+    val placed = state.macros.map { Quick.macroKey(it.id) } + state.shownRemotes.map { Quick.remoteKey(it.id) }
+    val rooms = (visible.mapNotNull { it.room } + placed.mapNotNull(state::placeOf))
+        .distinct().sortedBy { it.lowercase() }
     return buildList {
         add(PAGE_ALL)
         if (visible.any { it.applianceId in state.favorites }) add(PAGE_FAVORITES)

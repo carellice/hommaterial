@@ -26,16 +26,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import app.hommaterial.R
-import app.hommaterial.data.Device
 import app.hommaterial.str
 
 /**
- * Lets the user move [device] to one of the [rooms], to a new one or to none. [onPick] receives
- * the room, an empty text for no room at all, or null to follow Alexa again.
+ * Lets the user move what is called [name] to one of the [rooms], to a new one or to none.
+ * [onPick] receives the room, an empty text for no room at all, or null to follow Alexa again:
+ * a choice offered, worded as [follow], only to what has a room in Alexa.
  */
 @Composable
 fun RoomPicker(
-    device: Device,
+    name: String,
+    follow: String?,
     current: String?,
     rooms: List<String>,
     onPick: (String?) -> Unit,
@@ -44,13 +45,10 @@ fun RoomPicker(
     var created by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(str(R.string.room_pick_title, device.name)) },
+        title = { Text(str(R.string.room_pick_title, name)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Choice(
-                    str(R.string.room_as_alexa, device.room ?: str(R.string.room_none)),
-                    selected = current == null,
-                ) { onPick(null) }
+                if (follow != null) Choice(follow, selected = current == null) { onPick(null) }
                 for (room in rooms) Choice(room, selected = current == room) { onPick(room) }
                 Choice(str(R.string.room_none), selected = current == "") { onPick("") }
                 OutlinedTextField(

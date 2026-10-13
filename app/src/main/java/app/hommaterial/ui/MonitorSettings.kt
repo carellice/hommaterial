@@ -40,6 +40,7 @@ import app.hommaterial.data.REST_DATE
 import app.hommaterial.data.REST_POWER
 import app.hommaterial.data.REST_SENSORS
 import app.hommaterial.data.REST_TIMERS
+import app.hommaterial.quick.Quick
 import app.hommaterial.str
 
 private val REFRESH_CHOICES = listOf(30, 60, 120, 300)
@@ -274,7 +275,12 @@ private fun pagePicks(state: UiState, page: String): List<Pick> {
         PAGE_FAVORITES -> visible.filter { it.applianceId in state.favorites }
         else -> visible.filter { it.room == room }
     }
-    return devices.map { Pick(it.applianceId, it.name, it.room ?: str(R.string.room_none)) }
+    val picks = devices.map { Pick(it.applianceId, it.name, it.room ?: str(R.string.room_none)) }
+    if (room == null || !page.startsWith(PAGE_ROOM)) return picks
+    // What else was put in the room, to keep or to leave out as its devices.
+    return picks +
+        state.macros.filter { state.placeOf(Quick.macroKey(it.id)) == room }.map { Pick(it.id, it.name) } +
+        state.shownRemotes.filter { state.placeOf(Quick.remoteKey(it.id)) == room }.map { Pick(it.id, it.name) }
 }
 
 /** The two ways a panel usually starts: the whole home, or the room the tablet hangs in. */

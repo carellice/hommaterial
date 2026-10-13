@@ -19,22 +19,26 @@ import app.hommaterial.data.Group
 import app.hommaterial.data.History
 import app.hommaterial.data.LoginAttempt
 import app.hommaterial.data.Macro
+import app.hommaterial.data.MacroAction
 import app.hommaterial.data.Marketplace
 import app.hommaterial.data.MonitorConfig
 import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Reading
 import app.hommaterial.data.Remote
+import app.hommaterial.data.Schedule
 import app.hommaterial.data.SwitchBot
 import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
 import app.hommaterial.data.WidgetConfig
 import app.hommaterial.data.mapObjects
+import app.hommaterial.data.nextTime
 import app.hommaterial.data.toJsonArray
 import app.hommaterial.plural
 import app.hommaterial.quick.Alert
 import app.hommaterial.quick.Alerts
 import app.hommaterial.quick.PowerTile
 import app.hommaterial.quick.Quick
+import app.hommaterial.quick.Schedules
 import app.hommaterial.quick.Timers
 import app.hommaterial.str
 import app.hommaterial.voice.VoiceCommand
@@ -42,6 +46,7 @@ import app.hommaterial.voice.VoiceResult
 import app.hommaterial.voice.parseVoice
 import app.hommaterial.voice.wakeCommand
 import java.security.MessageDigest
+import java.util.Calendar
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -87,6 +92,8 @@ data class UiState(
     val tileDevices: List<String?> = emptyList(),
     /** Switch-off time of each device with a timer, in epoch milliseconds. */
     val timers: Map<String, Long> = emptyMap(),
+    /** The actions set to be carried out at a time, the next one first. */
+    val schedules: List<Schedule> = emptyList(),
     /** Temperature thresholds each sensor notifies about. */
     val alerts: Map<String, Alert> = emptyMap(),
     /** Whether the app looks for a newer release by itself, once a day. */
@@ -126,6 +133,14 @@ data class UiState(
         get() = devices.map { device ->
             rooms[device.applianceId]?.let { device.copy(room = it.ifEmpty { null }) } ?: device
         }
+
+    /** The room a remote or a custom device was put in, by its key; null when it is in none. */
+    fun placeOf(key: String): String? = rooms[key]?.ifEmpty { null }
+
+    /** Every room there is: of the devices, made in the app, or holding only remotes and custom devices. */
+    val allRooms: List<String>
+        get() = (placed.mapNotNull { it.room } + roomList + rooms.filterKeys { ':' in it }.values)
+            .filter { it.isNotEmpty() }.distinct().sortedBy { it.lowercase() }
 
     /** The remotes in the list: all but the hidden ones. */
     val shownRemotes: List<Remote> get() = remotes.filter { it.id !in hiddenRemotes }
@@ -173,6 +188,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     s.copy(
                         states = s.states + local.states().filterKeys { it !in s.busy },
                         timers = Timers.all(getApplication()),
+                        // One that does not repeat is gone once it has run.
+                        schedules = Schedules.all(getApplication()),
                     )
                 }
             }
@@ -200,6 +217,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             favorites = local.favorites(),
             tileDevices = local.tileDevices(),
             timers = Timers.all(getApplication()),
+            schedules = Schedules.all(getApplication()),
             alerts = Alerts.all(getApplication()),
             autoUpdate = settings.getBoolean("autoUpdate", true),
             theme = settings.getInt("theme", 0),
@@ -255,6 +273,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         refreshJob?.cancel()
         auth.logout()
         Timers.cancelAll(getApplication())
+        Schedules.cancelAll(getApplication())
         cache.edit().clear().apply()
         Alerts.schedule(getApplication())
         history.clear()
@@ -534,8 +553,47 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 wasIn -> rooms.remove(id)
             }
         }
+        // Remotes and custom devices have no room of their own to go back to.
+        for (key in s.macros.map { Quick.macroKey(it.id) } + s.remotes.map { Quick.remoteKey(it.id) }) {
+            if (key in members) rooms[key] = name else if (old != null && rooms[key] == old) rooms.remove(key)
+        }
         val list = (s.roomList.map { if (it == old) name else it } + name).distinct()
         saveRooms(rooms, list)
+    }
+
+    /** Puts a remote or a custom device, by its key, in [room]; null or an empty text takes it out. */
+    fun setPlace(key: String, room: String?) {
+        val rooms = _state.value.rooms
+        saveRooms(if (room.isNullOrEmpty()) rooms - key else rooms + (key to room))
+    }
+
+    /** Sets [action] to be carried out [at] a moment, and again on each of the [days] if there are any. */
+    fun addSchedule(action: MacroAction, label: String, at: Long, days: Set<Int>) {
+        val time = Calendar.getInstance().apply { timeInMillis = at }
+        val schedule = Schedule(
+            id = UUID.randomUUID().toString(),
+            action = action,
+            label = label,
+            at = at,
+            hour = time.get(Calendar.HOUR_OF_DAY),
+            minute = time.get(Calendar.MINUTE),
+            days = days,
+        )
+        Schedules.put(getApplication(), schedule)
+        _state.update { it.copy(schedules = Schedules.all(getApplication())) }
+    }
+
+    /** Switches a repeating schedule off, or on again from its next time. */
+    fun setScheduleEnabled(schedule: Schedule, enabled: Boolean) {
+        val now = System.currentTimeMillis()
+        val at = if (enabled) nextTime(schedule.hour, schedule.minute, schedule.days, now) else schedule.at
+        Schedules.put(getApplication(), schedule.copy(enabled = enabled, at = at))
+        _state.update { it.copy(schedules = Schedules.all(getApplication())) }
+    }
+
+    fun deleteSchedule(id: String) {
+        Schedules.delete(getApplication(), id)
+        _state.update { it.copy(schedules = Schedules.all(getApplication())) }
     }
 
     /** Removes a room created in the app; its devices go back to their Alexa room. */
@@ -582,6 +640,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteMacro(id: String) {
         // Its tile goes back to being free.
         _state.value.macros.find { it.id == id }?.let { setOnTile(it, onTile = false) }
+        setPlace(Quick.macroKey(id), null)
         saveMacros(_state.value.macros.filter { it.id != id })
     }
 

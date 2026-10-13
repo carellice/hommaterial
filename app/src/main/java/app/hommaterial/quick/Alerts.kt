@@ -17,11 +17,12 @@ import app.hommaterial.MainActivity
 import app.hommaterial.R
 import app.hommaterial.data.Cache
 import app.hommaterial.data.DeviceState
+import app.hommaterial.data.Schedule
 import app.hommaterial.str
-import org.json.JSONObject
 import java.text.DateFormat
 import java.util.Date
 import java.util.concurrent.TimeUnit
+import org.json.JSONObject
 
 private const val CHANNEL = "alerts"
 private const val WORK = "alerts"
@@ -107,6 +108,20 @@ object Alerts {
         }
         cache.prefs.edit().putStringSet("alertsTripped", tripped).apply()
     }
+
+    fun scheduleDone(context: Context, schedule: Schedule) = notify(
+        context,
+        "${schedule.id}|schedule".hashCode(),
+        schedule.label,
+        str(R.string.schedule_done_text, clock(System.currentTimeMillis())),
+    )
+
+    fun scheduleFailed(context: Context, schedule: Schedule, reason: String) = notify(
+        context,
+        "${schedule.id}|schedule".hashCode(),
+        str(R.string.schedule_failed_title, schedule.label),
+        reason,
+    )
 
     fun timerDone(context: Context, applianceId: String) {
         val name = Cache(context).devices().find { it.applianceId == applianceId }?.name ?: return

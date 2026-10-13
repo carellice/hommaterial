@@ -110,6 +110,13 @@
                 android:resource="@xml/home_widget" />
         </receiver>
         <receiver
+            android:name=".quick.ScheduleReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <receiver
             android:name=".quick.TimerReceiver"
             android:exported="false">
             <intent-filter>

@@ -124,6 +124,7 @@ import app.hommaterial.label
 import app.hommaterial.plural
 import app.hommaterial.quick.Alert
 import app.hommaterial.quick.Alerts
+import app.hommaterial.quick.Quick
 import app.hommaterial.quick.clock
 import app.hommaterial.quick.degrees
 import app.hommaterial.str
@@ -295,20 +296,26 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
         }
     }.filter { it.second.isNotEmpty() }
 
+    // Remotes and custom devices put in a room show there; the others keep their own sections.
     val inList = if (state.showHidden) state.remotes else state.shownRemotes
+    val roomRemotes = inList.groupBy { state.placeOf(Quick.remoteKey(it.id)) }
+    val roomMacros = state.macros.groupBy { state.placeOf(Quick.macroKey(it.id)) }
     val remotes = when (page) {
-        PAGE_ALL -> inList
+        PAGE_ALL -> roomRemotes[null].orEmpty()
         PAGE_REMOTES -> inList.filter { only == null || it.id in only }
         else -> emptyList()
     }
-
     val macros = when (page) {
-        PAGE_ALL -> state.macros
+        PAGE_ALL -> roomMacros[null].orEmpty()
         PAGE_MACROS -> state.macros.filter { only == null || it.id in only }
         else -> emptyList()
     }
+    // A room may hold nothing but them.
+    val extraRooms = (roomRemotes.keys + roomMacros.keys).filterNotNull().filter { page == PAGE_ALL || it == room }
+    val sections = (rooms.keys + extraRooms).toSortedSet(compareBy<String> { it == noRoom }.thenBy { it.lowercase() })
 
-    if (shown.isEmpty() && groups.isEmpty() && remotes.isEmpty() && macros.isEmpty() && !state.refreshing) {
+    val empty = shown.isEmpty() && groups.isEmpty() && remotes.isEmpty() && macros.isEmpty() && sections.isEmpty()
+    if (empty && !state.refreshing) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(str(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -359,7 +366,10 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
             }
             items(remotes, key = { "remote:${it.id}" }) { RemoteTile(it, state, vm) }
         }
-        for ((name, devices) in rooms) {
+        for (name in sections) {
+            val devices = rooms[name].orEmpty()
+            // On a monitor a room narrowed to some of its things leaves the others out, whatever they are.
+            val narrowed = only != null && page != PAGE_ALL
             item(key = "room:$name", span = { GridItemSpan(maxLineSpan) }) {
                 // The devices without a room are unrelated: switching them together makes no sense.
                 // Hidden devices stay out of it even while they are being shown.
@@ -373,6 +383,14 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
                 }
             }
             items(devices, key = { it.applianceId }) { DeviceTile(it, state, vm) }
+            items(
+                roomMacros[name].orEmpty().filter { !narrowed || it.id in only.orEmpty() },
+                key = { "macro:${it.id}" },
+            ) { MacroTile(it, state, vm) }
+            items(
+                roomRemotes[name].orEmpty().filter { !narrowed || it.id in only.orEmpty() },
+                key = { "remote:${it.id}" },
+            ) { RemoteTile(it, state, vm) }
         }
     }
 }
@@ -724,6 +742,8 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
     var open by remember { mutableStateOf(false) }
     var confirmSignOut by remember { mutableStateOf(false) }
     if (confirmSignOut) SignOutDialog(onConfirm = vm::logout, onDismiss = { confirmSignOut = false })
+    var scheduling by remember { mutableStateOf(false) }
+    if (scheduling) SchedulesDialog(state, vm, onDismiss = { scheduling = false })
     // What waits for the PIN of the monitor before it happens.
     var behindPin by remember { mutableStateOf<(() -> Unit)?>(null) }
     behindPin?.let { action ->
@@ -746,6 +766,10 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
         DropdownMenuItem(
             text = { Text(str(R.string.check_updates)) },
             onClick = { open = false; vm.checkForUpdate(manual = true) },
+        )
+        DropdownMenuItem(
+            text = { Text(str(R.string.s_schedules)) },
+            onClick = { open = false; guarded { scheduling = true } },
         )
         DropdownMenuItem(text = { Text(str(R.string.settings)) }, onClick = { open = false; guarded(onSettings) })
         DropdownMenuItem(
@@ -986,7 +1010,7 @@ internal fun DetailsContainer(onDismiss: () -> Unit, content: @Composable () -> 
  * and alerts work without it, but then they cannot tell when something needs attention.
  */
 @Composable
-private fun rememberNotificationRequest(onAnswer: () -> Unit = {}): () -> Unit {
+internal fun rememberNotificationRequest(onAnswer: () -> Unit = {}): () -> Unit {
     val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onAnswer() }
     return {
