@@ -94,6 +94,19 @@ export function HomeScreen({ onSettings }) {
   // The search of the top bar: null while it is closed.
   const [query, setQuery] = useState(null);
   useBack(() => setQuery(null), query != null);
+  // Ctrl+K, or Cmd+K on a Mac, opens the search from the keyboard, as in many apps on a computer.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k') return;
+      // Not under something open over the home: the search would end up behind it.
+      if (document.querySelector('.dialog, .sheet, .side-panel, .full-dialog, .menu, .rest')) return;
+      e.preventDefault();
+      setQuery((typed) => typed ?? '');
+      document.querySelector('input.search')?.select();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const found = query != null ? search(query, homeSections(PAGE_ALL, s)) : [];
   const look = homeLook(s, wide);
 
@@ -125,7 +138,7 @@ export function HomeScreen({ onSettings }) {
           ? html`<${IconButton} icon="close" label=${str('search_close')} onClick=${() => setQuery(null)} />`
           : html`
             ${showClock && pages.length === 1 && html`<${ClockText} cls="title-large" style="padding:0 12px" />`}
-            <${IconButton} icon="search" label=${str('search')} onClick=${() => setQuery('')} />
+            <${IconButton} icon="search" label=${str('pwa_search_shortcut')} onClick=${() => setQuery('')} />
             <${VoiceButton} />
             <${OverflowMenu} s=${s} onSettings=${onSettings} onArrange=${() => setArranging(true)} />`}
       </div>
