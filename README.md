@@ -8,7 +8,7 @@
 
 <p align="center">App Android · Gratuita · Open source · Italiano e inglese</p>
 
-<p align="center"><a href="https://carellice.github.io/hommaterial/"><b>Apri la versione web</b></a></p>
+<p align="center"><a href="https://carellice.github.io/hommaterial/"><b>Apri la versione web</b></a> · <a href="pwa/README.md">Guida di configurazione</a></p>
 
 Un'app Android nativa, veloce e minimale per comandare i dispositivi smart home
 collegati al proprio account Alexa.
@@ -182,7 +182,8 @@ o da installare sulla schermata Home, anche su iPhone:
 **[carellice.github.io/hommaterial](https://carellice.github.io/hommaterial/)**. Ha bisogno di un
 piccolo proxy su Cloudflare Workers, che crei tu, e funziona solo mentre è
 aperta: niente widget, riquadri rapidi né azioni in sottofondo. Le
-istruzioni sono in [`pwa/README.md`](pwa/README.md).
+istruzioni, con la guida di configurazione passo per passo, sono in
+[`pwa/README.md`](pwa/README.md).
 
 ## Limiti noti
 
