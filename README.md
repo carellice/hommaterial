@@ -112,6 +112,13 @@ collegati al proprio account Alexa.
   gruppo.
 - Sotto l'icona dell'app, tenendola premuta, compaiono i dispositivi e i
   gruppi scelti nelle Impostazioni, oppure i preferiti.
+- **Tag NFC**: dal pannello di un dispositivo, di un gruppo o di un
+  dispositivo personalizzato, **Scrivi su un tag NFC** scrive un tag che lo
+  accende, lo spegne, lo inverte o lo esegue. Basta avvicinarci il telefono,
+  anche con l'app chiusa, purché lo schermo sia acceso: a schermo spento
+  Android non legge i tag. Sulla schermata di blocco funziona se nelle
+  impostazioni dell'NFC è disattivato «Richiedi lo sblocco del dispositivo
+  per l'NFC».
 - Sugli schermi larghi, come i tablet, una barra laterale divide la casa in
   pagine (tutto, preferiti, gruppi e una per stanza) e il pannello di un
   dispositivo si apre di lato.

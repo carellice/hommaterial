@@ -56,6 +56,7 @@ import app.hommaterial.data.MacroAction
 import app.hommaterial.data.Remote
 import app.hommaterial.data.RemoteKind
 import app.hommaterial.plural
+import app.hommaterial.quick.NFC_MACRO
 import app.hommaterial.quick.Quick
 import app.hommaterial.str
 
@@ -279,6 +280,20 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
                                     vm.setOnTile(macro, tile == null)
                                 },
                             )
+                        }
+                        if (rememberHasNfc()) {
+                            var tagging by remember { mutableStateOf(false) }
+                            SectionCard {
+                                ListItem(
+                                    headlineContent = { Text(str(R.string.nfc_write)) },
+                                    supportingContent = { Text(str(R.string.nfc_write_text)) },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    modifier = Modifier.clickable { tagging = true },
+                                )
+                            }
+                            if (tagging) {
+                                NfcTagDialog(NFC_MACRO, macro.id, macro.name, canSwitch = false) { tagging = false }
+                            }
                         }
                     }
                     if (watched == null) {

@@ -499,4 +499,21 @@
         <item quantity="one">%d action</item>
         <item quantity="other">%d actions</item>
     </plurals>
+    <string name="nfc_write">Write to an NFC tag</string>
+    <string name="nfc_write_text">Holding the phone to the tag switches it, even with the app closed</string>
+    <string name="nfc_title">NFC tag</string>
+    <string name="nfc_what">What the tag does</string>
+    <string name="nfc_toggle">Switches on or off</string>
+    <string name="nfc_on">Switches on</string>
+    <string name="nfc_off">Switches off</string>
+    <string name="nfc_hold">Hold an NFC tag against the back of the phone and keep it still for a moment. What the tag held before is replaced.</string>
+    <string name="nfc_written">Tag written for %1$s. Holding the phone to it is enough, even with the app closed, as long as the screen is on.</string>
+    <string name="nfc_note">On the lock screen it works only if “Require device unlock for NFC” is off in the NFC settings. With the screen off Android does not read tags.</string>
+    <string name="nfc_read_only">This tag is write-protected</string>
+    <string name="nfc_too_small">This tag has too little room</string>
+    <string name="nfc_unsupported">This tag cannot be written</string>
+    <string name="nfc_failed">Writing failed: keep the tag still and try again</string>
+    <string name="nfc_disabled">NFC is off: turn it on to write the tag.</string>
+    <string name="nfc_settings">Open the NFC settings</string>
+    <string name="nfc_done">Done</string>
 </resources>

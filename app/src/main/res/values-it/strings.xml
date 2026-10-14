@@ -487,4 +487,21 @@
         <item quantity="one">%d azione</item>
         <item quantity="other">%d azioni</item>
     </plurals>
+    <string name="nfc_write">Scrivi su un tag NFC</string>
+    <string name="nfc_write_text">Avvicinando il telefono al tag lo comandi, anche con l\'app chiusa</string>
+    <string name="nfc_title">Tag NFC</string>
+    <string name="nfc_what">Cosa fa il tag</string>
+    <string name="nfc_toggle">Accende o spegne</string>
+    <string name="nfc_on">Accende</string>
+    <string name="nfc_off">Spegne</string>
+    <string name="nfc_hold">Avvicina un tag NFC al retro del telefono e tienilo fermo un attimo. Quello che c\'era sul tag viene sostituito.</string>
+    <string name="nfc_written">Tag scritto per %1$s. Basta avvicinarci il telefono, anche con l\'app chiusa, purché lo schermo sia acceso.</string>
+    <string name="nfc_note">Sulla schermata di blocco funziona solo se nelle impostazioni dell\'NFC è disattivato «Richiedi lo sblocco del dispositivo per l\'NFC». A schermo spento Android non legge i tag.</string>
+    <string name="nfc_read_only">Questo tag è protetto da scrittura</string>
+    <string name="nfc_too_small">Questo tag ha troppo poco spazio</string>
+    <string name="nfc_unsupported">Questo tag non si può scrivere</string>
+    <string name="nfc_failed">Scrittura non riuscita: tieni fermo il tag e riprova</string>
+    <string name="nfc_disabled">L\'NFC è disattivato: attivalo per scrivere il tag.</string>
+    <string name="nfc_settings">Apri le impostazioni NFC</string>
+    <string name="nfc_done">Fatto</string>
 </resources>

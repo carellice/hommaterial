@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 internal const val EXTRA_APPLIANCE_ID = "applianceId"
 internal const val EXTRA_GROUP_ID = "groupId"
 internal const val EXTRA_MACRO_ID = "macroId"
+internal const val EXTRA_POWER = "power"
 
 /** How a command sent from outside the app ended, with the sentence to show for it. */
 class Outcome(
@@ -98,8 +99,11 @@ object Quick {
         }
     }
 
-    /** Switches a whole group: off if any of its devices is on, according to Alexa, on otherwise. */
-    suspend fun toggleGroup(context: Context, groupId: String): Outcome {
+    /**
+     * Switches a whole group to [power], or without it off if any of its devices is on, according
+     * to Alexa, and on otherwise.
+     */
+    suspend fun toggleGroup(context: Context, groupId: String, power: Boolean? = null): Outcome {
         val cache = Cache(context)
         val group = cache.groups().find { it.id == groupId }
         val hidden = cache.hidden()
@@ -110,7 +114,7 @@ object Quick {
         return attempt {
             val api = Alexa.get(context).api
             val fresh = api.states(devices)
-            val on = devices.none { fresh[it.applianceId]?.power == true }
+            val on = power ?: devices.none { fresh[it.applianceId]?.power == true }
             val switched = HashMap<String, DeviceState>()
             var refused: Exception? = null
             for (device in devices.filter { fresh[it.applianceId]?.power != on }) {
@@ -242,14 +246,17 @@ class ToggleReceiver : BroadcastReceiver() {
         val device = intent.getStringExtra(EXTRA_APPLIANCE_ID)
         val group = intent.getStringExtra(EXTRA_GROUP_ID)
         val macro = intent.getStringExtra(EXTRA_MACRO_ID)
+        // Only a tag asks for a direction: a shortcut, a tile or the widget toggle.
+        val power = if (intent.hasExtra(EXTRA_POWER)) intent.getBooleanExtra(EXTRA_POWER, false) else null
         if (device == null && group == null && macro == null) return
         val app = context.applicationContext
         val pending = goAsync()
         Quick.scope.launch {
             try {
                 val outcome = when {
+                    device != null && power != null -> Quick.setPower(app, device, power)
                     device != null -> Quick.toggle(app, device)
-                    group != null -> Quick.toggleGroup(app, group)
+                    group != null -> Quick.toggleGroup(app, group, power)
                     else -> Quick.runMacro(app, macro!!)
                 }
                 Toast.makeText(app, outcome.message, Toast.LENGTH_SHORT).show()

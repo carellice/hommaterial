@@ -149,6 +149,8 @@ import app.hommaterial.label
 import app.hommaterial.plural
 import app.hommaterial.quick.Alert
 import app.hommaterial.quick.Alerts
+import app.hommaterial.quick.NFC_DEVICE
+import app.hommaterial.quick.NFC_GROUP
 import app.hommaterial.quick.Quick
 import app.hommaterial.quick.clock
 import app.hommaterial.quick.degrees
@@ -915,8 +917,20 @@ private fun GroupSheet(group: Group, devices: List<Device>, state: UiState, vm: 
                     )
                 }
             }
+            if (!LocalHomeLook.current.locked) NfcTagButton(NFC_GROUP, group.id, group.name)
         }
     }
+}
+
+/** Writes a tag that switches a device or a group, for phones that have NFC. */
+@Composable
+private fun NfcTagButton(kind: String, id: String, name: String) {
+    if (!rememberHasNfc()) return
+    var tagging by remember { mutableStateOf(false) }
+    TextButton(onClick = { tagging = true }, modifier = Modifier.padding(top = 8.dp)) {
+        Text(str(R.string.nfc_write))
+    }
+    if (tagging) NfcTagDialog(kind, id, name, canSwitch = true) { tagging = false }
 }
 
 /**
@@ -1422,6 +1436,7 @@ private fun DeviceSheet(
                     )
                 }
             }
+            if (device.hasPower) NfcTagButton(NFC_DEVICE, device.applianceId, device.name)
             TextButton(onClick = { vm.setHidden(device, !hidden); onDismiss() }) {
                 Text(str(if (hidden) R.string.unhide else R.string.hide))
             }
