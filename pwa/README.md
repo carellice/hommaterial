@@ -2,7 +2,7 @@
 
 La versione PWA di Hommaterial: la stessa app, da aprire nel browser o da
 installare sulla schermata Home di qualsiasi telefono, tablet o computer,
-iPhone compresi. Le avvertenze dell'app Android valgono anche qui: **app non
+iPhone compresi: **[carellice.github.io/hommaterial](https://carellice.github.io/hommaterial/)**. Le avvertenze dell'app Android valgono anche qui: **app non
 ufficiale, non affiliata ad Amazon, uso a proprio rischio**.
 
 Le parole sono quelle dell'app Android (`tools/strings.py` le prende da
