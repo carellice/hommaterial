@@ -142,7 +142,12 @@ class MainActivity : ComponentActivity() {
                 val language = str(R.string.voice_language)
                 LifecycleResumeEffect(language) {
                     // A command wakes a resting panel, as a touch would.
-                    val listener = WakeListener(applicationContext, language) { if (vm.onWake(it)) touches++ }
+                    val listener = WakeListener(
+                        context = applicationContext,
+                        language = language,
+                        onHeard = { if (vm.onWake(it)) touches++ },
+                        onError = vm::setWakeError,
+                    )
                     listener.start()
                     onPauseOrDispose { listener.stop() }
                 }

@@ -57,8 +57,13 @@ collegati al proprio account Alexa.
   accende e spegne, esegue delle azioni o apre il pannello, e se tenendolo
   premuto si apre il resto. La legenda è in fondo alla lista e nelle
   Impostazioni.
-- Dal menu, "Riordina" fa traballare i riquadri: si trascinano per dare a
-  ogni sezione l'ordine che si vuole, e "Fine" lo salva.
+- Dal menu, "Riordina" apre l'elenco dei riquadri di ogni sezione, da mettere
+  in ordine con le frecce.
+- Nelle Impostazioni, in Aspetto, i dispositivi si mostrano a griglia o a
+  elenco.
+- La lente in alto cerca i dispositivi mentre si scrive: il primo trovato è
+  evidenziato, e Invio lo accende o spegne, esegue un dispositivo
+  personalizzato o apre il pannello di un sensore o di un telecomando.
 - Tenendo premuto si apre il pannello con accensione, spegnimento esplicito,
   timer di spegnimento, luminosità e colore per le luci che li supportano.
 - I timer in corso stanno in una sezione in cima alla lista, con il conto
@@ -157,9 +162,10 @@ Impostazioni. Da accesa, l'app ascolta solo mentre è aperta sullo schermo
 accendi la lampada", oppure la parola da sola e poi il comando. La parola si
 può cambiare. Non ascolta ad app chiusa o a schermo spento, e usa il
 riconoscimento vocale sul dispositivo quando c'è.
-All'attivazione parte un breve addestramento: si ripete la parola sei volte
-e l'app impara come il riconoscimento sente quella voce, accettando anche
-i modi in cui la trascrive più spesso. Si può ripetere dalle Impostazioni.
+All'attivazione parte un breve addestramento: si ripete la parola sei volte,
+ogni volta nella finestra del riconoscimento vocale del telefono, e l'app
+accetta anche i modi in cui la trascrive più spesso. Si può ripetere dalle
+Impostazioni, dove compare anche un avviso se l'ascolto non funziona.
 
 Anche le azioni programmate le fa scattare il telefono, come i timer: all'ora
 stabilita deve essere acceso e connesso, e senza rete riprova per dieci minuti.

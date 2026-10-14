@@ -108,6 +108,8 @@ data class UiState(
     val alerts: Map<String, Alert> = emptyMap(),
     /** Whether the app looks for a newer release by itself, once a day. */
     val autoUpdate: Boolean = true,
+    /** How the tiles of the home are laid out: [LAYOUT_GRID] or [LAYOUT_LIST]. */
+    val layout: Int = LAYOUT_GRID,
     /** 0 follows the phone, 1 is always light, 2 always dark. */
     val theme: Int = 0,
     /** How this tablet behaves as the panel of the home. */
@@ -124,6 +126,8 @@ data class UiState(
     val wakeWord: String = "",
     /** The ways the training heard [wakeWord] said by this voice, accepted as it is. */
     val wakeVariants: List<String> = emptyList(),
+    /** The code of the failure the speech recognizer keeps giving while listening, null when it works. */
+    val wakeError: Int? = null,
     /** Whether the wake word is being trained: the usual listening keeps quiet meanwhile. */
     val wakeTraining: Boolean = false,
     /** Whether a PIN was chosen for the monitor mode. */
@@ -164,6 +168,8 @@ data class UiState(
 }
 
 private const val BACKUP_APP = "hommaterial"
+const val LAYOUT_GRID = 0
+const val LAYOUT_LIST = 1
 private const val PIN_KEY = "monitorPin"
 private const val WAKE_ARMED_MS = 8_000L
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
@@ -237,6 +243,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             alerts = Alerts.all(getApplication()),
             autoUpdate = settings.getBoolean("autoUpdate", true),
             theme = settings.getInt("theme", 0),
+            layout = settings.getInt("layout", LAYOUT_GRID),
             monitor = runCatching {
                 MonitorConfig.fromJson(JSONObject(settings.getString("monitor", "{}")!!))
             }.getOrDefault(MonitorConfig()),
@@ -305,6 +312,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 marketplace = auth.marketplace,
                 autoUpdate = it.autoUpdate,
                 theme = it.theme,
+                layout = it.layout,
                 monitor = it.monitor,
                 pin = it.pin,
                 wake = it.wake,
@@ -531,6 +539,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         // What was learnt was about the old word.
         settings.edit().putString("wakeWord", word).remove("wakeVariants").apply()
         _state.update { it.copy(wakeWord = word, wakeVariants = emptyList()) }
+    }
+
+    fun setWakeError(error: Int?) {
+        if (_state.value.wakeError != error) _state.update { it.copy(wakeError = error) }
     }
 
     fun setWakeTraining(on: Boolean) = _state.update { it.copy(wakeTraining = on) }
@@ -790,6 +802,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoUpdate(on: Boolean) {
         settings.edit().putBoolean("autoUpdate", on).apply()
         _state.update { it.copy(autoUpdate = on) }
+    }
+
+    fun setLayout(layout: Int) {
+        settings.edit().putInt("layout", layout).apply()
+        _state.update { it.copy(layout = layout) }
     }
 
     fun setTheme(theme: Int) {

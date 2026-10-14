@@ -57,6 +57,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -118,6 +119,14 @@ private fun kindLabel(remote: Remote): String = when (remote.kind) {
 internal fun RemoteTile(remote: Remote, state: UiState, vm: HomeViewModel) {
     var open by remember { mutableStateOf(false) }
     if (open) RemoteSheet(remote, state, vm, onDismiss = { open = false })
+    // The search opens it too, as a touch would.
+    val opening = LocalOpening.current
+    LaunchedEffect(opening.value) {
+        if (opening.value == Quick.remoteKey(remote.id)) {
+            opening.value = null
+            open = true
+        }
+    }
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(20.dp),

@@ -14,12 +14,6 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.StartOffset
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -27,7 +21,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,16 +38,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyGridItemScope
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -72,6 +66,7 @@ import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.Tv
@@ -98,6 +93,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -116,23 +113,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.toOffset
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.zIndex
 import app.hommaterial.HomeViewModel
+import app.hommaterial.LAYOUT_LIST
 import app.hommaterial.R
 import app.hommaterial.UiState
 import app.hommaterial.data.COLOR_CHOICES
@@ -157,7 +153,8 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 // By size of the tiles: compact, normal, large.
-private const val WIGGLE_MS = 130
+private val LIST_MIN_WIDTH = 320.dp
+private val ROW_HEIGHTS = listOf(56.dp, 64.dp, 84.dp)
 private val TILE_MIN_WIDTHS = listOf(132.dp, 148.dp, 216.dp)
 private val TILE_HEIGHTS = listOf(92.dp, 116.dp, 156.dp)
 private const val WIDE_DP = 600
@@ -182,17 +179,50 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     var page by rememberSaveable { mutableStateOf<String?>(null) }
     val current = page.takeIf { it in pages } ?: pages.first()
     val clock = monitor.enabled && monitor.clock
-    // Moving the tiles around by hand, until "Done" or the back gesture.
     var arranging by rememberSaveable { mutableStateOf(false) }
-    BackHandler(enabled = arranging) { arranging = false }
+    if (arranging) ArrangeDialog(state, vm, onDismiss = { arranging = false })
+    // The search of the top bar: null while it is closed.
+    var query by rememberSaveable { mutableStateOf<String?>(null) }
+    BackHandler(enabled = query != null) { query = null }
+    // The tile asked to open its panel, by its id, until it does.
+    val opening = remember { mutableStateOf<String?>(null) }
+    val found = query?.let { search(it, homeSections(PAGE_ALL, state)) }.orEmpty()
+
+    /** What a touch on the tile of [entry] does: the search runs it for the one it found first. */
+    fun activate(entry: Entry) {
+        val keepOpen = when (entry) {
+            is Entry.Dev -> {
+                val power = state.states[entry.device.applianceId]?.power?.takeIf { entry.device.hasPower }
+                if (power != null) vm.setPower(entry.device, !power) else opening.value = entry.id
+                power != null
+            }
+            is Entry.Grp -> vm.toggleGroup(entry.group).let { true }
+            is Entry.Mac -> vm.runMacro(entry.macro).let { true }
+            is Entry.Rem -> {
+                opening.value = entry.id
+                false
+            }
+        }
+        // What switched or ran is done with; a panel opens over the results, which must stay.
+        if (keepOpen) query = null
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { if (arranging) Text(str(R.string.arrange_title)) else Title(state.updatedAt) },
+                title = {
+                    val typed = query
+                    if (typed == null) {
+                        Title(state.updatedAt)
+                    } else {
+                        SearchField(typed, onChange = { query = it }) { found.firstOrNull()?.let(::activate) }
+                    }
+                },
                 actions = {
-                    if (arranging) {
-                        TextButton(onClick = { arranging = false }) { Text(str(R.string.arrange_done)) }
+                    if (query != null) {
+                        IconButton(onClick = { query = null }) {
+                            Icon(Icons.Outlined.Close, contentDescription = str(R.string.search_close))
+                        }
                         return@TopAppBar
                     }
                     // Without a side bar to sit in, the clock of the monitor goes up here.
@@ -204,6 +234,9 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                             modifier = Modifier.padding(horizontal = 12.dp),
                         )
                     }
+                    IconButton(onClick = { query = "" }) {
+                        Icon(Icons.Outlined.Search, contentDescription = str(R.string.search))
+                    }
                     VoiceButton(vm, listening = state.wake)
                     OverflowMenu(state, vm, onSettings, onArrange = { arranging = true })
                 },
@@ -212,26 +245,145 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Row(Modifier.padding(padding).fillMaxSize()) {
-            if (pages.size > 1) SideBar(pages, current, expanded = width >= SIDE_BAR_DP, clock) { page = it }
+            if (pages.size > 1 && query == null) {
+                SideBar(pages, current, expanded = width >= SIDE_BAR_DP, clock) { page = it }
+            }
             PullToRefreshBox(
                 isRefreshing = state.refreshing,
                 onRefresh = vm::refresh,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             ) {
-                val look = HomeLook(wide, if (monitor.enabled) monitor.tileSize else 1, state.locked)
-                CompositionLocalProvider(LocalHomeLook provides look) {
-                    Crossfade(current, label = "page") { PageGrid(it, state, vm, arranging) }
+                val look = HomeLook(
+                    wide = wide,
+                    tileSize = if (monitor.enabled) monitor.tileSize else 1,
+                    locked = state.locked,
+                    list = state.layout == LAYOUT_LIST,
+                )
+                CompositionLocalProvider(LocalHomeLook provides look, LocalOpening provides opening) {
+                    val typed = query
+                    if (typed != null) {
+                        SearchResults(typed, found, state, vm)
+                    } else {
+                        Crossfade(current, label = "page") { PageGrid(it, state, vm) }
+                    }
                 }
             }
         }
     }
 }
 
-/** How the tiles look and behave, which depends on the screen the app is on and on the monitor mode. */
-internal class HomeLook(val wide: Boolean = false, val tileSize: Int = 1, val locked: Boolean = false) {
-    val tileMinWidth get() = TILE_MIN_WIDTHS[tileSize]
-    val tileHeight get() = TILE_HEIGHTS[tileSize]
+/** The search of the top bar: typing finds, the Enter key acts on what was found first. */
+@Composable
+private fun SearchField(query: String, onChange: (String) -> Unit, onEnter: () -> Unit) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    TextField(
+        value = query,
+        onValueChange = onChange,
+        placeholder = { Text(str(R.string.search_hint)) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+        keyboardActions = KeyboardActions(onGo = { onEnter() }),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+        ),
+        modifier = Modifier.fillMaxWidth().focusRequester(focus),
+    )
 }
+
+/**
+ * What [query] matches among the tiles of the [sections], best first: names that start with it,
+ * then names with a word that does, then names that only contain it. Each tile comes once.
+ */
+private fun search(query: String, sections: List<Section>): List<Entry> {
+    val wanted = query.trim().lowercase()
+    if (wanted.isEmpty()) return emptyList()
+    fun rank(name: String): Int? {
+        val lower = name.lowercase()
+        return when {
+            lower == wanted -> 0
+            lower.startsWith(wanted) -> 1
+            lower.split(' ').any { it.startsWith(wanted) } -> 2
+            wanted in lower -> 3
+            else -> null
+        }
+    }
+    return sections.flatMap { it.entries }.distinctBy { it.id }
+        .mapNotNull { entry -> rank(entry.name)?.let { entry to it } }
+        .sortedWith(compareBy({ it.second }, { it.first.name.length }))
+        .map { it.first }
+}
+
+/** What the search found, the first one marked: it is the one the Enter key acts on. */
+@Composable
+private fun SearchResults(query: String, found: List<Entry>, state: UiState, vm: HomeViewModel) {
+    if (query.isBlank()) return
+    if (found.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(str(R.string.search_nothing, query), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+    val first = found.first()
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(LocalHomeLook.current.tileMinWidth),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item(key = "enter", span = { GridItemSpan(maxLineSpan) }) {
+            SectionHeader(str(R.string.search_enter, enterText(first, state), first.name))
+        }
+        items(found, key = { "found|${it.id}" }) { entry ->
+            val marked = entry === first
+            Box(
+                if (marked) {
+                    Modifier.border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(23.dp)).padding(3.dp)
+                } else {
+                    Modifier
+                },
+            ) {
+                entry.Tile(state, vm)
+            }
+        }
+    }
+}
+
+/** What the Enter key will do with [entry], as a verb. */
+private fun enterText(entry: Entry, state: UiState): String = when (entry) {
+    is Entry.Dev -> {
+        val power = state.states[entry.device.applianceId]?.power
+        when {
+            !entry.device.hasPower || power == null -> str(R.string.search_open)
+            power -> str(R.string.turn_off)
+            else -> str(R.string.turn_on)
+        }
+    }
+    is Entry.Grp -> str(R.string.search_switch)
+    is Entry.Mac -> str(R.string.search_run)
+    is Entry.Rem -> str(R.string.search_open)
+}
+
+/** How the tiles look and behave, which depends on the screen the app is on and on the monitor mode. */
+internal class HomeLook(
+    val wide: Boolean = false,
+    val tileSize: Int = 1,
+    val locked: Boolean = false,
+    /** Whether the tiles are rows of a list rather than squares of a grid. */
+    val list: Boolean = false,
+) {
+    // A list fills the width, or takes columns of a comfortable width on a wide screen.
+    val tileMinWidth get() = if (list) LIST_MIN_WIDTH else TILE_MIN_WIDTHS[tileSize]
+    val tileHeight get() = (if (list) ROW_HEIGHTS else TILE_HEIGHTS)[tileSize]
+    val gap get() = if (list) 8.dp else 12.dp
+}
+
+/** The tile asked to open its panel, by its id: the search opens what cannot be switched. */
+internal val LocalOpening = compositionLocalOf { mutableStateOf<String?>(null) }
 
 internal val LocalHomeLook = compositionLocalOf { HomeLook() }
 
@@ -299,9 +451,14 @@ private fun SideBar(
     }
 }
 
-/** The tiles of a page: the whole home in sections, or only the favorites, the groups or a room. */
-@Composable
-private fun PageGrid(page: String, state: UiState, vm: HomeViewModel, arranging: Boolean) {
+/** A section of the home: its tiles in the order the user gave them, and the room switch if it has one. */
+private class Section(val key: String, val title: String, val entries: List<Entry>, val switchable: List<Device>)
+
+/**
+ * The sections of a [page], each with its tiles. The order of each section is the one the user
+ * gave it; what was never moved keeps its usual place, after what was.
+ */
+private fun homeSections(page: String, state: UiState): List<Section> {
     val visible = state.placed.filter { state.showHidden || it.applianceId !in state.hidden }
     val room = page.takeIf { it.startsWith(PAGE_ROOM) }?.removePrefix(PAGE_ROOM)?.ifEmpty { null }
     // On a monitor a page may be narrowed to some of its devices, or of its groups.
@@ -315,18 +472,15 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel, arranging:
     // Named rooms first, alphabetically; devices without a room close the list.
     val noRoom = str(R.string.no_room)
     val rooms = (if (page == PAGE_FAVORITES) emptyList() else shown).groupBy { it.room ?: noRoom }
-        .toSortedMap(compareBy<String> { it == noRoom }.thenBy { it.lowercase() })
     // Hidden devices do not count for a group, as they do not for a room.
-    val listed = when (page) {
+    val groups = when (page) {
         PAGE_ALL -> state.groups
         PAGE_GROUPS -> state.groups.filter { only == null || it.id in only }
         else -> emptyList()
-    }
-    val groups = listed.map { group ->
-        group to state.devices.filter {
-            it.hasPower && it.applianceId in group.devices && it.applianceId !in state.hidden
-        }
-    }.filter { it.second.isNotEmpty() }
+    }.map { group ->
+        val members = state.devices.filter { it.applianceId in group.devices && it.applianceId !in state.hidden }
+        Entry.Grp(group, members.filter { it.hasPower })
+    }.filter { it.devices.isNotEmpty() }
 
     // Remotes and custom devices put in a room show there; the others keep their own sections.
     val inList = if (state.showHidden) state.remotes else state.shownRemotes
@@ -344,72 +498,66 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel, arranging:
     }
     // A room may hold nothing but them.
     val extraRooms = (roomRemotes.keys + roomMacros.keys).filterNotNull().filter { page == PAGE_ALL || it == room }
-    val sections = (rooms.keys + extraRooms).toSortedSet(compareBy<String> { it == noRoom }.thenBy { it.lowercase() })
+    val names = (rooms.keys + extraRooms).toSortedSet(compareBy<String> { it == noRoom }.thenBy { it.lowercase() })
+    // On a monitor a room narrowed to some of its things leaves the others out, whatever they are.
+    val narrowed = only != null && page != PAGE_ALL
 
-    // Favorites are repeated at the top, remotes and custom devices as the devices.
+    // Favorites are repeated at the top and stay in their rooms too; remotes and custom devices as the devices.
     val starred = page == PAGE_ALL || page == PAGE_FAVORITES
-    val favoriteMacros = state.macros.filter { starred && Quick.macroKey(it.id) in state.favorites }
-    val favoriteRemotes = inList.filter { starred && Quick.remoteKey(it.id) in state.favorites }
+    val favorites = if (!starred) emptyList() else {
+        shown.filter { it.applianceId in state.favorites }.sortedBy { it.name.lowercase() }.map(Entry::Dev) +
+            state.macros.filter { Quick.macroKey(it.id) in state.favorites }.map(Entry::Mac) +
+            inList.filter { Quick.remoteKey(it.id) in state.favorites }.map(Entry::Rem)
+    }
 
-    val empty = shown.isEmpty() && groups.isEmpty() && remotes.isEmpty() && macros.isEmpty() &&
-        sections.isEmpty() && favoriteMacros.isEmpty() && favoriteRemotes.isEmpty()
-    if (empty && !state.refreshing) {
+    fun section(key: String, title: String, entries: List<Entry>, switchable: List<Device> = emptyList()): Section {
+        val saved = state.order[key].orEmpty().withIndex().associate { it.value to it.index }
+        return Section(key, title, entries.sortedBy { saved[it.id] ?: Int.MAX_VALUE }, switchable)
+    }
+    return buildList {
+        add(section("favorites", str(R.string.favorites), favorites))
+        add(section("groups", str(R.string.s_groups), groups))
+        add(section("macros", str(R.string.s_macros), macros.map(Entry::Mac)))
+        add(section("remotes", str(R.string.s_remotes), remotes.map(Entry::Rem)))
+        for (name in names) {
+            val devices = rooms[name].orEmpty()
+            // The devices without a room are unrelated: switching them together makes no sense.
+            // Hidden devices stay out of it even while they are being shown.
+            val switchable = if (name == noRoom) emptyList() else {
+                devices.filter { it.hasPower && it.applianceId !in state.hidden }
+            }
+            val entries = devices.map(Entry::Dev) +
+                roomMacros[name].orEmpty().filter { !narrowed || it.id in only.orEmpty() }.map(Entry::Mac) +
+                roomRemotes[name].orEmpty().filter { !narrowed || it.id in only.orEmpty() }.map(Entry::Rem)
+            add(section("room:$name", name, entries, switchable.takeIf { it.size > 1 }.orEmpty()))
+        }
+    }.filter { it.entries.isNotEmpty() }
+}
+
+/** The tiles of a page: the whole home in sections, or only the favorites, the groups or a room. */
+@Composable
+private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
+    val sections = homeSections(page, state)
+    val shown = sections.flatMap { it.entries }.filterIsInstance<Entry.Dev>().map { it.device }
+    // Running timers come first, the one closest to switching off at the top.
+    val timers = state.timers.entries.sortedBy { it.value }
+        .mapNotNull { (id, at) -> shown.find { it.applianceId == id }?.let { it to at } }
+    // With them, what was set to happen once: the timers of remotes and custom devices among it.
+    val due = if (page == PAGE_ALL) state.schedules.filter { it.days.isEmpty() && it.enabled } else emptyList()
+
+    if (sections.isEmpty() && timers.isEmpty() && due.isEmpty() && !state.refreshing) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(str(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
-    // The order each section was arranged in; while a tile is being dragged, the one being made.
-    var working by remember { mutableStateOf<Map<String, List<String>>?>(null) }
-    val order = working ?: state.order
-    // The ids of each section as they are shown, for the drag to know where a tile may go.
-    val layout = HashMap<String, List<String>>()
-    fun arranged(section: String, entries: List<Entry>): List<Entry> {
-        val saved = order[section].orEmpty().withIndex().associate { it.value to it.index }
-        // What was never moved keeps its usual place, after what was.
-        return entries.sortedBy { saved[it.id] ?: Int.MAX_VALUE }.also { list -> layout[section] = list.map { it.id } }
-    }
-    val grid = rememberLazyGridState()
-    val reorder = remember(grid) {
-        Reorder(
-            grid = grid,
-            section = { layout[it].orEmpty() },
-            onMove = { section, ids -> working = (working ?: state.order) + (section to ids) },
-            onDrop = {
-                working?.let(vm::setOrder)
-                working = null
-            },
-        )
-    }
-
-    @Composable
-    fun Entry.Tile() = when (this) {
-        is Entry.Dev -> DeviceTile(device, state, vm)
-        is Entry.Mac -> MacroTile(macro, state, vm)
-        is Entry.Rem -> RemoteTile(remote, state, vm)
-        is Entry.Grp -> GroupTile(group, devices, state, vm) { vm.toggleGroup(group) }
-    }
-
     LazyVerticalGrid(
         columns = GridCells.Adaptive(LocalHomeLook.current.tileMinWidth),
-        state = grid,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(LocalHomeLook.current.gap),
     ) {
-        /** The tiles of a section, in the order the user gave them and movable while arranging. */
-        fun tiles(section: String, entries: List<Entry>) {
-            items(arranged(section, entries), key = { "$section|${it.id}" }) { entry ->
-                Movable("$section|${entry.id}", if (arranging) reorder else null) { entry.Tile() }
-            }
-        }
-
-        // Running timers come first, the one closest to switching off at the top.
-        val timers = state.timers.entries.sortedBy { it.value }
-            .mapNotNull { (id, at) -> shown.find { it.applianceId == id }?.let { it to at } }
-        // With them, what was set to happen once: the timers of remotes and custom devices among it.
-        val due = if (page == PAGE_ALL) state.schedules.filter { it.days.isEmpty() && it.enabled } else emptyList()
-        if ((timers.isNotEmpty() || due.isNotEmpty()) && !arranging) {
+        if (timers.isNotEmpty() || due.isNotEmpty()) {
             item(key = "timers", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(str(R.string.s_timers))
             }
@@ -422,59 +570,17 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel, arranging:
                 TimerRow(Icons.Outlined.Schedule, it.label, text, it.at) { vm.deleteSchedule(it.id) }
             }
         }
-        // Favorites are repeated at the top and stay in their rooms too.
-        val favorites = shown.filter { it.applianceId in state.favorites && starred }.sortedBy { it.name.lowercase() }
-        if (favorites.isNotEmpty() || favoriteMacros.isNotEmpty() || favoriteRemotes.isNotEmpty()) {
-            item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) {
-                SectionHeader(str(R.string.favorites))
-            }
-            tiles(
-                "favorites",
-                favorites.map(Entry::Dev) + favoriteMacros.map(Entry::Mac) + favoriteRemotes.map(Entry::Rem),
-            )
-        }
-        if (groups.isNotEmpty()) {
-            item(key = "groups", span = { GridItemSpan(maxLineSpan) }) {
-                SectionHeader(str(R.string.s_groups))
-            }
-            tiles("groups", groups.map { (group, devices) -> Entry.Grp(group, devices) })
-        }
-        if (macros.isNotEmpty()) {
-            item(key = "macros", span = { GridItemSpan(maxLineSpan) }) {
-                SectionHeader(str(R.string.s_macros))
-            }
-            tiles("macros", macros.map(Entry::Mac))
-        }
-        if (remotes.isNotEmpty()) {
-            item(key = "remotes", span = { GridItemSpan(maxLineSpan) }) {
-                SectionHeader(str(R.string.s_remotes))
-            }
-            tiles("remotes", remotes.map(Entry::Rem))
-        }
-        for (name in sections) {
-            val devices = rooms[name].orEmpty()
-            // On a monitor a room narrowed to some of its things leaves the others out, whatever they are.
-            val narrowed = only != null && page != PAGE_ALL
-            item(key = "room:$name", span = { GridItemSpan(maxLineSpan) }) {
-                // The devices without a room are unrelated: switching them together makes no sense.
-                // Hidden devices stay out of it even while they are being shown.
-                val switchable = if (name == noRoom) emptyList() else {
-                    devices.filter { it.hasPower && it.applianceId !in state.hidden }
-                }
-                if (switchable.size > 1 && !arranging) {
-                    SectionHeader(name) { on -> vm.setRoomPower(switchable, on) }
+        for (section in sections) {
+            item(key = section.key, span = { GridItemSpan(maxLineSpan) }) {
+                if (section.switchable.isNotEmpty()) {
+                    SectionHeader(section.title) { on -> vm.setRoomPower(section.switchable, on) }
                 } else {
-                    SectionHeader(name)
+                    SectionHeader(section.title)
                 }
             }
-            tiles(
-                "room:$name",
-                devices.map(Entry::Dev) +
-                    roomMacros[name].orEmpty().filter { !narrowed || it.id in only.orEmpty() }.map(Entry::Mac) +
-                    roomRemotes[name].orEmpty().filter { !narrowed || it.id in only.orEmpty() }.map(Entry::Rem),
-            )
+            items(section.entries, key = { "${section.key}|${it.id}" }) { it.Tile(state, vm) }
         }
-        if (!empty && !arranging) item(key = "legend", span = { GridItemSpan(maxLineSpan) }) { Legend() }
+        if (sections.isNotEmpty()) item(key = "legend", span = { GridItemSpan(maxLineSpan) }) { Legend() }
     }
 }
 
@@ -482,128 +588,93 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel, arranging:
 private sealed interface Entry {
     /** What it is called in the order the user gave a section. */
     val id: String
+    val name: String
 
     class Dev(val device: Device) : Entry {
         override val id get() = device.applianceId
+        override val name get() = device.name
     }
 
     class Mac(val macro: Macro) : Entry {
         override val id get() = Quick.macroKey(macro.id)
+        override val name get() = macro.name
     }
 
     class Rem(val remote: Remote) : Entry {
         override val id get() = Quick.remoteKey(remote.id)
+        override val name get() = remote.name
     }
 
     class Grp(val group: Group, val devices: List<Device>) : Entry {
         override val id get() = "group:${group.id}"
+        override val name get() = group.name
     }
 }
 
-/**
- * The tiles being moved by hand. Keys are "section|id": a tile moves only among those of its own
- * section, whose ids in order [section] gives; [onMove] receives the new order, [onDrop] the end.
- */
-private class Reorder(
-    val grid: LazyGridState,
-    val section: (String) -> List<String>,
-    val onMove: (String, List<String>) -> Unit,
-    val onDrop: () -> Unit,
-) {
-    var dragging by mutableStateOf<String?>(null)
-        private set
-
-    /** How far the tile being dragged is from where the grid would put it. */
-    var offset by mutableStateOf(Offset.Zero)
-        private set
-    private var start = Offset.Zero
-    private var moved = Offset.Zero
-
-    private fun item(key: String) = grid.layoutInfo.visibleItemsInfo.find { it.key == key }
-
-    fun start(key: String) {
-        dragging = key
-        start = item(key)?.offset?.toOffset() ?: Offset.Zero
-        moved = Offset.Zero
-        offset = Offset.Zero
-    }
-
-    fun drag(by: Offset) {
-        val key = dragging ?: return
-        val info = item(key) ?: return
-        moved += by
-        offset = start + moved - info.offset.toOffset()
-        // The tile under the middle of the one being dragged, if it belongs to the same section.
-        val center = start + moved + Offset(info.size.width / 2f, info.size.height / 2f)
-        val name = key.substringBefore('|')
-        val under = grid.layoutInfo.visibleItemsInfo.find {
-            val at = it.offset.toOffset()
-            it.key != key && (it.key as? String)?.substringBefore('|') == name &&
-                center.x in at.x..at.x + it.size.width && center.y in at.y..at.y + it.size.height
-        } ?: return
-        val ids = section(name).toMutableList()
-        val from = ids.indexOf(key.substringAfter('|'))
-        val to = ids.indexOf((under.key as String).substringAfter('|'))
-        if (from < 0 || to < 0) return
-        ids.add(to, ids.removeAt(from))
-        onMove(name, ids)
-    }
-
-    fun drop() {
-        dragging = null
-        offset = Offset.Zero
-        onDrop()
-    }
-}
-
-/**
- * A tile as it sits in the grid. While arranging, a [reorder] is given: the tile wiggles, as icons
- * do on a phone being arranged, takes no taps, and follows the finger that drags it.
- */
 @Composable
-private fun LazyGridItemScope.Movable(key: String, reorder: Reorder?, content: @Composable () -> Unit) {
-    val dragging = reorder?.dragging == key
-    val wiggle = rememberInfiniteTransition(label = "wiggle")
-    // Each tile starts at its own moment, so that they do not all lean together.
-    val angle by wiggle.animateFloat(
-        initialValue = -1.2f,
-        targetValue = 1.2f,
-        animationSpec = infiniteRepeatable(
-            tween(WIGGLE_MS),
-            RepeatMode.Reverse,
-            StartOffset((key.hashCode() and Int.MAX_VALUE) % WIGGLE_MS),
-        ),
-        label = "angle",
-    )
-    Box(
-        Modifier
-            // The dragged tile follows the finger; the others slide to their new places.
-            .then(if (dragging) Modifier else Modifier.animateItem())
-            .zIndex(if (dragging) 1f else 0f)
-            .graphicsLayer {
-                if (reorder == null) return@graphicsLayer
-                rotationZ = if (dragging) 0f else angle
-                translationX = if (dragging) reorder.offset.x else 0f
-                translationY = if (dragging) reorder.offset.y else 0f
-                scaleX = if (dragging) 1.06f else 1f
-                scaleY = scaleX
-            },
-    ) {
-        content()
-        if (reorder != null) {
-            Box(
-                Modifier.matchParentSize().pointerInput(key) {
-                    detectDragGestures(
-                        onDragStart = { reorder.start(key) },
-                        onDrag = { change, by ->
-                            change.consume()
-                            reorder.drag(by)
-                        },
-                        onDragEnd = reorder::drop,
-                        onDragCancel = reorder::drop,
+private fun Entry.Tile(state: UiState, vm: HomeViewModel) = when (this) {
+    is Entry.Dev -> DeviceTile(device, state, vm)
+    is Entry.Mac -> MacroTile(macro, state, vm)
+    is Entry.Rem -> RemoteTile(remote, state, vm)
+    is Entry.Grp -> GroupTile(group, devices, state, vm) { vm.toggleGroup(group) }
+}
+
+/** The tiles of the home as lists, one per section, to put in order with the arrows. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ArrangeDialog(state: UiState, vm: HomeViewModel, onDismiss: () -> Unit) {
+    val sections = homeSections(PAGE_ALL, state)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column {
+                TopAppBar(
+                    title = { Text(str(R.string.arrange)) },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Outlined.Close, contentDescription = str(R.string.back))
+                        }
+                    },
+                    actions = { TextButton(onClick = onDismiss) { Text(str(R.string.arrange_done)) } },
+                )
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .wrapContentWidth()
+                        .widthIn(max = 640.dp)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        str(R.string.arrange_text),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                },
-            )
+                    for (section in sections.filter { it.entries.size > 1 }) {
+                        SectionCard {
+                            Column(Modifier.padding(bottom = 8.dp)) {
+                                Text(
+                                    section.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+                                )
+                                val ids = section.entries.map { it.id }
+                                section.entries.forEachIndexed { index, entry ->
+                                    OrderRow(
+                                        name = entry.name,
+                                        first = index == 0,
+                                        last = index == ids.lastIndex,
+                                    ) { by ->
+                                        val moved = ids.toMutableList()
+                                        moved.add(index + by, moved.removeAt(index))
+                                        vm.setOrder(state.order + (section.key to moved))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -832,22 +903,50 @@ private val SWITCH_HINTS = listOf(TileHint.TOGGLE, TileHint.HOLD)
 internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: String, hints: List<TileHint>) {
     val size = LocalHomeLook.current.tileSize
     val type = MaterialTheme.typography
+    @Composable
+    fun Corner() {
+        if (busy) {
+            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            return
+        }
+        // Small: what a touch does, and whether holding does something else.
+        for (hint in hints) {
+            Icon(
+                hint.icon,
+                contentDescription = str(hint.text),
+                modifier = Modifier.padding(start = 4.dp).size(listOf(14.dp, 16.dp, 20.dp)[size]).alpha(0.6f),
+            )
+        }
+    }
+    // As a row of a list: the icon, the name over the state, the symbols at the end.
+    if (LocalHomeLook.current.list) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(listOf(22.dp, 24.dp, 30.dp)[size]))
+            Column(Modifier.padding(horizontal = 16.dp).weight(1f)) {
+                Text(
+                    name,
+                    style = if (size == 2) type.titleMedium else type.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    status,
+                    style = if (size == 2) type.bodyMedium else type.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.alpha(0.75f),
+                )
+            }
+            Corner()
+        }
+        return
+    }
     Column(Modifier.padding(listOf(12.dp, 14.dp, 18.dp)[size])) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(listOf(22.dp, 26.dp, 36.dp)[size]))
             Spacer(Modifier.weight(1f))
-            if (busy) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-            } else {
-                // In the corner, small: what a touch does, and whether holding does something else.
-                for (hint in hints) {
-                    Icon(
-                        hint.icon,
-                        contentDescription = str(hint.text),
-                        modifier = Modifier.padding(start = 4.dp).size(listOf(14.dp, 16.dp, 20.dp)[size]).alpha(0.6f),
-                    )
-                }
-            }
+            Corner()
         }
         Spacer(Modifier.weight(1f))
         Text(
@@ -1062,6 +1161,14 @@ private fun DeviceTile(
     val powerKnown = state?.power != null
     val colors = MaterialTheme.colorScheme
     var details by remember { mutableStateOf(false) }
+    // The search opens the panel of what it cannot switch.
+    val opening = LocalOpening.current
+    LaunchedEffect(opening.value) {
+        if (opening.value == device.applianceId) {
+            opening.value = null
+            details = true
+        }
+    }
 
     Surface(
         color = if (on) colors.primaryContainer else colors.surfaceContainerHigh,

@@ -1,12 +1,16 @@
 package app.hommaterial.ui
 
 import android.Manifest
+import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -79,6 +83,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import app.hommaterial.HomeViewModel
+import app.hommaterial.LAYOUT_GRID
+import app.hommaterial.LAYOUT_LIST
 import app.hommaterial.R
 import app.hommaterial.UiState
 import app.hommaterial.data.Device
@@ -363,6 +369,8 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             Section(R.string.s_appearance) {
                 val themes = listOf(R.string.theme_auto, R.string.theme_light, R.string.theme_dark)
                 Chips(R.string.theme, themes.mapIndexed { i, label -> i to str(label) }, state.theme, vm::setTheme)
+                val layouts = listOf(LAYOUT_GRID to str(R.string.layout_grid), LAYOUT_LIST to str(R.string.layout_list))
+                Chips(R.string.layout, layouts, state.layout, vm::setLayout)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     Setting(
                         title = str(R.string.language_choose),
@@ -408,6 +416,15 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                         text = str(R.string.wake_word_text, state.wakeWord),
                         onClick = { editingWake = true },
                     )
+                    // When the recognizer keeps failing, it says so: the app cannot hear anything then.
+                    state.wakeError?.takeIf { state.wake && microphone }?.let { error ->
+                        Text(
+                            wakeErrorText(error),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
                     if (state.wake && microphone) {
                         Setting(
                             title = str(R.string.wake_train),
@@ -857,12 +874,27 @@ private fun Context.open(intent: Intent) {
 }
 
 private const val TRAINING_ROUNDS = 6
+
+/** What a failure of the speech recognizer means for the wake word, in words. */
+private fun wakeErrorText(error: Int): String = str(
+    R.string.wake_error,
+    when (error) {
+        SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED, SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ->
+            str(R.string.wake_error_language)
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> str(R.string.wake_error_permission)
+        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> str(R.string.no_connection)
+        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> str(R.string.wake_error_busy)
+        else -> str(R.string.wake_error_other, error)
+    },
+)
 // The listening of the app has a moment to let go of the microphone before the training takes it.
 private const val TRAINING_START_MS = 600L
 
 /**
- * Has the wake word said again and again, noting each time how the recognizer heard it, so that
- * the ways it hears this voice are accepted too. [onDone] receives the guesses of each round.
+ * Has the wake word said again and again, noting each time how it was heard, so that the ways it
+ * hears this voice are accepted too. Each round goes through the speech recognizer of the phone,
+ * the same as the microphone button: it shows that it listens and stops by itself. [onDone]
+ * receives the guesses of each round.
  */
 @Composable
 private fun WakeTrainingDialog(
@@ -871,28 +903,42 @@ private fun WakeTrainingDialog(
     onDone: (List<List<String>>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
     var rounds by remember { mutableStateOf(listOf<List<String>>()) }
+    // Whether the recognizer was closed without an answer: the user picks up again from here.
+    var stopped by remember { mutableStateOf(false) }
+    var unavailable by remember { mutableStateOf(false) }
+    val prompt = str(R.string.wake_train_prompt, word)
     val language = str(R.string.voice_language)
-    val listener = remember {
-        WakeListener(context.applicationContext, language) { heard ->
-            if (heard.isNotEmpty()) rounds = rounds + listOf(heard)
+    lateinit var listen: () -> Unit
+    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val heard = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty()
+        if (result.resultCode == Activity.RESULT_OK && heard.isNotEmpty()) {
+            rounds = rounds + listOf(heard)
+            if (rounds.size >= TRAINING_ROUNDS) onDone(rounds) else listen()
+        } else {
+            stopped = true
         }
     }
+    listen = {
+        stopped = false
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
+            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, "$prompt (${rounds.size + 1}/$TRAINING_ROUNDS)")
+        try {
+            speech.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            unavailable = true
+        }
+    }
+    // The listening of the app keeps quiet meanwhile: the microphone is for the training.
     LaunchedEffect(Unit) {
         vm.setWakeTraining(true)
         delay(TRAINING_START_MS)
-        listener.start()
+        listen()
     }
-    DisposableEffect(Unit) {
-        onDispose {
-            listener.stop()
-            vm.setWakeTraining(false)
-        }
-    }
-    LaunchedEffect(rounds.size) {
-        if (rounds.size >= TRAINING_ROUNDS) onDone(rounds)
-    }
+    DisposableEffect(Unit) { onDispose { vm.setWakeTraining(false) } }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(str(R.string.wake_train_title)) },
@@ -903,7 +949,7 @@ private fun WakeTrainingDialog(
                     progress = { rounds.size / TRAINING_ROUNDS.toFloat() },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text(str(R.string.wake_train_count, rounds.size + 1, TRAINING_ROUNDS))
+                Text(str(R.string.wake_train_count, minOf(rounds.size + 1, TRAINING_ROUNDS), TRAINING_ROUNDS))
                 rounds.lastOrNull()?.firstOrNull()?.let {
                     Text(
                         str(R.string.wake_train_heard, it),
@@ -912,13 +958,15 @@ private fun WakeTrainingDialog(
                     )
                 }
                 Text(
-                    str(R.string.wake_train_hint),
+                    str(if (unavailable) R.string.voice_unavailable else R.string.wake_train_hint),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.run { if (unavailable) error else onSurfaceVariant },
                 )
             }
         },
-        confirmButton = {},
+        confirmButton = {
+            if (stopped && !unavailable) TextButton(onClick = listen) { Text(str(R.string.wake_train_go_on)) }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
     )
 }

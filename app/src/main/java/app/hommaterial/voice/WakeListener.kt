@@ -15,7 +15,6 @@ private const val RESTART_MS = 300L
 // After a real failure, such as a recognizer that is busy or gone, there is no point in insisting:
 // each one in a row waits twice as long, up to a minute.
 private const val RETRY_MS = 3_000L
-private const val SILENCE_MS = 700L
 private const val RETRY_MAX_MS = 60_000L
 
 /**
@@ -27,6 +26,8 @@ class WakeListener(
     private val context: Context,
     private val language: String,
     private val onHeard: (List<String>) -> Unit,
+    /** Told the code of a real failure, and null again once the recognizer listens. */
+    private val onError: (Int?) -> Unit = {},
 ) : RecognitionListener {
     private val handler = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
@@ -58,14 +59,12 @@ class WakeListener(
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-            // A shorter pause ends a sentence sooner, where the recognizer honours it.
-            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_MS)
-            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_MS)
         recognizer?.startListening(intent)
     }
 
     override fun onResults(results: Bundle) {
         failures = 0
+        onError(null)
         results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.let(onHeard)
         handler.postDelayed(::listen, RESTART_MS)
     }
@@ -83,6 +82,8 @@ class WakeListener(
         // Silence is not a failure: it is what a recognizer left listening hears most of the time.
         val quiet = error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
         failures = if (quiet) 0 else failures + 1
+        // Silence is normal; a failure that comes back is worth showing.
+        if (quiet) onError(null) else if (failures >= 2) onError(error)
         val wait = if (quiet) RESTART_MS else (RETRY_MS shl (failures - 1).coerceAtMost(5)).coerceAtMost(RETRY_MAX_MS)
         handler.postDelayed(::listen, wait)
     }
