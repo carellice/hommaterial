@@ -1,20 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The app logo in one color, for the status bar: speech bubble, ring and sound bars. -->
+<!-- The app logo in one color, for the status bar: the house and its power symbol. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="200"
-    android:viewportHeight="200">
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M6,98a94,94 0 1,0 188,0a94,94 0 1,0 -188,0zM44,98a56,56 0 1,0 112,0a56,56 0 1,0 -112,0z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M14,140L26,194L66,180z" />
-    <path
-        android:pathData="M64,91V105M82,80V116M100,72V124M118,80V116M136,91V105"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round"
-        android:strokeWidth="11" />
+    android:viewportWidth="56"
+    android:viewportHeight="56">
+    <group
+        android:translateX="-26"
+        android:translateY="-26">
+        <path
+            android:pathData="M50.98,32.3Q54,29.67 57.02,32.3L74.98,47.92Q78,50.54 78,54.54L78,73Q78,77 74,77L34,77Q30,77 30,73L30,54.54Q30,50.54 33.02,47.92Z"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineJoin="round"
+            android:strokeWidth="5" />
+        <path
+            android:pathData="M60.106,54.723A9.5,9.5 0,1 1,47.894 54.723"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round"
+            android:strokeWidth="3.6" />
+        <path
+            android:pathData="M54,50L54,59.5"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round"
+            android:strokeWidth="3.6" />
+    </group>
 </vector>

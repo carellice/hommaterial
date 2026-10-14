@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The icon in one color, for the themed icons of Android 13: the house drawn as an outline. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- A little smaller than the safe zone allows: round icons need room around it. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.86"
+        android:scaleY="0.86">
+        <path
+            android:pathData="M50.98,32.3Q54,29.67 57.02,32.3L74.98,47.92Q78,50.54 78,54.54L78,73Q78,77 74,77L34,77Q30,77 30,73L30,54.54Q30,50.54 33.02,47.92Z"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineJoin="round"
+            android:strokeWidth="5" />
+        <path
+            android:pathData="M60.106,54.723A9.5,9.5 0,1 1,47.894 54.723"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round"
+            android:strokeWidth="3.6" />
+        <path
+            android:pathData="M54,50L54,59.5"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round"
+            android:strokeWidth="3.6" />
+    </group>
+</vector>
