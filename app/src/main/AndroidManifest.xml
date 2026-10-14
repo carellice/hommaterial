@@ -90,6 +90,56 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+        <service
+            android:name=".quick.PowerTile6"
+            android:exported="true"
+            android:icon="@drawable/ic_power"
+            android:label="Hommaterial 6"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".quick.PowerTile7"
+            android:exported="true"
+            android:icon="@drawable/ic_power"
+            android:label="Hommaterial 7"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".quick.PowerTile8"
+            android:exported="true"
+            android:icon="@drawable/ic_power"
+            android:label="Hommaterial 8"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".quick.PowerTile9"
+            android:exported="true"
+            android:icon="@drawable/ic_power"
+            android:label="Hommaterial 9"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".quick.PowerTile10"
+            android:exported="true"
+            android:icon="@drawable/ic_power"
+            android:label="Hommaterial 10"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
         <receiver
             android:name=".quick.HomeWidgetReceiver"
             android:exported="true"

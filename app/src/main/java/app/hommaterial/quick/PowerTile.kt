@@ -184,7 +184,7 @@ abstract class PowerTile(private val slot: Int) : TileService() {
     }
 
     companion object {
-        const val SLOTS = 5
+        const val SLOTS = 10
 
         private val services = listOf(
             PowerTile1::class.java,
@@ -192,6 +192,11 @@ abstract class PowerTile(private val slot: Int) : TileService() {
             PowerTile3::class.java,
             PowerTile4::class.java,
             PowerTile5::class.java,
+            PowerTile6::class.java,
+            PowerTile7::class.java,
+            PowerTile8::class.java,
+            PowerTile9::class.java,
+            PowerTile10::class.java,
         )
 
         /** The slots whose custom device is running. */
@@ -222,3 +227,13 @@ class PowerTile3 : PowerTile(2)
 class PowerTile4 : PowerTile(3)
 
 class PowerTile5 : PowerTile(4)
+
+class PowerTile6 : PowerTile(5)
+
+class PowerTile7 : PowerTile(6)
+
+class PowerTile8 : PowerTile(7)
+
+class PowerTile9 : PowerTile(8)
+
+class PowerTile10 : PowerTile(9)

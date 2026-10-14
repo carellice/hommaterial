@@ -18,7 +18,7 @@ const historyPrefs = new Prefs('history');
 
 const BACKUP_APP = 'hommaterial';
 const PIN_KEY = 'monitorPin';
-const TILE_SLOTS = 5;
+const TILE_SLOTS = 10;
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const RETRY_DELAY_MS = 60_000;
 // Past this delay a switch-off or an action would come as a surprise rather than at the time asked for.
