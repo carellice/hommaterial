@@ -449,6 +449,9 @@
     <string name="hint_run_short">esegue</string>
     <string name="hint_open_short">apre il pannello</string>
     <string name="hint_hold_short">tieni premuto per il resto</string>
+    <string name="arrange">Riordina</string>
+    <string name="arrange_title">Trascina per riordinare</string>
+    <string name="arrange_done">Fine</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>

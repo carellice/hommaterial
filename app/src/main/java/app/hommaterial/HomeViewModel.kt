@@ -85,6 +85,8 @@ data class UiState(
     /** The rooms the user created, which exist even while no device is in them. */
     val roomList: List<String> = emptyList(),
     val groups: List<Group> = emptyList(),
+    /** The order the user gave the tiles of each section of the home. See [Cache.order]. */
+    val order: Map<String, List<String>> = emptyMap(),
     /** The custom devices: tiles that run a series of actions. */
     val macros: List<Macro> = emptyList(),
     /** What is listed under the app icon, or null for the favorites. See [Cache.shortcuts]. */
@@ -219,6 +221,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             roomList = local.roomList(),
             groups = local.groups(),
             macros = local.macros(),
+            order = local.order(),
             shortcuts = local.shortcuts(),
             widget = local.widget(),
             favorites = local.favorites(),
@@ -685,6 +688,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         Quick.refresh(getApplication())
     }
 
+    fun setOrder(order: Map<String, List<String>>) {
+        local.putOrder(order)
+        _state.update { it.copy(order = order) }
+    }
+
     /** Creates a custom device, when its id is empty, or replaces the one with the same id. */
     fun saveMacro(macro: Macro) {
         val macros = _state.value.macros
@@ -872,6 +880,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("roomList", JSONArray(s.roomList))
             .put("groups", JSONArray(s.groups.map { it.toJson() }))
             .put("macros", JSONArray(s.macros.map { it.toJson() }))
+            .put("order", JSONObject(s.order.mapValues { JSONArray(it.value) }))
             .put("shortcuts", s.shortcuts?.let { JSONArray(it) } ?: JSONObject.NULL)
             .put("widget", s.widget.toJson())
             .put("tiles", JSONArray(s.tileDevices.map { it ?: JSONObject.NULL }))
@@ -934,6 +943,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         local.putRoomList(list("roomList").orEmpty())
         local.putGroups(backup.optJSONArray("groups")?.mapObjects(Group::fromJson).orEmpty())
         local.putMacros(backup.optJSONArray("macros")?.mapObjects(Macro::fromJson).orEmpty())
+        val order = backup.optJSONObject("order") ?: JSONObject()
+        local.putOrder(
+            order.keys().asSequence().associateWith { section ->
+                order.getJSONArray(section).let { a -> (0 until a.length()).map(a::getString) }
+            },
+        )
         local.putShortcuts(list("shortcuts"))
         local.putWidget(backup.optJSONObject("widget")?.let(WidgetConfig::fromJson) ?: WidgetConfig())
         val tiles = backup.optJSONArray("tiles")
@@ -965,6 +980,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 roomList = local.roomList(),
                 groups = local.groups(),
                 macros = local.macros(),
+                order = local.order(),
                 shortcuts = local.shortcuts(),
                 widget = local.widget(),
                 tileDevices = local.tileDevices(),

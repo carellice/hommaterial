@@ -57,6 +57,8 @@ collegati al proprio account Alexa.
   accende e spegne, esegue delle azioni o apre il pannello, e se tenendolo
   premuto si apre il resto. La legenda è in fondo alla lista e nelle
   Impostazioni.
+- Dal menu, "Riordina" fa traballare i riquadri: si trascinano per dare a
+  ogni sezione l'ordine che si vuole, e "Fine" lo salva.
 - Tenendo premuto si apre il pannello con accensione, spegnimento esplicito,
   timer di spegnimento, luminosità e colore per le luci che li supportano.
 - I timer in corso stanno in una sezione in cima alla lista, con il conto

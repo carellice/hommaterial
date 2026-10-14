@@ -67,6 +67,20 @@ class Cache(context: Context) {
     fun putGroups(groups: List<Group>) =
         prefs.edit().putString("groups", JSONArray(groups.map { it.toJson() }).toString()).apply()
 
+    /** The order the user gave the tiles of each section of the home, by section: their ids. */
+    fun order(): Map<String, List<String>> = runCatching {
+        val json = JSONObject(prefs.getString("order", "{}")!!)
+        json.keys().asSequence().associateWith { section ->
+            json.getJSONArray(section).let { a -> (0 until a.length()).map(a::getString) }
+        }
+    }.getOrDefault(emptyMap())
+
+    fun putOrder(order: Map<String, List<String>>) {
+        val json = JSONObject()
+        for ((section, ids) in order) json.put(section, JSONArray(ids))
+        prefs.edit().putString("order", json.toString()).apply()
+    }
+
     fun macros(): List<Macro> = runCatching {
         JSONArray(prefs.getString("macros", "[]")).mapObjects(Macro::fromJson)
     }.getOrDefault(emptyList())

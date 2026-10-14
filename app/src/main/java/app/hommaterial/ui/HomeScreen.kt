@@ -7,12 +7,19 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.speech.RecognizerIntent
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -20,6 +27,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,8 +47,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridItemScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -105,8 +116,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -114,8 +128,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toOffset
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.UiState
@@ -124,6 +140,8 @@ import app.hommaterial.data.ColorChoice
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.Group
+import app.hommaterial.data.Macro
+import app.hommaterial.data.Remote
 import app.hommaterial.data.WHITE_CHOICES
 import app.hommaterial.data.statusText
 import app.hommaterial.label
@@ -139,6 +157,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 // By size of the tiles: compact, normal, large.
+private const val WIGGLE_MS = 130
 private val TILE_MIN_WIDTHS = listOf(132.dp, 148.dp, 216.dp)
 private val TILE_HEIGHTS = listOf(92.dp, 116.dp, 156.dp)
 private const val WIDE_DP = 600
@@ -163,12 +182,19 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     var page by rememberSaveable { mutableStateOf<String?>(null) }
     val current = page.takeIf { it in pages } ?: pages.first()
     val clock = monitor.enabled && monitor.clock
+    // Moving the tiles around by hand, until "Done" or the back gesture.
+    var arranging by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = arranging) { arranging = false }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Title(state.updatedAt) },
+                title = { if (arranging) Text(str(R.string.arrange_title)) else Title(state.updatedAt) },
                 actions = {
+                    if (arranging) {
+                        TextButton(onClick = { arranging = false }) { Text(str(R.string.arrange_done)) }
+                        return@TopAppBar
+                    }
                     // Without a side bar to sit in, the clock of the monitor goes up here.
                     if (clock && pages.size == 1) {
                         val now by rememberNow()
@@ -179,7 +205,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                         )
                     }
                     VoiceButton(vm, listening = state.wake)
-                    OverflowMenu(state, vm, onSettings)
+                    OverflowMenu(state, vm, onSettings, onArrange = { arranging = true })
                 },
             )
         },
@@ -194,7 +220,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
             ) {
                 val look = HomeLook(wide, if (monitor.enabled) monitor.tileSize else 1, state.locked)
                 CompositionLocalProvider(LocalHomeLook provides look) {
-                    Crossfade(current, label = "page") { PageGrid(it, state, vm) }
+                    Crossfade(current, label = "page") { PageGrid(it, state, vm, arranging) }
                 }
             }
         }
@@ -275,7 +301,7 @@ private fun SideBar(
 
 /** The tiles of a page: the whole home in sections, or only the favorites, the groups or a room. */
 @Composable
-private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
+private fun PageGrid(page: String, state: UiState, vm: HomeViewModel, arranging: Boolean) {
     val visible = state.placed.filter { state.showHidden || it.applianceId !in state.hidden }
     val room = page.takeIf { it.startsWith(PAGE_ROOM) }?.removePrefix(PAGE_ROOM)?.ifEmpty { null }
     // On a monitor a page may be narrowed to some of its devices, or of its groups.
@@ -332,19 +358,58 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
             Text(str(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+    // The order each section was arranged in; while a tile is being dragged, the one being made.
+    var working by remember { mutableStateOf<Map<String, List<String>>?>(null) }
+    val order = working ?: state.order
+    // The ids of each section as they are shown, for the drag to know where a tile may go.
+    val layout = HashMap<String, List<String>>()
+    fun arranged(section: String, entries: List<Entry>): List<Entry> {
+        val saved = order[section].orEmpty().withIndex().associate { it.value to it.index }
+        // What was never moved keeps its usual place, after what was.
+        return entries.sortedBy { saved[it.id] ?: Int.MAX_VALUE }.also { list -> layout[section] = list.map { it.id } }
+    }
+    val grid = rememberLazyGridState()
+    val reorder = remember(grid) {
+        Reorder(
+            grid = grid,
+            section = { layout[it].orEmpty() },
+            onMove = { section, ids -> working = (working ?: state.order) + (section to ids) },
+            onDrop = {
+                working?.let(vm::setOrder)
+                working = null
+            },
+        )
+    }
+
+    @Composable
+    fun Entry.Tile() = when (this) {
+        is Entry.Dev -> DeviceTile(device, state, vm)
+        is Entry.Mac -> MacroTile(macro, state, vm)
+        is Entry.Rem -> RemoteTile(remote, state, vm)
+        is Entry.Grp -> GroupTile(group, devices, state, vm) { vm.toggleGroup(group) }
+    }
+
     LazyVerticalGrid(
         columns = GridCells.Adaptive(LocalHomeLook.current.tileMinWidth),
+        state = grid,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        /** The tiles of a section, in the order the user gave them and movable while arranging. */
+        fun tiles(section: String, entries: List<Entry>) {
+            items(arranged(section, entries), key = { "$section|${it.id}" }) { entry ->
+                Movable("$section|${entry.id}", if (arranging) reorder else null) { entry.Tile() }
+            }
+        }
+
         // Running timers come first, the one closest to switching off at the top.
         val timers = state.timers.entries.sortedBy { it.value }
             .mapNotNull { (id, at) -> shown.find { it.applianceId == id }?.let { it to at } }
         // With them, what was set to happen once: the timers of remotes and custom devices among it.
         val due = if (page == PAGE_ALL) state.schedules.filter { it.days.isEmpty() && it.enabled } else emptyList()
-        if (timers.isNotEmpty() || due.isNotEmpty()) {
+        if ((timers.isNotEmpty() || due.isNotEmpty()) && !arranging) {
             item(key = "timers", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(str(R.string.s_timers))
             }
@@ -363,29 +428,28 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
             item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(str(R.string.favorites))
             }
-            items(favorites, key = { "favorite:${it.applianceId}" }) { DeviceTile(it, state, vm) }
-            items(favoriteMacros, key = { "favorite:macro:${it.id}" }) { MacroTile(it, state, vm) }
-            items(favoriteRemotes, key = { "favorite:remote:${it.id}" }) { RemoteTile(it, state, vm) }
+            tiles(
+                "favorites",
+                favorites.map(Entry::Dev) + favoriteMacros.map(Entry::Mac) + favoriteRemotes.map(Entry::Rem),
+            )
         }
         if (groups.isNotEmpty()) {
             item(key = "groups", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(str(R.string.s_groups))
             }
-            items(groups, key = { "group:${it.first.id}" }) { (group, devices) ->
-                GroupTile(group, devices, state, vm) { vm.toggleGroup(group) }
-            }
+            tiles("groups", groups.map { (group, devices) -> Entry.Grp(group, devices) })
         }
         if (macros.isNotEmpty()) {
             item(key = "macros", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(str(R.string.s_macros))
             }
-            items(macros, key = { "macro:${it.id}" }) { MacroTile(it, state, vm) }
+            tiles("macros", macros.map(Entry::Mac))
         }
         if (remotes.isNotEmpty()) {
             item(key = "remotes", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(str(R.string.s_remotes))
             }
-            items(remotes, key = { "remote:${it.id}" }) { RemoteTile(it, state, vm) }
+            tiles("remotes", remotes.map(Entry::Rem))
         }
         for (name in sections) {
             val devices = rooms[name].orEmpty()
@@ -397,23 +461,150 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
                 val switchable = if (name == noRoom) emptyList() else {
                     devices.filter { it.hasPower && it.applianceId !in state.hidden }
                 }
-                if (switchable.size > 1) {
+                if (switchable.size > 1 && !arranging) {
                     SectionHeader(name) { on -> vm.setRoomPower(switchable, on) }
                 } else {
                     SectionHeader(name)
                 }
             }
-            items(devices, key = { it.applianceId }) { DeviceTile(it, state, vm) }
-            items(
-                roomMacros[name].orEmpty().filter { !narrowed || it.id in only.orEmpty() },
-                key = { "macro:${it.id}" },
-            ) { MacroTile(it, state, vm) }
-            items(
-                roomRemotes[name].orEmpty().filter { !narrowed || it.id in only.orEmpty() },
-                key = { "remote:${it.id}" },
-            ) { RemoteTile(it, state, vm) }
+            tiles(
+                "room:$name",
+                devices.map(Entry::Dev) +
+                    roomMacros[name].orEmpty().filter { !narrowed || it.id in only.orEmpty() }.map(Entry::Mac) +
+                    roomRemotes[name].orEmpty().filter { !narrowed || it.id in only.orEmpty() }.map(Entry::Rem),
+            )
         }
-        if (!empty) item(key = "legend", span = { GridItemSpan(maxLineSpan) }) { Legend() }
+        if (!empty && !arranging) item(key = "legend", span = { GridItemSpan(maxLineSpan) }) { Legend() }
+    }
+}
+
+/** Something that has a tile on the home: a device, a custom device, a remote or a group. */
+private sealed interface Entry {
+    /** What it is called in the order the user gave a section. */
+    val id: String
+
+    class Dev(val device: Device) : Entry {
+        override val id get() = device.applianceId
+    }
+
+    class Mac(val macro: Macro) : Entry {
+        override val id get() = Quick.macroKey(macro.id)
+    }
+
+    class Rem(val remote: Remote) : Entry {
+        override val id get() = Quick.remoteKey(remote.id)
+    }
+
+    class Grp(val group: Group, val devices: List<Device>) : Entry {
+        override val id get() = "group:${group.id}"
+    }
+}
+
+/**
+ * The tiles being moved by hand. Keys are "section|id": a tile moves only among those of its own
+ * section, whose ids in order [section] gives; [onMove] receives the new order, [onDrop] the end.
+ */
+private class Reorder(
+    val grid: LazyGridState,
+    val section: (String) -> List<String>,
+    val onMove: (String, List<String>) -> Unit,
+    val onDrop: () -> Unit,
+) {
+    var dragging by mutableStateOf<String?>(null)
+        private set
+
+    /** How far the tile being dragged is from where the grid would put it. */
+    var offset by mutableStateOf(Offset.Zero)
+        private set
+    private var start = Offset.Zero
+    private var moved = Offset.Zero
+
+    private fun item(key: String) = grid.layoutInfo.visibleItemsInfo.find { it.key == key }
+
+    fun start(key: String) {
+        dragging = key
+        start = item(key)?.offset?.toOffset() ?: Offset.Zero
+        moved = Offset.Zero
+        offset = Offset.Zero
+    }
+
+    fun drag(by: Offset) {
+        val key = dragging ?: return
+        val info = item(key) ?: return
+        moved += by
+        offset = start + moved - info.offset.toOffset()
+        // The tile under the middle of the one being dragged, if it belongs to the same section.
+        val center = start + moved + Offset(info.size.width / 2f, info.size.height / 2f)
+        val name = key.substringBefore('|')
+        val under = grid.layoutInfo.visibleItemsInfo.find {
+            val at = it.offset.toOffset()
+            it.key != key && (it.key as? String)?.substringBefore('|') == name &&
+                center.x in at.x..at.x + it.size.width && center.y in at.y..at.y + it.size.height
+        } ?: return
+        val ids = section(name).toMutableList()
+        val from = ids.indexOf(key.substringAfter('|'))
+        val to = ids.indexOf((under.key as String).substringAfter('|'))
+        if (from < 0 || to < 0) return
+        ids.add(to, ids.removeAt(from))
+        onMove(name, ids)
+    }
+
+    fun drop() {
+        dragging = null
+        offset = Offset.Zero
+        onDrop()
+    }
+}
+
+/**
+ * A tile as it sits in the grid. While arranging, a [reorder] is given: the tile wiggles, as icons
+ * do on a phone being arranged, takes no taps, and follows the finger that drags it.
+ */
+@Composable
+private fun LazyGridItemScope.Movable(key: String, reorder: Reorder?, content: @Composable () -> Unit) {
+    val dragging = reorder?.dragging == key
+    val wiggle = rememberInfiniteTransition(label = "wiggle")
+    // Each tile starts at its own moment, so that they do not all lean together.
+    val angle by wiggle.animateFloat(
+        initialValue = -1.2f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            tween(WIGGLE_MS),
+            RepeatMode.Reverse,
+            StartOffset((key.hashCode() and Int.MAX_VALUE) % WIGGLE_MS),
+        ),
+        label = "angle",
+    )
+    Box(
+        Modifier
+            // The dragged tile follows the finger; the others slide to their new places.
+            .then(if (dragging) Modifier else Modifier.animateItem())
+            .zIndex(if (dragging) 1f else 0f)
+            .graphicsLayer {
+                if (reorder == null) return@graphicsLayer
+                rotationZ = if (dragging) 0f else angle
+                translationX = if (dragging) reorder.offset.x else 0f
+                translationY = if (dragging) reorder.offset.y else 0f
+                scaleX = if (dragging) 1.06f else 1f
+                scaleY = scaleX
+            },
+    ) {
+        content()
+        if (reorder != null) {
+            Box(
+                Modifier.matchParentSize().pointerInput(key) {
+                    detectDragGestures(
+                        onDragStart = { reorder.start(key) },
+                        onDrag = { change, by ->
+                            change.consume()
+                            reorder.drag(by)
+                        },
+                        onDragEnd = reorder::drop,
+                        onDragCancel = reorder::drop,
+                    )
+                },
+            )
+        }
     }
 }
 
@@ -805,7 +996,7 @@ private fun VoiceDialog(ask: VoiceResult.Ask, vm: HomeViewModel) {
 }
 
 @Composable
-private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
+private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Unit, onArrange: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     var confirmSignOut by remember { mutableStateOf(false) }
     if (confirmSignOut) SignOutDialog(onConfirm = vm::logout, onDismiss = { confirmSignOut = false })
@@ -836,6 +1027,7 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
             text = { Text(str(R.string.check_updates)) },
             onClick = { open = false; vm.checkForUpdate(manual = true) },
         )
+        DropdownMenuItem(text = { Text(str(R.string.arrange)) }, onClick = { open = false; guarded(onArrange) })
         DropdownMenuItem(
             text = { Text(str(R.string.s_automations)) },
             onClick = { open = false; guarded { automating = true } },

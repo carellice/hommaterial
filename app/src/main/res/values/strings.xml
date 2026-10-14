@@ -460,6 +460,9 @@
     <string name="hint_run_short">runs</string>
     <string name="hint_open_short">opens the panel</string>
     <string name="hint_hold_short">hold for the rest</string>
+    <string name="arrange">Rearrange</string>
+    <string name="arrange_title">Drag to rearrange</string>
+    <string name="arrange_done">Done</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>
