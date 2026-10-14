@@ -47,6 +47,12 @@ class SwitchBot {
     this.prefs.clear();
   }
 
+  /** The token and the secret, for the backup; null while not linked. */
+  keys() {
+    const token = this.prefs.get('token');
+    return token ? { token, secret: this.prefs.get('secret', '') } : null;
+  }
+
   /** The remotes as last fetched. */
   remotes() {
     return this.prefs.get('remotes', []);

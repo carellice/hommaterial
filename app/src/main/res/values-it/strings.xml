@@ -168,7 +168,7 @@
     <string name="s_timers">Timer attivi</string>
     <string name="s_alerts">Avvisi di temperatura</string>
     <string name="alert_remove">Rimuovi gli avvisi</string>
-    <string name="backup_text">Preferiti, dispositivi nascosti, stanze, gruppi, scorciatoie, widget, riquadri, avvisi, modalità monitor (senza il PIN) e impostazioni. L\'accesso ad Amazon, i timer e la cronologia dei sensori non sono inclusi.</string>
+    <string name="backup_text">Preferiti, dispositivi nascosti, stanze, gruppi, dispositivi personalizzati, scorciatoie, widget, riquadri, avvisi, modalità monitor (senza il PIN), impostazioni e le chiavi di SwitchBot, che si ricollega da solo. Custodisci il file: con quelle chiavi si comandano i tuoi telecomandi. L\'accesso ad Amazon, i timer e la cronologia dei sensori non sono inclusi.</string>
     <string name="backup_export">Esporta su file</string>
     <string name="backup_import">Importa da file</string>
     <string name="backup_exported">Backup salvato</string>

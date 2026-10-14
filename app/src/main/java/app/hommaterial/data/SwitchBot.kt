@@ -72,6 +72,10 @@ class SwitchBot(context: Context, private val http: OkHttpClient) {
 
     fun disconnect() = prefs.edit().clear().apply()
 
+    /** The token and the secret, for the backup; null while not linked. */
+    fun keys(): Pair<String, String>? =
+        prefs.getString("token", null)?.let { it to prefs.getString("secret", "").orEmpty() }
+
     /** The remotes as last fetched. */
     fun remotes(): List<Remote> = runCatching {
         JSONArray(prefs.getString("remotes", "[]")).mapObjects(Remote::fromJson)

@@ -1015,12 +1015,14 @@ export function exportBackup() {
     alerts: s.alerts,
     autoUpdate: s.autoUpdate,
     theme: s.theme,
-    // The names typed for the buttons of the remotes, never the keys of the SwitchBot account.
     remoteButtons: s.remoteButtons,
     hiddenRemotes: s.hiddenRemotes,
     // Without the PIN: a file that travels must not carry it, not even scrambled.
     monitor: s.monitor,
   };
+  // The keys of SwitchBot travel along, so that another browser or phone links again by itself.
+  const keys = switchBot.keys();
+  if (keys) backup.switchBot = keys;
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -1094,6 +1096,11 @@ function restore(backup, monitor) {
     update({ hiddenRemotes: switchBot.hidden() });
   }
   if (monitor && backup.monitor) setMonitor(monitorFromJson(backup.monitor));
+  if (backup.switchBot?.token) {
+    switchBot.connect(backup.switchBot.token, backup.switchBot.secret || '');
+    update({ switchBot: true });
+    guarded(async () => update({ remotes: await switchBot.fetchRemotes() }), true);
+  }
   say(str('backup_imported'));
 }
 

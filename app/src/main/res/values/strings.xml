@@ -176,7 +176,7 @@
     <string name="s_alerts">Temperature alerts</string>
     <string name="alert_remove">Remove the alerts</string>
     <string name="s_backup" translatable="false">Backup</string>
-    <string name="backup_text">Favorites, hidden devices, rooms, groups, shortcuts, widget, tiles, alerts, monitor mode (without the PIN) and settings. The Amazon sign-in, the timers and the sensor history are not included.</string>
+    <string name="backup_text">Favorites, hidden devices, rooms, groups, custom devices, shortcuts, widget, tiles, alerts, monitor mode (without the PIN), settings and the SwitchBot keys, so that it links again by itself. Keep the file safe: those keys control your remotes. The Amazon sign-in, the timers and the sensor history are not included.</string>
     <string name="backup_export">Export to a file</string>
     <string name="backup_import">Import from a file</string>
     <string name="backup_exported">Backup saved</string>

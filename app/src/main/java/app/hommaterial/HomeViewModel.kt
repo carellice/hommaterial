@@ -858,11 +858,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("alerts", alerts)
             .put("autoUpdate", s.autoUpdate)
             .put("theme", s.theme)
-            // The names typed for the buttons of the remotes, never the keys of the SwitchBot account.
             .put("remoteButtons", JSONObject(s.remoteButtons.mapValues { JSONArray(it.value) }))
             .put("hiddenRemotes", JSONArray(s.hiddenRemotes))
             // Without the PIN: a file that travels must not carry it, not even scrambled.
             .put("monitor", s.monitor.toJson())
+        // The keys of SwitchBot travel along, so that a new phone links again by itself.
+        switchBot.keys()?.let { (token, secret) ->
+            backup.put("switchBot", JSONObject().put("token", token).put("secret", secret))
+        }
         viewModelScope.launch {
             val saved = runCatching {
                 withContext(Dispatchers.IO) {
@@ -972,6 +975,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(hiddenRemotes = switchBot.hidden()) }
         }
         if (monitor) backup.optJSONObject("monitor")?.let { setMonitor(MonitorConfig.fromJson(it)) }
+        backup.optJSONObject("switchBot")?.let { keys ->
+            val token = keys.optString("token")
+            if (token.isNotEmpty()) {
+                switchBot.connect(token, keys.optString("secret"))
+                _state.update { it.copy(switchBot = true) }
+                viewModelScope.launch {
+                    guarded(quiet = true) { _state.update { it.copy(remotes = switchBot.fetchRemotes()) } }
+                }
+            }
+        }
         Quick.refresh(app)
         _messages.tryEmit(str(R.string.backup_imported))
     }
