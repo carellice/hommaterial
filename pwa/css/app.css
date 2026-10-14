@@ -511,6 +511,7 @@ button.list-item:hover, .list-item.clickable:hover { background: color-mix(in sr
   flex: none;
   padding: 0;
 }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 12px; justify-items: center; }
 .swatch.selected { border: 3px solid var(--primary); box-shadow: inset 0 0 0 3px var(--surface-container-low); }
 input[type="range"] { width: 100%; accent-color: var(--primary); height: 40px; }
 .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }

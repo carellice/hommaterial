@@ -448,7 +448,7 @@ function DeviceSheet({ device, s, look, onDismiss }) {
         <${BrightnessSlider} brightness=${st?.brightness ?? 100} onChange=${(v) => store.setBrightness(device, v)} />`}
       ${choices.length > 0 && html`
         <span class="label label-large" style="margin-bottom:8px">${str('color')}</span>
-        <div class="chips" style="gap:12px">
+        <div class="swatches">
           ${choices.map((choice) => html`
             <button class=${`swatch ${st?.colorName === choice.alexaName ? 'selected' : ''}`} style=${`background:${choice.rgb}`}
               aria-label=${str(choice.label)} title=${str(choice.label)} onClick=${() => store.setColor(device, choice)}></button>`)}
