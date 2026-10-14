@@ -7,13 +7,13 @@ import {
 import * as store from '../store.js';
 import { str, plural, clock, dateText, degrees } from '../i18n.js';
 import {
-  PAGE_ALL, LAYOUT_LIST, TIMER_CHOICES, WHITE_CHOICES, COLOR_CHOICES,
+  PAGE_ALL, LAYOUT_LIST, ACTION_POWER, WHITE_CHOICES, COLOR_CHOICES,
   homeSections, shownPages, pageLabel, pageIcon, search, statusText, countdown, ageText, whenText, isLocked,
 } from '../model.js';
 import { MacroTile } from './macros.js';
 import { RemoteTile } from './remotes.js';
 import { HistoryCharts } from './chart.js';
-import { SchedulesDialog } from './schedules.js';
+import { SchedulesDialog, TimerChoices } from './schedules.js';
 import { AutomationsDialog } from './automations.js';
 
 // By size of the tiles: compact, normal, large.
@@ -402,10 +402,11 @@ function DeviceTile({ device, s, look }) {
     ${details && html`<${DeviceSheet} device=${device} s=${s} look=${look} onDismiss=${() => setDetails(false)} />`}`;
 }
 
-function TimerChoices({ onChoose }) {
-  return html`<div class="chips">${TIMER_CHOICES.map(([label, minutes]) => html`
-    <button class="chip" onClick=${() => onChoose(minutes)}>${str(label)}</button>`)}</div>`;
-}
+// A timer that switches on is a scheduled action, since the timers of the devices only switch off.
+const switchOn = (device) => ({ type: ACTION_POWER, target: device.applianceId, value: 'on', custom: false });
+
+const switchingOn = (device, s) => s.schedules.filter((it) => !it.days.length && it.enabled
+  && it.action.type === ACTION_POWER && it.action.target === device.applianceId && it.action.value === 'on');
 
 /** Everything beyond the tap-to-toggle: explicit on/off, timer, brightness, color, favorites, hiding. */
 function DeviceSheet({ device, s, look, onDismiss }) {
@@ -435,10 +436,15 @@ function DeviceSheet({ device, s, look, onDismiss }) {
         ${timer
           ? html`<div class="row"><span class="grow">${str('turns_off_at', clock(timer))}</span>
               <button class="text-btn" onClick=${() => store.cancelTimer(id)}>${str('cancel_timer')}</button></div>`
-          : html`<${TimerChoices} onChoose=${(minutes) => {
+          : html`<${TimerChoices} canTurnOn onChoose=${(minutes, on) => {
               store.askNotifications();
-              store.setTimer(device, minutes);
-            }} />`}`}
+              if (on) store.addTimer(switchOn(device), str('voice_on', device.name), minutes);
+              else store.setTimer(device, minutes);
+            }} />`}
+        ${/* Switching on is a scheduled action: the one waiting, and what cancels it. */ ''}
+        ${switchingOn(device, s).map((waiting) => html`
+          <div class="row" key=${waiting.id}><span class="grow">${str('schedule_once', waiting.label, clock(waiting.at))}</span>
+            <button class="text-btn" onClick=${() => store.deleteSchedule(waiting.id)}>${str('cancel_timer')}</button></div>`)}`}
       ${device.isSensor && html`
         <${HistoryCharts} readings=${store.readings(id)} />
         <${AlertSettings} alert=${s.alerts[id] ?? { above: null, below: null }} temperature=${st?.temperature}
@@ -521,6 +527,7 @@ function GroupTile({ group, devices, s, look }) {
 function GroupSheet({ group, devices, s, onDismiss }) {
   const now = Date.now();
   const timers = devices.map((d) => s.timers[d.applianceId]).filter((at) => at > now);
+  const waiting = devices.flatMap((d) => switchingOn(d, s));
   const lit = devices.filter((d) => s.states[d.applianceId]?.power === true).length;
   return html`
     <${Details} onDismiss=${onDismiss}>
@@ -542,9 +549,15 @@ function GroupSheet({ group, devices, s, onDismiss }) {
             : str('group_timers_some', timers.length, devices.length)}</span>
           <button class="text-btn" onClick=${() => devices.forEach((d) => store.cancelTimer(d.applianceId))}>${str('cancel_timer')}</button>
         </div>`}
-      <${TimerChoices} onChoose=${(minutes) => {
+      ${waiting.length > 0 && html`
+        <div class="row">
+          <span class="grow">${str('schedule_once', str('voice_on', group.name), clock(Math.max(...waiting.map((it) => it.at))))}</span>
+          <button class="text-btn" onClick=${() => waiting.forEach((it) => store.deleteSchedule(it.id))}>${str('cancel_timer')}</button>
+        </div>`}
+      ${/* A timer of the user's own can switch the group on too, one scheduled action for each device. */ ''}
+      <${TimerChoices} canTurnOn onChoose=${(minutes, on) => {
         store.askNotifications();
-        devices.forEach((d) => store.setTimer(d, minutes));
+        devices.forEach((d) => (on ? store.addTimer(switchOn(d), str('voice_on', d.name), minutes) : store.setTimer(d, minutes)));
       }} />
       <span class="label label-large" style="margin-bottom:4px">${str('s_devices')}</span>
       ${[...devices].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())).map((device) => {

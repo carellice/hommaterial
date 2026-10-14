@@ -76,7 +76,13 @@ function RemoteSheet({ remote, s, look, onDismiss }) {
       ${/* The timer: switching off for the remotes that can, a key to choose for those learnt by hand. */ ''}
       ${(kind !== 'CUSTOM' || buttons.length > 0) && html`
         <div style="margin-top:20px">
+          ${/* The remotes that switch can also be switched on by a timer of the user's own. */ ''}
           <${TimerChips} title=${str(kind === 'CUSTOM' ? 'timer_key_in' : 'turn_off_in')} target=${remote.id} s=${s}
+            onTurnOn=${kind === 'CUSTOM' ? null : (minutes) => {
+              store.askNotifications();
+              const action = { type: ACTION_REMOTE, target: remote.id, value: 'turnOn', custom: false };
+              store.addTimer(action, describe(action, s), minutes);
+            }}
             onChoose=${(minutes) => {
               store.askNotifications();
               if (kind === 'CUSTOM') setTiming(minutes);

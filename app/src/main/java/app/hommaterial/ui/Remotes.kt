@@ -200,7 +200,13 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
             if (remote.kind != RemoteKind.CUSTOM || buttons.isNotEmpty()) {
                 Column(Modifier.padding(top = 20.dp)) {
                     val title = if (remote.kind == RemoteKind.CUSTOM) R.string.timer_key_in else R.string.turn_off_in
-                    TimerChips(str(title), remote.id, state, vm) { minutes ->
+                    // The remotes that switch can also be switched on by a timer of the user's own.
+                    val turnOn: ((Int) -> Unit)? = if (remote.kind == RemoteKind.CUSTOM) null else { minutes ->
+                        askNotifications()
+                        val action = MacroAction(ACTION_REMOTE, remote.id, "turnOn")
+                        vm.addTimer(action, describe(action, state), minutes)
+                    }
+                    TimerChips(str(title), remote.id, state, vm, onTurnOn = turnOn) { minutes ->
                         askNotifications()
                         if (remote.kind == RemoteKind.CUSTOM) {
                             timing = minutes

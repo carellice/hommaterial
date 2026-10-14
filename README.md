@@ -68,6 +68,8 @@ collegati al proprio account Alexa.
   personalizzato o apre il pannello di un sensore o di un telecomando.
 - Tenendo premuto si apre il pannello con accensione, spegnimento esplicito,
   timer di spegnimento, luminosità e colore per le luci che li supportano.
+  Oltre ai tempi già pronti c'è **Personalizzato…**: ore e minuti a scelta,
+  e allo scadere spegne oppure accende.
 - I timer in corso stanno in una sezione in cima alla lista, con il conto
   alla rovescia, ordinati dal più vicino allo spegnimento.
 - I preferiti stanno in cima alla lista.

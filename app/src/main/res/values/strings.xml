@@ -87,6 +87,12 @@
     <string name="timer_30" translatable="false">30 min</string>
     <string name="timer_60">1 hour</string>
     <string name="timer_120">2 hours</string>
+    <string name="timer_custom">Custom…</string>
+    <string name="timer_custom_title">Custom timer</string>
+    <string name="timer_hours">Hours</string>
+    <string name="timer_minutes">Minutes</string>
+    <string name="timer_then">When it runs out</string>
+    <string name="timer_start">Start</string>
     <string name="no_room">Other</string>
     <string name="favorites">Favorites</string>
     <string name="no_devices">No devices</string>

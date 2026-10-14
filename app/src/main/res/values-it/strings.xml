@@ -81,6 +81,12 @@
     <string name="humidity">Umidità</string>
     <string name="timer_60">1 ora</string>
     <string name="timer_120">2 ore</string>
+    <string name="timer_custom">Personalizzato…</string>
+    <string name="timer_custom_title">Timer personalizzato</string>
+    <string name="timer_hours">Ore</string>
+    <string name="timer_minutes">Minuti</string>
+    <string name="timer_then">Allo scadere</string>
+    <string name="timer_start">Avvia</string>
     <string name="no_room">Altro</string>
     <string name="favorites">Preferiti</string>
     <string name="no_devices">Nessun dispositivo</string>

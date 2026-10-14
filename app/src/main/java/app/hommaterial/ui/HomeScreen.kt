@@ -133,13 +133,16 @@ import app.hommaterial.HomeViewModel
 import app.hommaterial.LAYOUT_LIST
 import app.hommaterial.R
 import app.hommaterial.UiState
+import app.hommaterial.data.ACTION_POWER
 import app.hommaterial.data.COLOR_CHOICES
 import app.hommaterial.data.ColorChoice
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.Group
 import app.hommaterial.data.Macro
+import app.hommaterial.data.MacroAction
 import app.hommaterial.data.Remote
+import app.hommaterial.data.Schedule
 import app.hommaterial.data.WHITE_CHOICES
 import app.hommaterial.data.statusText
 import app.hommaterial.label
@@ -163,6 +166,14 @@ private const val WIDE_DP = 600
 private const val SIDE_BAR_DP = 840
 internal val TIMER_CHOICES =
     listOf(R.string.timer_15 to 15, R.string.timer_30 to 30, R.string.timer_60 to 60, R.string.timer_120 to 120)
+
+// A timer that switches on is a scheduled action, since the timers of the devices only switch off.
+private fun switchOn(device: Device) = MacroAction(ACTION_POWER, device.applianceId, "on")
+
+private fun switchingOn(device: Device, state: UiState): List<Schedule> = state.schedules.filter {
+    it.days.isEmpty() && it.enabled && it.action.type == ACTION_POWER &&
+        it.action.target == device.applianceId && it.action.value == "on"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -765,6 +776,7 @@ private fun DeviceTile(device: Device, state: UiState, vm: HomeViewModel) {
         tilesFull = null !in state.tileDevices,
         timer = state.timers[device.applianceId]?.takeIf { it > System.currentTimeMillis() },
         alert = state.alerts[device.applianceId] ?: Alert(),
+        switchingOn = switchingOn(device, state),
         vm = vm,
     )
 }
@@ -854,15 +866,24 @@ private fun GroupSheet(group: Group, devices: List<Device>, state: UiState, vm: 
                     TextButton(onClick = { devices.forEach(vm::cancelTimer) }) { Text(str(R.string.cancel_timer)) }
                 }
             }
-            Row(
-                Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                for ((label, minutes) in TIMER_CHOICES) {
-                    AssistChip(
-                        onClick = { askNotifications(); devices.forEach { vm.setTimer(it, minutes) } },
-                        label = { Text(str(label)) },
+            // A timer of the user's own can switch the group on too, one scheduled action for each device.
+            val waiting = devices.flatMap { switchingOn(it, state) }
+            if (waiting.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        str(R.string.schedule_once, str(R.string.voice_on, group.name), clock(waiting.maxOf { it.at })),
+                        modifier = Modifier.weight(1f),
                     )
+                    TextButton(onClick = { waiting.forEach { vm.deleteSchedule(it.id) } }) {
+                        Text(str(R.string.cancel_timer))
+                    }
+                }
+            }
+            TimerChoices(canTurnOn = true) { minutes, on ->
+                askNotifications()
+                for (device in devices) {
+                    if (on) vm.addTimer(switchOn(device), describe(switchOn(device), state), minutes)
+                    else vm.setTimer(device, minutes)
                 }
             }
 
@@ -1202,6 +1223,7 @@ private fun DeviceTile(
     tilesFull: Boolean,
     timer: Long?,
     alert: Alert,
+    switchingOn: List<Schedule>,
     vm: HomeViewModel,
 ) {
     val on = state?.power == true
@@ -1252,7 +1274,10 @@ private fun DeviceTile(
     }
 
     if (details) {
-        DeviceSheet(device, state, hidden, favorite, tile, tilesFull, timer, alert, vm, onDismiss = { details = false })
+        DeviceSheet(
+            device, state, hidden, favorite, tile, tilesFull, timer, alert, switchingOn, vm,
+            onDismiss = { details = false },
+        )
     }
 }
 
@@ -1268,6 +1293,7 @@ private fun DeviceSheet(
     tilesFull: Boolean,
     timer: Long?,
     alert: Alert,
+    switchingOn: List<Schedule>,
     vm: HomeViewModel,
     onDismiss: () -> Unit,
 ) {
@@ -1321,16 +1347,23 @@ private fun DeviceSheet(
                         TextButton(onClick = { vm.cancelTimer(device) }) { Text(str(R.string.cancel_timer)) }
                     }
                 } else {
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        for ((label, minutes) in TIMER_CHOICES) {
-                            AssistChip(
-                                onClick = { askNotifications(); vm.setTimer(device, minutes) },
-                                label = { Text(str(label)) },
-                            )
+                    TimerChoices(canTurnOn = true) { minutes, on ->
+                        askNotifications()
+                        if (on) {
+                            vm.addTimer(switchOn(device), str(R.string.voice_on, device.name), minutes)
+                        } else {
+                            vm.setTimer(device, minutes)
                         }
+                    }
+                }
+                // Switching on is a scheduled action: the one waiting, and what cancels it.
+                for (waiting in switchingOn) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            str(R.string.schedule_once, waiting.label, clock(waiting.at)),
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { vm.deleteSchedule(waiting.id) }) { Text(str(R.string.cancel_timer)) }
                     }
                 }
             }

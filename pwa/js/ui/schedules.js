@@ -1,6 +1,6 @@
 // Actions carried out at a time, and the timers of what is not a device of Alexa.
 import { html, useState } from '../lib.js';
-import { Icon, IconButton, Switch, Dialog, FullDialog, Card, Setting } from './common.js';
+import { Icon, IconButton, Switch, Dialog, FullDialog, Card, Setting, Field } from './common.js';
 import * as store from '../store.js';
 import { str, clock } from '../i18n.js';
 import {
@@ -17,18 +17,65 @@ function duration(minutes) {
 }
 
 /**
- * The timer of a remote or of a custom device, [target]: the usual delays to choose from, or the
- * one that is running with what cancels it. [onChoose] receives the minutes.
+ * The usual delays of a timer, and one of the user's own. [canTurnOn] lets that one switch on
+ * instead of off; [onChoose] receives the minutes and whether to switch on.
  */
-export function TimerChips({ title, target, s, onChoose }) {
+export function TimerChoices({ canTurnOn = false, onChoose }) {
+  const [custom, setCustom] = useState(false);
+  return html`
+    <div class="chips">
+      ${TIMER_CHOICES.map(([label, minutes]) => html`
+        <button class="chip" onClick=${() => onChoose(minutes, false)}>${str(label)}</button>`)}
+      <button class="chip" onClick=${() => setCustom(true)}>${str('timer_custom')}</button>
+    </div>
+    ${custom && html`<${CustomTimerDialog} canTurnOn=${canTurnOn} onDismiss=${() => setCustom(false)}
+      onChoose=${(minutes, on) => {
+        setCustom(false);
+        onChoose(minutes, on);
+      }} />`}`;
+}
+
+/** Asks for a delay in hours and minutes and, with [canTurnOn], whether to switch off or on then. */
+function CustomTimerDialog({ canTurnOn, onChoose, onDismiss }) {
+  const [hours, setHours] = useState('');
+  const [minutes, setMinutes] = useState('');
+  const [on, setOn] = useState(false);
+  const total = (Number(hours) || 0) * 60 + (Number(minutes) || 0);
+  const start = () => total > 0 && onChoose(total, on);
+  const digits = (v) => v.replace(/\D/g, '').slice(0, 2);
+  return html`
+    <${Dialog} title=${str('timer_custom_title')} onDismiss=${onDismiss} actions=${html`
+      <button class="text-btn" onClick=${onDismiss}>${str('cancel')}</button>
+      <button class="text-btn" disabled=${total <= 0} onClick=${start}>${str('timer_start')}</button>`}>
+      <div class="two" style="margin-top:0">
+        <${Field} label=${str('timer_hours')} inputMode="numeric" autofocus value=${hours} onEnter=${start}
+          onInput=${(v) => setHours(digits(v))} />
+        <${Field} label=${str('timer_minutes')} inputMode="numeric" value=${minutes} onEnter=${start}
+          onInput=${(v) => setMinutes(Number(digits(v)) > 59 ? '59' : digits(v))} />
+      </div>
+      ${canTurnOn && html`
+        <div class="label-large" style="margin-top:16px">${str('timer_then')}</div>
+        <div class="chips">
+          ${[[false, 'turn_off'], [true, 'turn_on']].map(([value, label]) => html`
+            <button class=${`chip ${on === value ? 'selected' : ''}`} onClick=${() => setOn(value)}>
+              ${on === value && html`<${Icon} name="check" />`}${str(label)}</button>`)}
+        </div>`}
+    <//>`;
+}
+
+/**
+ * The timer of a remote or of a custom device, [target]: the delays to choose from, or the one
+ * that is running with what cancels it. [onChoose] receives the minutes; with [onTurnOn] a timer
+ * of the user's own can also switch on, and that one receives them instead.
+ */
+export function TimerChips({ title, target, s, onChoose, onTurnOn }) {
   const running = s.schedules.find((it) => !it.days.length && it.enabled && it.action.target === target);
   return html`
     <div class="label-large">${title}</div>
     ${running
       ? html`<div class="row"><span class="grow">${str('schedule_once', running.label, clock(running.at))}</span>
           <button class="text-btn" onClick=${() => store.deleteSchedule(running.id)}>${str('cancel_timer')}</button></div>`
-      : html`<div class="chips">${TIMER_CHOICES.map(([label, minutes]) => html`
-          <button class="chip" onClick=${() => onChoose(minutes)}>${str(label)}</button>`)}</div>`}`;
+      : html`<${TimerChoices} canTurnOn=${!!onTurnOn} onChoose=${(minutes, on) => (on ? onTurnOn(minutes) : onChoose(minutes))} />`}`;
 }
 
 /** The actions set to happen at a time: what is waiting, and how to add one. */
