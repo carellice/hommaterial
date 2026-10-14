@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- On the lock screen too, where Android takes widgets there again: phones from Android 16 QPR1,
+<!-- On the lock screen too, where Android takes widgets there again: phones from Android 16 QPR2,
      tablets with the hub of widgets. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_description"

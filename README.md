@@ -75,7 +75,7 @@ collegati al proprio account Alexa.
   nelle Impostazioni, dove si regolano anche ordine, colonne, dimensione dei
   riquadri, intestazione e sfondo.
 - Lo stesso widget si può mettere anche sulla schermata di blocco, dove
-  Android lo consente: Android 16 QPR1 e successivi, e i tablet con l'hub
+  Android lo consente: Android 16 QPR2 e successivi, e i tablet con l'hub
   dei widget.
 - Fino a dieci dispositivi a scelta si comandano dalle Impostazioni rapide di
   Android, ognuno con il suo riquadro.
