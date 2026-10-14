@@ -32,7 +32,9 @@ self.addEventListener('fetch', (event) => {
 async function fresh(request) {
   const cache = await caches.open(CACHE);
   try {
-    const response = await fetch(request);
+    // Asked to the site every time, past the cache of the browser: a new version shows up at once.
+    // A navigation cannot be given options, and the browser checks it with the site by itself.
+    const response = await (request.mode === 'navigate' ? fetch(request) : fetch(request, { cache: 'no-cache' }));
     if (response.ok) cache.put(request, response.clone());
     return response;
   } catch (e) {
