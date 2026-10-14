@@ -1,0 +1,7 @@
+name = "hommaterial-proxy"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+# The site of the web app; empty lets any site use the proxy.
+ALLOWED_ORIGINS = "https://carellice.github.io"

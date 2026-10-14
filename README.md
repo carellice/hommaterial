@@ -173,6 +173,14 @@ quando il telefono legge lo stato, non nell'istante in cui cambia.
 Gli avvisi di temperatura li controlla il telefono, circa ogni 15 minuti e
 più di rado quando è fermo da un po': non sono un allarme in tempo reale.
 
+## Versione web
+
+Nella cartella [`pwa`](pwa) c'è la stessa app come PWA, da aprire nel browser
+o da installare sulla schermata Home, anche su iPhone. Ha bisogno di un
+piccolo proxy su Cloudflare Workers, che crei tu, e funziona solo mentre è
+aperta: niente widget, riquadri rapidi né azioni in sottofondo. Le
+istruzioni sono in [`pwa/README.md`](pwa/README.md).
+
 ## Limiti noti
 
 - L'interfaccia è in italiano e in inglese e segue la lingua del telefono; con
