@@ -300,7 +300,8 @@ export function Snackbar() {
  * a long press, a right click or the context menu key all count as holding.
  */
 export function usePress(onClick, onLong) {
-  const press = useRef({ timer: null, long: false, x: 0, y: 0 });
+  // [long] swallows the click that ends a long press; [heldAt] is when the long press went off.
+  const press = useRef({ timer: null, long: false, heldAt: 0, x: 0, y: 0 });
   const latest = useRef({ onClick, onLong });
   latest.current = { onClick, onLong };
   const clear = () => {
@@ -310,16 +311,18 @@ export function usePress(onClick, onLong) {
   const hold = () => {
     clear();
     press.current.long = true;
+    press.current.heldAt = Date.now();
     navigator.vibrate?.(12);
     latest.current.onLong?.();
   };
   return {
     onPointerDown: useCallback((e) => {
-      if (e.button !== 0 || !latest.current.onLong) return;
+      // Every new press starts clean, whatever the button: a right click must not leave a click swallowed.
       press.current.long = false;
+      clear();
+      if (e.button !== 0 || !latest.current.onLong) return;
       press.current.x = e.clientX;
       press.current.y = e.clientY;
-      clear();
       press.current.timer = setTimeout(hold, 450);
     }, []),
     onPointerMove: useCallback((e) => {
@@ -339,8 +342,10 @@ export function usePress(onClick, onLong) {
     onContextMenu: useCallback((e) => {
       e.preventDefault();
       if (!latest.current.onLong) return;
-      if (press.current.long) return;
-      hold();
+      // A finger held on a phone brings the context menu too, once the long press has already opened.
+      if (Date.now() - press.current.heldAt < 1000) return;
+      clear();
+      latest.current.onLong();
     }, []),
   };
 }
