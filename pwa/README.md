@@ -24,17 +24,22 @@ piccolo proxy su Cloudflare Workers, gratuito, che crei tu:
 
 Usa sempre un proxy tuo: vede passare il token del tuo account.
 
-### Creare il proxy
+## Configurazione passo per passo
 
-Con l'account Cloudflare (il piano gratuito basta):
+### 1. Crea il proxy su Cloudflare (gratis, una volta sola)
 
-1. Dashboard → **Workers & Pages** → **Create** → **Hello World** → dai il nome
-   `hommaterial-proxy` → **Deploy**.
-2. **Edit code**: sostituisci tutto con il contenuto di `worker/worker.js` →
-   **Deploy**.
-3. **Settings → Variables and Secrets**: aggiungi `ALLOWED_ORIGINS` con
-   `https://carellice.github.io` e, se vuoi, il segreto `PROXY_KEY`.
-4. L'indirizzo è del tipo `https://hommaterial-proxy.<account>.workers.dev`.
+1. Vai su [dash.cloudflare.com](https://dash.cloudflare.com) e registrati se
+   non hai un account: il piano gratuito basta.
+2. **Workers & Pages → Create → Hello World**, dai il nome
+   `hommaterial-proxy` e premi **Deploy**.
+3. **Edit code**: sostituisci tutto con il contenuto di
+   [`worker/worker.js`](worker/worker.js) e premi **Deploy**.
+4. **Settings → Variables and Secrets**: aggiungi la variabile
+   `ALLOWED_ORIGINS` con valore `https://carellice.github.io`. Se vuoi, aggiungi
+   anche il segreto `PROXY_KEY` con una parola a tua scelta: senza quella il
+   proxy non risponde a nessuno.
+5. Annota l'indirizzo che Cloudflare ti dà, del tipo
+   `https://hommaterial-proxy.<tuo-account>.workers.dev`.
 
 In alternativa, da terminale, nella cartella `pwa/worker`:
 
@@ -42,26 +47,55 @@ In alternativa, da terminale, nella cartella `pwa/worker`:
 npx wrangler deploy
 ```
 
-Per non scriverlo su ogni dispositivo, l'indirizzo si può mettere in
-`config.js`.
+### 2. Primo accesso
+
+1. Apri [carellice.github.io/hommaterial](https://carellice.github.io/hommaterial/)
+   e accetta le avvertenze.
+2. Alla voce **Proxy** tocca **Imposta il proxy** e incolla l'indirizzo del
+   Worker (e la chiave, se l'hai messa). L'app controlla che risponda prima di
+   salvarlo.
+3. Tocca **Apri la pagina di accesso**: Amazon si apre in una nuova scheda.
+   Entra con il tuo account, verifica in due passaggi compresa.
+4. Alla fine Amazon mostra una pagina vuota o di errore: è normale. Copia
+   l'indirizzo completo dalla barra del browser (contiene `maplanding`).
+5. Torna nell'app, incollalo e tocca **Completa l'accesso**.
+
+La password resta tra te e Amazon: l'app riceve solo il codice che sta
+nell'indirizzo.
+
+### 3. Installala (facoltativo, consigliato)
+
+- **Android, con Chrome:** menu ⋮ → **Installa app** (o **Aggiungi a
+  schermata Home**).
+- **iPhone e iPad, con Safari:** **Condividi → Aggiungi alla schermata Home**.
+  Su iPhone le notifiche funzionano solo così.
+- **Computer, con Chrome o Edge:** l'icona di installazione nella barra degli
+  indirizzi.
+
+### 4. Ultimi ritocchi (facoltativi)
+
+- **Notifiche:** in **Impostazioni → Notifiche** tocca per consentirle.
+  Servono a timer, azioni programmate, automazioni e avvisi.
+- **Le scelte dell'app Android:** esporta il backup da Android
+  (**Impostazioni → Backup → Esporta**) e importalo nella PWA dallo stesso
+  menu. Stanze, gruppi, preferiti, dispositivi personalizzati e il resto
+  arrivano uguali.
+- **SwitchBot:** in **Impostazioni → Telecomandi SwitchBot** inserisci token e
+  chiave segreta, come nell'app Android.
+- **Più dispositivi:** se scrivi l'indirizzo del Worker in
+  [`config.js`](config.js), ogni dispositivo lo trova già impostato e salta il
+  passo 2.2.
+
+Se il primo accesso non riesce, il messaggio in rosso nella schermata di
+accesso dice perché.
 
 ## Pubblicarla su GitHub Pages
 
-Il workflow `.github/workflows/pages.yml` pubblica la cartella `pwa` a ogni
-push che la cambia. Una sola volta: nel repository, **Settings → Pages →
-Source: GitHub Actions**. L'app sarà su
-`https://carellice.github.io/hommaterial/`.
-
-## Accedere ad Amazon
-
-La pagina di Amazon non si può mostrare dentro una pagina web come fa l'app
-Android, quindi l'accesso ha un passo in più:
-
-1. **Apri la pagina di accesso**: si apre Amazon in una nuova scheda; entra,
-   verifica in due passaggi compresa.
-2. Amazon finisce su una pagina vuota o di errore il cui indirizzo contiene
-   `maplanding`: copialo per intero dalla barra del browser.
-3. Incollalo nell'app e tocca **Completa l'accesso**.
+Serve solo a chi pubblica la propria copia del progetto. Il workflow
+`.github/workflows/pages.yml` pubblica la cartella `pwa` a ogni push che la
+cambia. Una sola volta, nel repository: **Settings → Pages → Source: GitHub
+Actions**. Chi la pubblica altrove mette il proprio indirizzo in
+`ALLOWED_ORIGINS` del Worker.
 
 ## Cosa cambia rispetto all'app Android
 
