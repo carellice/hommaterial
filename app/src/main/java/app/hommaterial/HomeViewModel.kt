@@ -47,10 +47,8 @@ import app.hommaterial.str
 import app.hommaterial.voice.ExtraCommand
 import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
-import app.hommaterial.voice.learnWake
 import app.hommaterial.voice.parseExtras
 import app.hommaterial.voice.parseVoice
-import app.hommaterial.voice.wakeCommand
 import java.security.MessageDigest
 import java.util.Calendar
 import java.util.UUID
@@ -121,15 +119,6 @@ data class UiState(
     val remoteButtons: Map<String, List<String>> = emptyMap(),
     val acSettings: Map<String, AcSetting> = emptyMap(),
     val hiddenRemotes: Set<String> = emptySet(),
-    /** Whether the app listens for [wakeWord] while it is open, to take spoken commands hands-free. */
-    val wake: Boolean = false,
-    val wakeWord: String = "",
-    /** The ways the training heard [wakeWord] said by this voice, accepted as it is. */
-    val wakeVariants: List<String> = emptyList(),
-    /** The code of the failure the speech recognizer keeps giving while listening, null when it works. */
-    val wakeError: Int? = null,
-    /** Whether the wake word is being trained: the usual listening keeps quiet meanwhile. */
-    val wakeTraining: Boolean = false,
     /** Whether a PIN was chosen for the monitor mode. */
     val pin: Boolean = false,
     /** Whether a backup being imported is waiting to know if its monitor mode comes along. */
@@ -171,7 +160,6 @@ private const val BACKUP_APP = "hommaterial"
 const val LAYOUT_GRID = 0
 const val LAYOUT_LIST = 1
 private const val PIN_KEY = "monitorPin"
-private const val WAKE_ARMED_MS = 8_000L
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
@@ -195,8 +183,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private var refreshJob: Job? = null
     private var updateJob: Job? = null
     private var pendingBackup: JSONObject? = null
-    /** Until when a sentence counts as a command without the wake word, which was just said alone. */
-    private var wakeArmedUntil = 0L
 
     init {
         // Shortcuts and widget may be stale after an update of the app or a change made elsewhere.
@@ -253,11 +239,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             remoteButtons = switchBot.buttons(),
             acSettings = switchBot.acSettings(),
             hiddenRemotes = switchBot.hidden(),
-            wake = settings.getBoolean("wake", false),
-            wakeWord = settings.getString("wakeWord", null) ?: str(R.string.wake_word_default),
-            wakeVariants = runCatching {
-                JSONArray(settings.getString("wakeVariants", "[]")).let { a -> (0 until a.length()).map(a::getString) }
-            }.getOrDefault(emptyList()),
         )
     }
 
@@ -315,9 +296,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 layout = it.layout,
                 monitor = it.monitor,
                 pin = it.pin,
-                wake = it.wake,
-                wakeWord = it.wakeWord,
-                wakeVariants = it.wakeVariants,
                 // SwitchBot is another account: signing out of Amazon leaves it linked.
                 switchBot = it.switchBot,
                 remotes = it.remotes,
@@ -508,57 +486,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 },
             )
         }
-    }
-
-    /**
-     * Acts on a sentence [heard] while listening for the wake word, and says whether it was meant
-     * for the app. The word alone is answered, and the next sentence is the command.
-     */
-    fun onWake(heard: List<String>): Boolean {
-        val now = System.currentTimeMillis()
-        val armed = now < wakeArmedUntil
-        val phrases = listOf(_state.value.wakeWord) + _state.value.wakeVariants
-        val commands = (wakeCommand(heard, phrases) ?: heard.takeIf { armed } ?: return false)
-            .filter { it.isNotBlank() }
-        wakeArmedUntil = 0
-        if (commands.isEmpty()) {
-            wakeArmedUntil = now + WAKE_ARMED_MS
-            _messages.tryEmit(str(R.string.wake_go_on))
-        } else {
-            onSpeech(commands)
-        }
-        return true
-    }
-
-    fun setWake(on: Boolean) {
-        settings.edit().putBoolean("wake", on).apply()
-        _state.update { it.copy(wake = on) }
-    }
-
-    fun setWakeWord(word: String) {
-        // What was learnt was about the old word.
-        settings.edit().putString("wakeWord", word).remove("wakeVariants").apply()
-        _state.update { it.copy(wakeWord = word, wakeVariants = emptyList()) }
-    }
-
-    fun setWakeError(error: Int?) {
-        if (_state.value.wakeError != error) _state.update { it.copy(wakeError = error) }
-    }
-
-    fun setWakeTraining(on: Boolean) = _state.update { it.copy(wakeTraining = on) }
-
-    /** Keeps what the training learnt from the recognizer's guesses at each round, and says it. */
-    fun finishWakeTraining(rounds: List<List<String>>) {
-        val variants = learnWake(_state.value.wakeWord, rounds)
-        settings.edit().putString("wakeVariants", JSONArray(variants).toString()).apply()
-        _state.update { it.copy(wakeVariants = variants) }
-        _messages.tryEmit(
-            if (variants.isEmpty()) {
-                str(R.string.wake_trained_same)
-            } else {
-                str(R.string.wake_trained, variants.joinToString("», «"))
-            },
-        )
     }
 
     fun runVoice(command: VoiceCommand) {

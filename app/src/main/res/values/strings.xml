@@ -324,15 +324,6 @@
     <string name="tile_label" translatable="false">%1$s · %2$s</string>
     <string name="group_turn_off_in">Turn everything off in</string>
     <string name="group_timers_some">Timer on %1$d of %2$d</string>
-    <string name="s_voice">Voice commands</string>
-    <string name="wake_text">With the wake word on, the app listens while it is open on the screen: say “ok home, turn on the lamp”, or the word alone and then the command. It does not listen with the app closed or the screen off. The sentences are transcribed by the speech recognizer of the device, on the device itself where it can.</string>
-    <string name="wake_enable">Wake word</string>
-    <string name="wake_enable_text">Takes spoken commands without touching the microphone</string>
-    <string name="wake_word">Word to say</string>
-    <string name="wake_word_text">Now: “%1$s”</string>
-    <string name="wake_word_hint">Two or three plain words are recognized best</string>
-    <string name="wake_go_on">I\'m listening…</string>
-    <string name="wake_word_default">ok home</string>
     <string name="s_remotes">Remotes</string>
     <string name="s_switchbot">SwitchBot remotes</string>
     <string name="switchbot_text">The infrared remotes set up on a SwitchBot hub, with their own buttons. They go through the official SwitchBot API, not through Alexa. Infrared goes one way: a remote has no state to show.</string>
@@ -462,16 +453,6 @@
     <string name="hint_hold_short">hold for the rest</string>
     <string name="arrange">Rearrange</string>
     <string name="arrange_done">Done</string>
-    <string name="wake_train">Train the word</string>
-    <string name="wake_train_text">Say the word a few times: the app learns how the recognizer hears your voice and recognizes it better</string>
-    <string name="wake_train_done">Trained: also recognizes “%1$s”. Tap to train again</string>
-    <string name="wake_train_title">Training</string>
-    <string name="wake_train_say">Say “%1$s”</string>
-    <string name="wake_train_count">Time %1$d of %2$d</string>
-    <string name="wake_train_heard">I heard “%1$s”</string>
-    <string name="wake_train_hint">Speak as you usually would, from where you usually are. Each time the phone shows that it is listening and stops by itself.</string>
-    <string name="wake_trained">Done: I also recognize “%1$s”</string>
-    <string name="wake_trained_same">Done: the word is already heard well as it is</string>
     <string name="layout">Devices</string>
     <string name="layout_grid">Grid</string>
     <string name="layout_list">List</string>
@@ -484,13 +465,6 @@
     <string name="search_open">open</string>
     <string name="search_switch">switch</string>
     <string name="search_run">run</string>
-    <string name="wake_train_prompt">Say “%1$s”</string>
-    <string name="wake_train_go_on">Go on</string>
-    <string name="wake_error">Listening does not work: %1$s</string>
-    <string name="wake_error_language">the language is missing on the device, download it from the speech recognition settings</string>
-    <string name="wake_error_permission">the microphone permission is missing</string>
-    <string name="wake_error_busy">the recognizer is busy with another app</string>
-    <string name="wake_error_other">speech recognition error %1$d</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

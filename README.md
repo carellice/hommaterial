@@ -156,17 +156,6 @@ collegati al proprio account Alexa.
 Non fa altro, di proposito: niente routine, niente musica. La voce la
 trascrive il riconoscimento vocale del telefono, non l'app.
 
-La parola di attivazione è spenta finché non la si accende dalle
-Impostazioni. Da accesa, l'app ascolta solo mentre è aperta sullo schermo
-(anche sulla schermata di riposo della modalità monitor): si dice "ok casa,
-accendi la lampada", oppure la parola da sola e poi il comando. La parola si
-può cambiare. Non ascolta ad app chiusa o a schermo spento, e usa il
-riconoscimento vocale sul dispositivo quando c'è.
-All'attivazione parte un breve addestramento: si ripete la parola sei volte,
-ogni volta nella finestra del riconoscimento vocale del telefono, e l'app
-accetta anche i modi in cui la trascrive più spesso. Si può ripetere dalle
-Impostazioni, dove compare anche un avviso se l'ascolto non funziona.
-
 Anche le azioni programmate le fa scattare il telefono, come i timer: all'ora
 stabilita deve essere acceso e connesso, e senza rete riprova per dieci minuti.
 

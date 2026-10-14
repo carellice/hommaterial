@@ -1,16 +1,10 @@
 package app.hommaterial.ui
 
-import android.Manifest
-import android.app.Activity
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -52,11 +46,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -66,7 +58,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -100,8 +91,6 @@ import app.hommaterial.quick.SHORTCUT_MACRO
 import app.hommaterial.quick.clock
 import app.hommaterial.quick.degrees
 import app.hommaterial.str
-import app.hommaterial.voice.WakeListener
-import kotlinx.coroutines.delay
 
 private const val SOURCE_URL = "https://github.com/carellice/hommaterial"
 private const val BACKUP_FILE = "hommaterial-backup.json"
@@ -238,26 +227,6 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { returns++ }
     val notifications = remember(returns) { Alerts.enabled(context) }
 
-    val microphone = remember(returns) {
-        context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-    }
-    // Saying yes to the microphone is what turns the wake word on; a no leaves it off.
-    var training by remember { mutableStateOf(false) }
-    val askMicrophone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        if (it) {
-            vm.setWake(true)
-            training = true
-        }
-    }
-    if (training) {
-        WakeTrainingDialog(
-            word = state.wakeWord,
-            vm = vm,
-            onDone = { vm.finishWakeTraining(it); training = false },
-            onDismiss = { training = false },
-        )
-    }
-    var editingWake by remember { mutableStateOf(false) }
     var linkingSwitchBot by remember { mutableStateOf(false) }
     var editingMacro by remember { mutableStateOf<Macro?>(null) }
     var creatingMacro by remember { mutableStateOf(false) }
@@ -279,14 +248,6 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             onConfirm = vm::disconnectSwitchBot,
             onDismiss = { confirmSwitchBot = false },
         )
-    }
-    if (editingWake) {
-        // A new word is learnt anew.
-        WakeWordDialog(state.wakeWord, onSave = {
-            vm.setWakeWord(it)
-            editingWake = false
-            if (state.wake) training = true
-        }) { editingWake = false }
     }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) {
         if (it != null) vm.exportBackup(it)
@@ -398,47 +359,6 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                         )
                     },
                 )
-            }
-
-            Section(R.string.s_voice, R.string.wake_text) {
-                if (WakeListener.available(context)) {
-                    Toggle(R.string.wake_enable, R.string.wake_enable_text, state.wake && microphone) { on ->
-                        if (on && !microphone) {
-                            askMicrophone.launch(Manifest.permission.RECORD_AUDIO)
-                        } else {
-                            vm.setWake(on)
-                            // Switched on, it starts by learning how this voice says the word.
-                            if (on) training = true
-                        }
-                    }
-                    Setting(
-                        title = str(R.string.wake_word),
-                        text = str(R.string.wake_word_text, state.wakeWord),
-                        onClick = { editingWake = true },
-                    )
-                    // When the recognizer keeps failing, it says so: the app cannot hear anything then.
-                    state.wakeError?.takeIf { state.wake && microphone }?.let { error ->
-                        Text(
-                            wakeErrorText(error),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        )
-                    }
-                    if (state.wake && microphone) {
-                        Setting(
-                            title = str(R.string.wake_train),
-                            text = if (state.wakeVariants.isEmpty()) {
-                                str(R.string.wake_train_text)
-                            } else {
-                                str(R.string.wake_train_done, state.wakeVariants.joinToString("», «"))
-                            },
-                            onClick = { training = true },
-                        )
-                    }
-                } else {
-                    Setting(title = str(R.string.wake_enable), text = str(R.string.voice_unavailable))
-                }
             }
 
             Section(R.string.s_switchbot, R.string.switchbot_text) {
@@ -696,29 +616,6 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     }
 }
 
-@Composable
-private fun WakeWordDialog(word: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
-    var typed by remember { mutableStateOf(word) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(str(R.string.wake_word)) },
-        text = {
-            OutlinedTextField(
-                value = typed,
-                onValueChange = { typed = it },
-                supportingText = { Text(str(R.string.wake_word_hint)) },
-                singleLine = true,
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(typed.trim().lowercase()) }, enabled = typed.isNotBlank()) {
-                Text(str(R.string.save))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
-    )
-}
-
 /** A section of the settings that opens and closes on a tap of its title. */
 @Composable
 private fun Accordion(
@@ -871,102 +768,4 @@ private fun DeviceRow(device: Device, room: String?, state: UiState, vm: HomeVie
 /** Opens a screen of the phone, which some versions and brands of Android do not have. */
 private fun Context.open(intent: Intent) {
     runCatching { startActivity(intent) }
-}
-
-private const val TRAINING_ROUNDS = 6
-
-/** What a failure of the speech recognizer means for the wake word, in words. */
-private fun wakeErrorText(error: Int): String = str(
-    R.string.wake_error,
-    when (error) {
-        SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED, SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ->
-            str(R.string.wake_error_language)
-        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> str(R.string.wake_error_permission)
-        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> str(R.string.no_connection)
-        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> str(R.string.wake_error_busy)
-        else -> str(R.string.wake_error_other, error)
-    },
-)
-// The listening of the app has a moment to let go of the microphone before the training takes it.
-private const val TRAINING_START_MS = 600L
-
-/**
- * Has the wake word said again and again, noting each time how it was heard, so that the ways it
- * hears this voice are accepted too. Each round goes through the speech recognizer of the phone,
- * the same as the microphone button: it shows that it listens and stops by itself. [onDone]
- * receives the guesses of each round.
- */
-@Composable
-private fun WakeTrainingDialog(
-    word: String,
-    vm: HomeViewModel,
-    onDone: (List<List<String>>) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var rounds by remember { mutableStateOf(listOf<List<String>>()) }
-    // Whether the recognizer was closed without an answer: the user picks up again from here.
-    var stopped by remember { mutableStateOf(false) }
-    var unavailable by remember { mutableStateOf(false) }
-    val prompt = str(R.string.wake_train_prompt, word)
-    val language = str(R.string.voice_language)
-    lateinit var listen: () -> Unit
-    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val heard = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty()
-        if (result.resultCode == Activity.RESULT_OK && heard.isNotEmpty()) {
-            rounds = rounds + listOf(heard)
-            if (rounds.size >= TRAINING_ROUNDS) onDone(rounds) else listen()
-        } else {
-            stopped = true
-        }
-    }
-    listen = {
-        stopped = false
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
-            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-            .putExtra(RecognizerIntent.EXTRA_PROMPT, "$prompt (${rounds.size + 1}/$TRAINING_ROUNDS)")
-        try {
-            speech.launch(intent)
-        } catch (e: ActivityNotFoundException) {
-            unavailable = true
-        }
-    }
-    // The listening of the app keeps quiet meanwhile: the microphone is for the training.
-    LaunchedEffect(Unit) {
-        vm.setWakeTraining(true)
-        delay(TRAINING_START_MS)
-        listen()
-    }
-    DisposableEffect(Unit) { onDispose { vm.setWakeTraining(false) } }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(str(R.string.wake_train_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(str(R.string.wake_train_say, word), style = MaterialTheme.typography.headlineSmall)
-                LinearProgressIndicator(
-                    progress = { rounds.size / TRAINING_ROUNDS.toFloat() },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(str(R.string.wake_train_count, minOf(rounds.size + 1, TRAINING_ROUNDS), TRAINING_ROUNDS))
-                rounds.lastOrNull()?.firstOrNull()?.let {
-                    Text(
-                        str(R.string.wake_train_heard, it),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Text(
-                    str(if (unavailable) R.string.voice_unavailable else R.string.wake_train_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.run { if (unavailable) error else onSurfaceVariant },
-                )
-            }
-        },
-        confirmButton = {
-            if (stopped && !unavailable) TextButton(onClick = listen) { Text(str(R.string.wake_train_go_on)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
-    )
 }

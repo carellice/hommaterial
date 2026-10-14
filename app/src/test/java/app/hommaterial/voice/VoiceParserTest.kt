@@ -88,14 +88,6 @@ class VoiceParserTest {
     }
 
     @Test
-    fun wakeWordIsFoundAndTakenOff() {
-        assertEquals(listOf("accendi la lampada"), wakeCommand(listOf("Ok casa, accendi la lampada"), "ok casa"))
-        assertEquals(listOf("spegni tutto"), wakeCommand(listOf("senti ok casa spegni tutto", "che caso"), "Ok Casa"))
-        assertEquals(listOf(""), wakeCommand(listOf("ok casa"), "ok casa"))
-        assertEquals(null, wakeCommand(listOf("accendi la lampada", "casa"), "ok casa"))
-    }
-
-    @Test
     fun customDevicesAndRemotesAreUnderstoodByTheirWholeName() {
         val macros = listOf("m1" to "Postazione", "m2" to "Buonanotte casa")
         val remotes = listOf("r1" to "TV Salotto")
@@ -107,19 +99,6 @@ class VoiceParserTest {
         // A custom device is never "switched off", and half a name is not enough.
         assertEquals(null, parseExtras(listOf("spegni postazione"), macros, remotes))
         assertEquals(null, parseExtras(listOf("accendi la tv"), macros, remotes))
-    }
-
-    @Test
-    fun theTrainingKeepsTheWaysHeardMoreThanOnce() {
-        val rounds = listOf(
-            listOf("ok casa", "okay casa", "o casa"),
-            listOf("okay casa", "ok cassa"),
-            listOf("o casa", "ok"),
-            listOf("Okay Casa!", "casa"),
-        )
-        // "ok cassa" came once, and the single words would go off on anything.
-        assertEquals(listOf("okay casa", "o casa"), learnWake("ok casa", rounds))
-        assertEquals(listOf("accendi"), wakeCommand(listOf("okay casa accendi"), listOf("ok casa", "okay casa")))
     }
 
     @Test

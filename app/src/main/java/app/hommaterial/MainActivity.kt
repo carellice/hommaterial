@@ -1,7 +1,5 @@
 package app.hommaterial
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -43,7 +41,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
@@ -55,7 +52,6 @@ import app.hommaterial.ui.RestScreen
 import app.hommaterial.ui.SettingsScreen
 import app.hommaterial.ui.UpdateDialog
 import app.hommaterial.ui.rememberNow
-import app.hommaterial.voice.WakeListener
 import java.util.Calendar
 import kotlinx.coroutines.delay
 
@@ -131,25 +127,6 @@ class MainActivity : ComponentActivity() {
                         percent == 0 -> WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                         else -> percent / 100f
                     }
-                }
-            }
-            // The wake word is listened for while the app is on the screen, rest screen included.
-            var canListen by remember { mutableStateOf(false) }
-            LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-                canListen = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-            }
-            if (state.wake && state.loggedIn && canListen && !state.wakeTraining) {
-                val language = str(R.string.voice_language)
-                LifecycleResumeEffect(language) {
-                    // A command wakes a resting panel, as a touch would.
-                    val listener = WakeListener(
-                        context = applicationContext,
-                        language = language,
-                        onHeard = { if (vm.onWake(it)) touches++ },
-                        onError = vm::setWakeError,
-                    )
-                    listener.start()
-                    onPauseOrDispose { listener.stop() }
                 }
             }
             HommaterialTheme(dark) {

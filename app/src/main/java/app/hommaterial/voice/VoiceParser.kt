@@ -39,45 +39,6 @@ private fun words(text: String): List<String> =
         .split(Regex("[^a-z0-9]+"))
         .filter { it.isNotEmpty() }
 
-/**
- * What follows the wake [word] in the sentences [heard], which are the guesses of the recognizer
- * for one sentence: null when the word is in none of them, empty texts when it was said alone.
- */
-fun wakeCommand(heard: List<String>, word: String): List<String>? = wakeCommand(heard, listOf(word))
-
-/** The same, accepting any of the [phrases]: the wake word and the ways it was learnt to be heard. */
-fun wakeCommand(heard: List<String>, phrases: List<String>): List<String>? {
-    // The longest first: "ok casa" must not be taken for a shorter variant inside it.
-    val wakes = phrases.map(::words).filter { it.isNotEmpty() }.sortedByDescending { it.size }
-    if (wakes.isEmpty()) return null
-    val after = heard.mapNotNull { sentence ->
-        val said = words(sentence)
-        wakes.firstNotNullOfOrNull { wake ->
-            val at = (0..said.size - wake.size).firstOrNull { said.subList(it, it + wake.size) == wake }
-            at?.let { said.drop(it + wake.size).joinToString(" ") }
-        }
-    }
-    return after.takeIf { it.isNotEmpty() }
-}
-
-/**
- * What the training teaches: the ways the recognizer heard the wake [word] said by this voice, from
- * its guesses at each of the [rounds]. Only a way heard in two rounds at least is kept, and only one
- * of as many words: a guess made once is noise, and a shorter one would go off on common words.
- */
-fun learnWake(word: String, rounds: List<List<String>>): List<String> {
-    val wake = words(word)
-    val seen = HashMap<List<String>, Int>()
-    for (guesses in rounds) {
-        for (heard in guesses.map(::words).filter { it.size == wake.size && it != wake }.distinct()) {
-            seen[heard] = (seen[heard] ?: 0) + 1
-        }
-    }
-    return seen.filter { (heard, times) -> times >= 2 && heard.joinToString("").length > 3 }
-        .entries.sortedByDescending { it.value }
-        .map { it.key.joinToString(" ") }
-}
-
 /** Same word, give or take the ending: "luce" and "luci", "presa" and "prese". */
 private fun alike(a: String, b: String): Boolean {
     if (a == b) return true
