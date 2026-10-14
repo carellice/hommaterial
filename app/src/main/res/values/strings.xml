@@ -463,6 +463,16 @@
     <string name="arrange">Rearrange</string>
     <string name="arrange_title">Drag to rearrange</string>
     <string name="arrange_done">Done</string>
+    <string name="wake_train">Train the word</string>
+    <string name="wake_train_text">Say the word a few times: the app learns how the recognizer hears your voice and recognizes it better</string>
+    <string name="wake_train_done">Trained: also recognizes “%1$s”. Tap to train again</string>
+    <string name="wake_train_title">Training</string>
+    <string name="wake_train_say">Say “%1$s”</string>
+    <string name="wake_train_count">Time %1$d of %2$d</string>
+    <string name="wake_train_heard">I heard “%1$s”</string>
+    <string name="wake_train_hint">Speak as you usually would, from where you usually are: that is how it must know you.</string>
+    <string name="wake_trained">Done: I also recognize “%1$s”</string>
+    <string name="wake_trained_same">Done: the word is already heard well as it is</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>

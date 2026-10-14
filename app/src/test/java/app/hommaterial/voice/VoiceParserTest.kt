@@ -110,6 +110,19 @@ class VoiceParserTest {
     }
 
     @Test
+    fun theTrainingKeepsTheWaysHeardMoreThanOnce() {
+        val rounds = listOf(
+            listOf("ok casa", "okay casa", "o casa"),
+            listOf("okay casa", "ok cassa"),
+            listOf("o casa", "ok"),
+            listOf("Okay Casa!", "casa"),
+        )
+        // "ok cassa" came once, and the single words would go off on anything.
+        assertEquals(listOf("okay casa", "o casa"), learnWake("ok casa", rounds))
+        assertEquals(listOf("accendi"), wakeCommand(listOf("okay casa accendi"), listOf("ok casa", "okay casa")))
+    }
+
+    @Test
     fun englishIsUnderstoodToo() {
         val command = ran(run("turn off the Lampada, please"))
         assertEquals("Lampada", command.devices.single().name)

@@ -452,6 +452,16 @@
     <string name="arrange">Riordina</string>
     <string name="arrange_title">Trascina per riordinare</string>
     <string name="arrange_done">Fine</string>
+    <string name="wake_train">Addestra la parola</string>
+    <string name="wake_train_text">Ripeti la parola qualche volta: l\'app impara come il riconoscimento sente la tua voce e la riconosce meglio</string>
+    <string name="wake_train_done">Addestrata: riconosce anche «%1$s». Tocca per ripetere</string>
+    <string name="wake_train_title">Addestramento</string>
+    <string name="wake_train_say">Di\' «%1$s»</string>
+    <string name="wake_train_count">Volta %1$d di %2$d</string>
+    <string name="wake_train_heard">Ho sentito «%1$s»</string>
+    <string name="wake_train_hint">Parla come faresti di solito, alla solita distanza: è così che deve riconoscerti.</string>
+    <string name="wake_trained">Fatto: riconosco anche «%1$s»</string>
+    <string name="wake_trained_same">Fatto: la parola viene già sentita bene così com\'è</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>

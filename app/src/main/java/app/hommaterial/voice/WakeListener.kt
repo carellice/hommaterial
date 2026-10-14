@@ -15,6 +15,7 @@ private const val RESTART_MS = 300L
 // After a real failure, such as a recognizer that is busy or gone, there is no point in insisting:
 // each one in a row waits twice as long, up to a minute.
 private const val RETRY_MS = 3_000L
+private const val SILENCE_MS = 700L
 private const val RETRY_MAX_MS = 60_000L
 
 /**
@@ -57,6 +58,9 @@ class WakeListener(
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            // A shorter pause ends a sentence sooner, where the recognizer honours it.
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_MS)
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_MS)
         recognizer?.startListening(intent)
     }
 

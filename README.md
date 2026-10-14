@@ -157,6 +157,9 @@ Impostazioni. Da accesa, l'app ascolta solo mentre è aperta sullo schermo
 accendi la lampada", oppure la parola da sola e poi il comando. La parola si
 può cambiare. Non ascolta ad app chiusa o a schermo spento, e usa il
 riconoscimento vocale sul dispositivo quando c'è.
+All'attivazione parte un breve addestramento: si ripete la parola sei volte
+e l'app impara come il riconoscimento sente quella voce, accettando anche
+i modi in cui la trascrive più spesso. Si può ripetere dalle Impostazioni.
 
 Anche le azioni programmate le fa scattare il telefono, come i timer: all'ora
 stabilita deve essere acceso e connesso, e senza rete riprova per dieci minuti.

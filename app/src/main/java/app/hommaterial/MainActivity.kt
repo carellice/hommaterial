@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
             LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
                 canListen = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
             }
-            if (state.wake && state.loggedIn && canListen) {
+            if (state.wake && state.loggedIn && canListen && !state.wakeTraining) {
                 val language = str(R.string.voice_language)
                 LifecycleResumeEffect(language) {
                     // A command wakes a resting panel, as a touch would.

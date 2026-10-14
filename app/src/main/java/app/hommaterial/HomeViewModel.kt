@@ -47,6 +47,7 @@ import app.hommaterial.str
 import app.hommaterial.voice.ExtraCommand
 import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
+import app.hommaterial.voice.learnWake
 import app.hommaterial.voice.parseExtras
 import app.hommaterial.voice.parseVoice
 import app.hommaterial.voice.wakeCommand
@@ -121,6 +122,10 @@ data class UiState(
     /** Whether the app listens for [wakeWord] while it is open, to take spoken commands hands-free. */
     val wake: Boolean = false,
     val wakeWord: String = "",
+    /** The ways the training heard [wakeWord] said by this voice, accepted as it is. */
+    val wakeVariants: List<String> = emptyList(),
+    /** Whether the wake word is being trained: the usual listening keeps quiet meanwhile. */
+    val wakeTraining: Boolean = false,
     /** Whether a PIN was chosen for the monitor mode. */
     val pin: Boolean = false,
     /** Whether a backup being imported is waiting to know if its monitor mode comes along. */
@@ -243,6 +248,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             hiddenRemotes = switchBot.hidden(),
             wake = settings.getBoolean("wake", false),
             wakeWord = settings.getString("wakeWord", null) ?: str(R.string.wake_word_default),
+            wakeVariants = runCatching {
+                JSONArray(settings.getString("wakeVariants", "[]")).let { a -> (0 until a.length()).map(a::getString) }
+            }.getOrDefault(emptyList()),
         )
     }
 
@@ -301,6 +309,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 pin = it.pin,
                 wake = it.wake,
                 wakeWord = it.wakeWord,
+                wakeVariants = it.wakeVariants,
                 // SwitchBot is another account: signing out of Amazon leaves it linked.
                 switchBot = it.switchBot,
                 remotes = it.remotes,
@@ -500,7 +509,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun onWake(heard: List<String>): Boolean {
         val now = System.currentTimeMillis()
         val armed = now < wakeArmedUntil
-        val commands = (wakeCommand(heard, _state.value.wakeWord) ?: heard.takeIf { armed } ?: return false)
+        val phrases = listOf(_state.value.wakeWord) + _state.value.wakeVariants
+        val commands = (wakeCommand(heard, phrases) ?: heard.takeIf { armed } ?: return false)
             .filter { it.isNotBlank() }
         wakeArmedUntil = 0
         if (commands.isEmpty()) {
@@ -518,8 +528,25 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setWakeWord(word: String) {
-        settings.edit().putString("wakeWord", word).apply()
-        _state.update { it.copy(wakeWord = word) }
+        // What was learnt was about the old word.
+        settings.edit().putString("wakeWord", word).remove("wakeVariants").apply()
+        _state.update { it.copy(wakeWord = word, wakeVariants = emptyList()) }
+    }
+
+    fun setWakeTraining(on: Boolean) = _state.update { it.copy(wakeTraining = on) }
+
+    /** Keeps what the training learnt from the recognizer's guesses at each round, and says it. */
+    fun finishWakeTraining(rounds: List<List<String>>) {
+        val variants = learnWake(_state.value.wakeWord, rounds)
+        settings.edit().putString("wakeVariants", JSONArray(variants).toString()).apply()
+        _state.update { it.copy(wakeVariants = variants) }
+        _messages.tryEmit(
+            if (variants.isEmpty()) {
+                str(R.string.wake_trained_same)
+            } else {
+                str(R.string.wake_trained, variants.joinToString("», «"))
+            },
+        )
     }
 
     fun runVoice(command: VoiceCommand) {

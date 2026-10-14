@@ -48,6 +48,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +62,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -93,6 +95,7 @@ import app.hommaterial.quick.clock
 import app.hommaterial.quick.degrees
 import app.hommaterial.str
 import app.hommaterial.voice.WakeListener
+import kotlinx.coroutines.delay
 
 private const val SOURCE_URL = "https://github.com/carellice/hommaterial"
 private const val BACKUP_FILE = "hommaterial-backup.json"
@@ -233,8 +236,20 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
         context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     }
     // Saying yes to the microphone is what turns the wake word on; a no leaves it off.
+    var training by remember { mutableStateOf(false) }
     val askMicrophone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        if (it) vm.setWake(true)
+        if (it) {
+            vm.setWake(true)
+            training = true
+        }
+    }
+    if (training) {
+        WakeTrainingDialog(
+            word = state.wakeWord,
+            vm = vm,
+            onDone = { vm.finishWakeTraining(it); training = false },
+            onDismiss = { training = false },
+        )
     }
     var editingWake by remember { mutableStateOf(false) }
     var linkingSwitchBot by remember { mutableStateOf(false) }
@@ -260,7 +275,12 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
         )
     }
     if (editingWake) {
-        WakeWordDialog(state.wakeWord, onSave = { vm.setWakeWord(it); editingWake = false }) { editingWake = false }
+        // A new word is learnt anew.
+        WakeWordDialog(state.wakeWord, onSave = {
+            vm.setWakeWord(it)
+            editingWake = false
+            if (state.wake) training = true
+        }) { editingWake = false }
     }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) {
         if (it != null) vm.exportBackup(it)
@@ -379,6 +399,8 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                             askMicrophone.launch(Manifest.permission.RECORD_AUDIO)
                         } else {
                             vm.setWake(on)
+                            // Switched on, it starts by learning how this voice says the word.
+                            if (on) training = true
                         }
                     }
                     Setting(
@@ -386,6 +408,17 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                         text = str(R.string.wake_word_text, state.wakeWord),
                         onClick = { editingWake = true },
                     )
+                    if (state.wake && microphone) {
+                        Setting(
+                            title = str(R.string.wake_train),
+                            text = if (state.wakeVariants.isEmpty()) {
+                                str(R.string.wake_train_text)
+                            } else {
+                                str(R.string.wake_train_done, state.wakeVariants.joinToString("», «"))
+                            },
+                            onClick = { training = true },
+                        )
+                    }
                 } else {
                     Setting(title = str(R.string.wake_enable), text = str(R.string.voice_unavailable))
                 }
@@ -821,4 +854,71 @@ private fun DeviceRow(device: Device, room: String?, state: UiState, vm: HomeVie
 /** Opens a screen of the phone, which some versions and brands of Android do not have. */
 private fun Context.open(intent: Intent) {
     runCatching { startActivity(intent) }
+}
+
+private const val TRAINING_ROUNDS = 6
+// The listening of the app has a moment to let go of the microphone before the training takes it.
+private const val TRAINING_START_MS = 600L
+
+/**
+ * Has the wake word said again and again, noting each time how the recognizer heard it, so that
+ * the ways it hears this voice are accepted too. [onDone] receives the guesses of each round.
+ */
+@Composable
+private fun WakeTrainingDialog(
+    word: String,
+    vm: HomeViewModel,
+    onDone: (List<List<String>>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    var rounds by remember { mutableStateOf(listOf<List<String>>()) }
+    val language = str(R.string.voice_language)
+    val listener = remember {
+        WakeListener(context.applicationContext, language) { heard ->
+            if (heard.isNotEmpty()) rounds = rounds + listOf(heard)
+        }
+    }
+    LaunchedEffect(Unit) {
+        vm.setWakeTraining(true)
+        delay(TRAINING_START_MS)
+        listener.start()
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            listener.stop()
+            vm.setWakeTraining(false)
+        }
+    }
+    LaunchedEffect(rounds.size) {
+        if (rounds.size >= TRAINING_ROUNDS) onDone(rounds)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.wake_train_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(str(R.string.wake_train_say, word), style = MaterialTheme.typography.headlineSmall)
+                LinearProgressIndicator(
+                    progress = { rounds.size / TRAINING_ROUNDS.toFloat() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(str(R.string.wake_train_count, rounds.size + 1, TRAINING_ROUNDS))
+                rounds.lastOrNull()?.firstOrNull()?.let {
+                    Text(
+                        str(R.string.wake_train_heard, it),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    str(R.string.wake_train_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
+    )
 }
