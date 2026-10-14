@@ -850,7 +850,7 @@ private fun GroupSheet(group: Group, devices: List<Device>, state: UiState, vm: 
             }
 
             Text(
-                str(R.string.group_turn_off_in),
+                str(R.string.timer),
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(top = 20.dp),
             )
@@ -866,7 +866,7 @@ private fun GroupSheet(group: Group, devices: List<Device>, state: UiState, vm: 
                     TextButton(onClick = { devices.forEach(vm::cancelTimer) }) { Text(str(R.string.cancel_timer)) }
                 }
             }
-            // A timer of the user's own can switch the group on too, one scheduled action for each device.
+            // A timer can switch the group on too, one scheduled action for each device.
             val waiting = devices.flatMap { switchingOn(it, state) }
             if (waiting.isNotEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1337,7 +1337,7 @@ private fun DeviceSheet(
 
             if (device.hasPower) {
                 Text(
-                    str(R.string.turn_off_in),
+                    str(R.string.timer),
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(top = 20.dp),
                 )

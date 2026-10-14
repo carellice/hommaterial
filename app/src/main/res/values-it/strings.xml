@@ -85,7 +85,6 @@
     <string name="timer_custom_title">Timer personalizzato</string>
     <string name="timer_hours">Ore</string>
     <string name="timer_minutes">Minuti</string>
-    <string name="timer_then">Allo scadere</string>
     <string name="timer_start">Avvia</string>
     <string name="no_room">Altro</string>
     <string name="favorites">Preferiti</string>
@@ -103,7 +102,6 @@
     <string name="status_until">%1$s · fino alle %2$s</string>
     <string name="turn_on">Accendi</string>
     <string name="turn_off">Spegni</string>
-    <string name="turn_off_in">Spegni tra</string>
     <string name="turns_off_at">Si spegne alle %1$s</string>
     <string name="cancel_timer">Annulla timer</string>
     <string name="brightness">Luminosità</string>
@@ -317,7 +315,6 @@
     <string name="backup_monitor_no">Lascia quella attuale</string>
     <string name="min_avg_max">min %1$s · media %2$s · max %3$s</string>
     <string name="chart_hint">Tieni il dito sul grafico per leggere un valore.</string>
-    <string name="group_turn_off_in">Spegni tutto tra</string>
     <string name="group_timers_some">Timer su %1$d di %2$d</string>
     <string name="s_remotes">Telecomandi</string>
     <string name="s_switchbot">Telecomandi SwitchBot</string>

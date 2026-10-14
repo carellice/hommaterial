@@ -67,9 +67,9 @@ collegati al proprio account Alexa.
   evidenziato, e Invio lo accende o spegne, esegue un dispositivo
   personalizzato o apre il pannello di un sensore o di un telecomando.
 - Tenendo premuto si apre il pannello con accensione, spegnimento esplicito,
-  timer di spegnimento, luminosità e colore per le luci che li supportano.
-  Oltre ai tempi già pronti c'è **Personalizzato…**: ore e minuti a scelta,
-  e allo scadere spegne oppure accende.
+  timer, luminosità e colore per le luci che li supportano. Il timer spegne
+  oppure accende, a scelta, dopo uno dei tempi già pronti o dopo ore e
+  minuti scelti con **Personalizzato…**.
 - I timer in corso stanno in una sezione in cima alla lista, con il conto
   alla rovescia, ordinati dal più vicino allo spegnimento.
 - I preferiti stanno in cima alla lista.
@@ -108,7 +108,8 @@ collegati al proprio account Alexa.
   vuole e scegliendo i dispositivi di ognuna, senza cambiare niente in Alexa.
 - I gruppi accendono o spengono insieme più dispositivi di stanze diverse.
   Tenendo premuto un gruppo si apre il suo pannello: i dispositivi si
-  comandano uno per uno e il timer di spegnimento vale per tutto il gruppo.
+  comandano uno per uno e il timer, che spegne o accende, vale per tutto il
+  gruppo.
 - Sotto l'icona dell'app, tenendola premuta, compaiono i dispositivi e i
   gruppi scelti nelle Impostazioni, oppure i preferiti.
 - Sugli schermi larghi, come i tablet, una barra laterale divide la casa in

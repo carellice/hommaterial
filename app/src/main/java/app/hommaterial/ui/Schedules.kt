@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -105,78 +106,81 @@ private fun duration(minutes: Int): String = when (minutes) {
 }
 
 /**
- * The usual delays of a timer, and one of the user's own. [canTurnOn] lets that one switch on
+ * The delays of a timer: the usual ones and one of the user's own. [canTurnOn] lets them switch on
  * instead of off; [onChoose] receives the minutes and whether to switch on.
  */
 @Composable
 internal fun TimerChoices(canTurnOn: Boolean = false, onChoose: (minutes: Int, on: Boolean) -> Unit) {
     var custom by remember { mutableStateOf(false) }
+    // What every delay below does when it runs out.
+    var on by remember { mutableStateOf(false) }
+    if (canTurnOn) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((value, label) in listOf(false to R.string.turn_off, true to R.string.turn_on)) {
+                FilterChip(
+                    selected = on == value,
+                    onClick = { on = value },
+                    label = { Text(str(label)) },
+                    leadingIcon = if (on == value) {
+                        { Icon(Icons.Outlined.Check, contentDescription = null) }
+                    } else {
+                        null
+                    },
+                )
+            }
+        }
+    }
     Row(
         Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         for ((label, minutes) in TIMER_CHOICES) {
-            AssistChip(onClick = { onChoose(minutes, false) }, label = { Text(str(label)) })
+            AssistChip(onClick = { onChoose(minutes, on) }, label = { Text(str(label)) })
         }
         AssistChip(onClick = { custom = true }, label = { Text(str(R.string.timer_custom)) })
     }
     if (custom) {
         CustomTimerDialog(
-            canTurnOn,
-            onChoose = { minutes, on -> custom = false; onChoose(minutes, on) },
+            onChoose = { minutes -> custom = false; onChoose(minutes, on) },
             onDismiss = { custom = false },
         )
     }
 }
 
-/** Asks for a delay in hours and minutes and, with [canTurnOn], whether to switch off or on then. */
+/** Asks for a delay in hours and minutes. */
 @Composable
-private fun CustomTimerDialog(canTurnOn: Boolean, onChoose: (minutes: Int, on: Boolean) -> Unit, onDismiss: () -> Unit) {
+private fun CustomTimerDialog(onChoose: (minutes: Int) -> Unit, onDismiss: () -> Unit) {
     var hours by remember { mutableStateOf("") }
     var minutes by remember { mutableStateOf("") }
-    var on by remember { mutableStateOf(false) }
     val total = (hours.toIntOrNull() ?: 0) * 60 + (minutes.toIntOrNull() ?: 0)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(str(R.string.timer_custom_title)) },
         text = {
-            Column {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = hours,
-                        onValueChange = { text -> hours = text.filter { it.isDigit() }.take(2) },
-                        label = { Text(str(R.string.timer_hours)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(
-                        value = minutes,
-                        onValueChange = { text ->
-                            val typed = text.filter { it.isDigit() }.take(2)
-                            minutes = if ((typed.toIntOrNull() ?: 0) > 59) "59" else typed
-                        },
-                        label = { Text(str(R.string.timer_minutes)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                if (canTurnOn) {
-                    Text(
-                        str(R.string.timer_then),
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = !on, onClick = { on = false }, label = { Text(str(R.string.turn_off)) })
-                        FilterChip(selected = on, onClick = { on = true }, label = { Text(str(R.string.turn_on)) })
-                    }
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = hours,
+                    onValueChange = { text -> hours = text.filter { it.isDigit() }.take(2) },
+                    label = { Text(str(R.string.timer_hours)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = minutes,
+                    onValueChange = { text ->
+                        val typed = text.filter { it.isDigit() }.take(2)
+                        minutes = if ((typed.toIntOrNull() ?: 0) > 59) "59" else typed
+                    },
+                    label = { Text(str(R.string.timer_minutes)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onChoose(total, on) }, enabled = total > 0) { Text(str(R.string.timer_start)) }
+            TextButton(onClick = { onChoose(total) }, enabled = total > 0) { Text(str(R.string.timer_start)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
     )
@@ -184,8 +188,8 @@ private fun CustomTimerDialog(canTurnOn: Boolean, onChoose: (minutes: Int, on: B
 
 /**
  * The timer of a remote or of a custom device, [target]: the delays to choose from, or the one
- * that is running with what cancels it. [onChoose] receives the minutes; with [onTurnOn] a timer
- * of the user's own can also switch on, and that one receives them instead.
+ * that is running with what cancels it. [onChoose] receives the minutes; with [onTurnOn] the
+ * timer can also switch on, and that one receives them instead.
  */
 @Composable
 internal fun TimerChips(

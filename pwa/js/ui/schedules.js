@@ -17,31 +17,38 @@ function duration(minutes) {
 }
 
 /**
- * The usual delays of a timer, and one of the user's own. [canTurnOn] lets that one switch on
+ * The delays of a timer: the usual ones and one of the user's own. [canTurnOn] lets them switch on
  * instead of off; [onChoose] receives the minutes and whether to switch on.
  */
 export function TimerChoices({ canTurnOn = false, onChoose }) {
   const [custom, setCustom] = useState(false);
+  // What every delay below does when it runs out.
+  const [on, setOn] = useState(false);
   return html`
+    ${canTurnOn && html`
+      <div class="chips">
+        ${[[false, 'turn_off'], [true, 'turn_on']].map(([value, label]) => html`
+          <button class=${`chip ${on === value ? 'selected' : ''}`} onClick=${() => setOn(value)}>
+            ${on === value && html`<${Icon} name="check" />`}${str(label)}</button>`)}
+      </div>`}
     <div class="chips">
       ${TIMER_CHOICES.map(([label, minutes]) => html`
-        <button class="chip" onClick=${() => onChoose(minutes, false)}>${str(label)}</button>`)}
+        <button class="chip" onClick=${() => onChoose(minutes, on)}>${str(label)}</button>`)}
       <button class="chip" onClick=${() => setCustom(true)}>${str('timer_custom')}</button>
     </div>
-    ${custom && html`<${CustomTimerDialog} canTurnOn=${canTurnOn} onDismiss=${() => setCustom(false)}
-      onChoose=${(minutes, on) => {
+    ${custom && html`<${CustomTimerDialog} onDismiss=${() => setCustom(false)}
+      onChoose=${(minutes) => {
         setCustom(false);
         onChoose(minutes, on);
       }} />`}`;
 }
 
-/** Asks for a delay in hours and minutes and, with [canTurnOn], whether to switch off or on then. */
-function CustomTimerDialog({ canTurnOn, onChoose, onDismiss }) {
+/** Asks for a delay in hours and minutes. */
+function CustomTimerDialog({ onChoose, onDismiss }) {
   const [hours, setHours] = useState('');
   const [minutes, setMinutes] = useState('');
-  const [on, setOn] = useState(false);
   const total = (Number(hours) || 0) * 60 + (Number(minutes) || 0);
-  const start = () => total > 0 && onChoose(total, on);
+  const start = () => total > 0 && onChoose(total);
   const digits = (v) => v.replace(/\D/g, '').slice(0, 2);
   return html`
     <${Dialog} title=${str('timer_custom_title')} onDismiss=${onDismiss} actions=${html`
@@ -53,20 +60,13 @@ function CustomTimerDialog({ canTurnOn, onChoose, onDismiss }) {
         <${Field} label=${str('timer_minutes')} inputMode="numeric" value=${minutes} onEnter=${start}
           onInput=${(v) => setMinutes(Number(digits(v)) > 59 ? '59' : digits(v))} />
       </div>
-      ${canTurnOn && html`
-        <div class="label-large" style="margin-top:16px">${str('timer_then')}</div>
-        <div class="chips">
-          ${[[false, 'turn_off'], [true, 'turn_on']].map(([value, label]) => html`
-            <button class=${`chip ${on === value ? 'selected' : ''}`} onClick=${() => setOn(value)}>
-              ${on === value && html`<${Icon} name="check" />`}${str(label)}</button>`)}
-        </div>`}
     <//>`;
 }
 
 /**
  * The timer of a remote or of a custom device, [target]: the delays to choose from, or the one
- * that is running with what cancels it. [onChoose] receives the minutes; with [onTurnOn] a timer
- * of the user's own can also switch on, and that one receives them instead.
+ * that is running with what cancels it. [onChoose] receives the minutes; with [onTurnOn] the
+ * timer can also switch on, and that one receives them instead.
  */
 export function TimerChips({ title, target, s, onChoose, onTurnOn }) {
   const running = s.schedules.find((it) => !it.days.length && it.enabled && it.action.target === target);

@@ -432,7 +432,7 @@ function DeviceSheet({ device, s, look, onDismiss }) {
           <button class="tonal-btn" onClick=${() => store.setPower(device, true)}>${str('turn_on')}</button>
           <button class="tonal-btn" onClick=${() => store.setPower(device, false)}>${str('turn_off')}</button>
         </div>
-        <span class="label label-large">${str('turn_off_in')}</span>
+        <span class="label label-large">${str('timer')}</span>
         ${timer
           ? html`<div class="row"><span class="grow">${str('turns_off_at', clock(timer))}</span>
               <button class="text-btn" onClick=${() => store.cancelTimer(id)}>${str('cancel_timer')}</button></div>`
@@ -540,7 +540,7 @@ function GroupSheet({ group, devices, s, onDismiss }) {
         <button class="tonal-btn" onClick=${() => store.setRoomPower(devices, true)}>${str('all_on')}</button>
         <button class="tonal-btn" onClick=${() => store.setRoomPower(devices, false)}>${str('all_off')}</button>
       </div>
-      <span class="label label-large">${str('group_turn_off_in')}</span>
+      <span class="label label-large">${str('timer')}</span>
       ${timers.length > 0 && html`
         <div class="row">
           ${/* The devices may carry timers of their own: the group says when the last one goes off. */ ''}
@@ -554,7 +554,7 @@ function GroupSheet({ group, devices, s, onDismiss }) {
           <span class="grow">${str('schedule_once', str('voice_on', group.name), clock(Math.max(...waiting.map((it) => it.at))))}</span>
           <button class="text-btn" onClick=${() => waiting.forEach((it) => store.deleteSchedule(it.id))}>${str('cancel_timer')}</button>
         </div>`}
-      ${/* A timer of the user's own can switch the group on too, one scheduled action for each device. */ ''}
+      ${/* A timer can switch the group on too, one scheduled action for each device. */ ''}
       <${TimerChoices} canTurnOn onChoose=${(minutes, on) => {
         store.askNotifications();
         devices.forEach((d) => (on ? store.addTimer(switchOn(d), str('voice_on', d.name), minutes) : store.setTimer(d, minutes)));

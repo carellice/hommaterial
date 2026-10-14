@@ -91,7 +91,7 @@
     <string name="timer_custom_title">Custom timer</string>
     <string name="timer_hours">Hours</string>
     <string name="timer_minutes">Minutes</string>
-    <string name="timer_then">When it runs out</string>
+    <string name="timer" translatable="false">Timer</string>
     <string name="timer_start">Start</string>
     <string name="no_room">Other</string>
     <string name="favorites">Favorites</string>
@@ -110,7 +110,6 @@
     <string name="status_until">%1$s · until %2$s</string>
     <string name="turn_on">Turn on</string>
     <string name="turn_off">Turn off</string>
-    <string name="turn_off_in">Turn off in</string>
     <string name="turns_off_at">Turns off at %1$s</string>
     <string name="cancel_timer">Cancel timer</string>
     <string name="brightness">Brightness</string>
@@ -328,7 +327,6 @@
     <string name="chart_reading" translatable="false">%1$s · %2$s</string>
     <string name="chart_hint">Hold a finger on the chart to read a value.</string>
     <string name="tile_label" translatable="false">%1$s · %2$s</string>
-    <string name="group_turn_off_in">Turn everything off in</string>
     <string name="group_timers_some">Timer on %1$d of %2$d</string>
     <string name="s_remotes">Remotes</string>
     <string name="s_switchbot">SwitchBot remotes</string>
