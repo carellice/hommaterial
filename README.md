@@ -74,7 +74,10 @@ collegati al proprio account Alexa.
 - Il widget per la schermata Home mostra i dispositivi e i gruppi scelti
   nelle Impostazioni, dove si regolano anche ordine, colonne, dimensione dei
   riquadri, intestazione e sfondo.
-- Fino a cinque dispositivi a scelta si comandano dalle Impostazioni rapide di
+- Lo stesso widget si può mettere anche sulla schermata di blocco, dove
+  Android lo consente: Android 16 QPR1 e successivi, e i tablet con l'hub
+  dei widget.
+- Fino a dieci dispositivi a scelta si comandano dalle Impostazioni rapide di
   Android, ognuno con il suo riquadro.
   Sotto il nome del dispositivo il riquadro mostra la stanza in cui si
   trova, o un gruppo che lo contiene se non ha una stanza.
