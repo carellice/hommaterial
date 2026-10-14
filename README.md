@@ -144,6 +144,9 @@ collegati al proprio account Alexa.
   o eseguire un dispositivo personalizzato tra un po'), i preferiti, i
   comandi vocali ("esegui la postazione", "spegni la TV del salotto") e, per
   i dispositivi personalizzati, le scorciatoie sotto l'icona dell'app.
+- In cima alla lista, sotto i timer, compaiono le azioni programmate che si
+  ripetono, con il tempo che manca alla prossima, e le automazioni attive;
+  da lì si sospendono con un tocco.
 - Dal menu si creano le automazioni: quando un sensore supera o scende sotto
   una temperatura o un'umidità, oppure quando un dispositivo si accende o si
   spegne, l'app accende o spegne un dispositivo, esegue un dispositivo

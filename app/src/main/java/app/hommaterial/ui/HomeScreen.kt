@@ -54,13 +54,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DevicesOther
+import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.PowerSettingsNew
@@ -543,8 +546,11 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
         .mapNotNull { (id, at) -> shown.find { it.applianceId == id }?.let { it to at } }
     // With them, what was set to happen once: the timers of remotes and custom devices among it.
     val due = if (page == PAGE_ALL) state.schedules.filter { it.days.isEmpty() && it.enabled } else emptyList()
+    val repeating = if (page == PAGE_ALL) state.schedules.filter { it.days.isNotEmpty() && it.enabled } else emptyList()
+    val automations = if (page == PAGE_ALL) state.automations.filter { it.enabled } else emptyList()
 
-    if (sections.isEmpty() && timers.isEmpty() && due.isEmpty() && !state.refreshing) {
+    val running = timers.isNotEmpty() || due.isNotEmpty() || repeating.isNotEmpty() || automations.isNotEmpty()
+    if (sections.isEmpty() && !running && !state.refreshing) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(str(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -567,6 +573,38 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
             items(due, key = { "schedule:${it.id}" }, span = { GridItemSpan(maxLineSpan) }) {
                 val text = str(R.string.schedule_due, clock(it.at))
                 TimerRow(Icons.Outlined.Schedule, it.label, text, it.at) { vm.deleteSchedule(it.id) }
+            }
+        }
+        // Then what repeats and what waits for a device, as running as a timer: paused from here,
+        // they stay in their lists of the menu, to be switched on again.
+        if (repeating.isNotEmpty()) {
+            item(key = "repeating", span = { GridItemSpan(maxLineSpan) }) {
+                SectionHeader(str(R.string.s_schedules))
+            }
+            items(repeating, key = { "repeating:${it.id}" }, span = { GridItemSpan(maxLineSpan) }) {
+                TimerRow(
+                    Icons.Outlined.EventRepeat,
+                    it.label,
+                    whenText(it),
+                    it.at,
+                    Icons.Outlined.PauseCircle,
+                    R.string.pause,
+                ) { vm.setScheduleEnabled(it, false) }
+            }
+        }
+        if (automations.isNotEmpty()) {
+            item(key = "automations", span = { GridItemSpan(maxLineSpan) }) {
+                SectionHeader(str(R.string.s_automations))
+            }
+            items(automations, key = { "automation:${it.id}" }, span = { GridItemSpan(maxLineSpan) }) {
+                TimerRow(
+                    Icons.Outlined.Bolt,
+                    it.title,
+                    it.label,
+                    null,
+                    Icons.Outlined.PauseCircle,
+                    R.string.pause,
+                ) { vm.setAutomationEnabled(it, false) }
             }
         }
         for (section in sections) {
@@ -968,7 +1006,15 @@ internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: St
 
 /** Something due at a time, such as a device with a switch-off timer, with the time left counted down. */
 @Composable
-private fun TimerRow(icon: ImageVector, name: String, text: String, at: Long, onCancel: () -> Unit) {
+private fun TimerRow(
+    icon: ImageVector,
+    name: String,
+    text: String,
+    at: Long?,
+    stop: ImageVector = Icons.Outlined.Close,
+    @StringRes stopLabel: Int = R.string.cancel_timer,
+    onStop: () -> Unit,
+) {
     val now by produceState(System.currentTimeMillis(), at) {
         while (true) {
             value = System.currentTimeMillis()
@@ -992,12 +1038,14 @@ private fun TimerRow(icon: ImageVector, name: String, text: String, at: Long, on
                 Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.alpha(0.75f))
             }
             // Digits of equal width keep the countdown from jittering as it ticks.
-            Text(
-                countdown(at - now),
-                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
-            )
-            IconButton(onClick = onCancel) {
-                Icon(Icons.Outlined.Close, contentDescription = str(R.string.cancel_timer))
+            if (at != null) {
+                Text(
+                    countdown(at - now),
+                    style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                )
+            }
+            IconButton(onClick = onStop) {
+                Icon(stop, contentDescription = str(stopLabel))
             }
         }
     }
@@ -1007,7 +1055,12 @@ private fun TimerRow(icon: ImageVector, name: String, text: String, at: Long, on
 internal fun countdown(millis: Long): String {
     val seconds = millis.coerceAtLeast(0) / 1000
     val (h, m, s) = Triple(seconds / 3600, seconds / 60 % 60, seconds % 60)
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
+    return when {
+        // Days away, the seconds would only flicker: days and hours say enough.
+        h >= 24 -> str(R.string.countdown_days, h / 24, h % 24)
+        h > 0 -> "%d:%02d:%02d".format(h, m, s)
+        else -> "%02d:%02d".format(m, s)
+    }
 }
 
 @Composable

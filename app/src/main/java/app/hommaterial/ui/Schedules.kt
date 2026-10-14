@@ -73,7 +73,7 @@ private val IN_MINUTES = listOf(5, 10, 15, 30, 60, 120)
 private fun dayName(day: Int): String = DateFormatSymbols.getInstance().shortWeekdays[day]
 
 /** When a schedule runs next, or on which days, as a line of text. */
-private fun whenText(schedule: Schedule): String {
+internal fun whenText(schedule: Schedule): String {
     val text = when {
         schedule.days.isEmpty() -> {
             val now = Calendar.getInstance()

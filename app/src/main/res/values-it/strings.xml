@@ -454,6 +454,8 @@
     <string name="search_open">apri</string>
     <string name="search_switch">accendi o spegni</string>
     <string name="search_run">esegui</string>
+    <string name="pause">Sospendi</string>
+    <string name="countdown_days">%1$d g %2$d h</string>
     <plurals name="devices">
         <item quantity="one">%d dispositivo</item>
         <item quantity="other">%d dispositivi</item>

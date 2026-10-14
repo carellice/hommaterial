@@ -465,6 +465,8 @@
     <string name="search_open">open</string>
     <string name="search_switch">switch</string>
     <string name="search_run">run</string>
+    <string name="pause">Pause</string>
+    <string name="countdown_days">%1$d d %2$d h</string>
     <plurals name="devices">
         <item quantity="one">%d device</item>
         <item quantity="other">%d devices</item>
