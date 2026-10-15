@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,6 +77,8 @@ private fun TagWaitDialog(uri: Uri, name: String, onDismiss: () -> Unit) {
         onPauseOrDispose { }
     }
     val written = result?.written == true
+    val haptic = LocalHaptics.current
+    LaunchedEffect(result) { result?.let { haptic(if (it.written) Haptic.Confirm else Haptic.Reject) } }
     DisposableEffect(activity, adapter, enabled, written) {
         if (activity == null || adapter == null || !enabled || written) return@DisposableEffect onDispose { }
         val main = Handler(Looper.getMainLooper())

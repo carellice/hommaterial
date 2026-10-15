@@ -1562,13 +1562,23 @@ private fun ColorSwatch(choice: ColorChoice, selected: Boolean, onClick: () -> U
 private fun BrightnessSlider(brightness: Int, onChange: (Int) -> Unit) {
     // Local while dragging; the command goes out once, when the finger lifts.
     var value by remember(brightness) { mutableFloatStateOf(brightness.toFloat()) }
+    val haptic = LocalHaptics.current
     Slider(
         value = value,
-        onValueChange = { value = it },
+        onValueChange = {
+            // A light tick every 5%, and a firmer one at either end, felt under the finger.
+            val step = it.roundToInt() / BRIGHTNESS_STEP
+            if (step != value.roundToInt() / BRIGHTNESS_STEP) {
+                haptic(if (it <= 1f || it >= 100f) Haptic.Confirm else Haptic.Tick)
+            }
+            value = it
+        },
         onValueChangeFinished = { onChange(value.roundToInt().coerceIn(1, 100)) },
         valueRange = 1f..100f,
     )
 }
+
+private const val BRIGHTNESS_STEP = 5
 
 private fun iconFor(device: Device): ImageVector = when (device.category) {
     "LIGHT" -> Icons.Outlined.Lightbulb

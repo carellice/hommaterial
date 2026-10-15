@@ -79,6 +79,11 @@ collegati al proprio account Alexa.
 - I timer in corso stanno in una sezione in cima alla lista, con il conto
   alla rovescia, ordinati dal più vicino allo spegnimento.
 - I preferiti stanno in cima alla lista.
+- Ogni azione si sente sotto il dito: una vibrazione breve e diversa per
+  accensione e spegnimento, per un dispositivo personalizzato eseguito, un
+  tasto del telecomando, un timer avviato o un tag NFC scritto, piccoli scatti
+  mentre si regola la luminosità, e una vibrazione d'errore quando un comando
+  non riesce. Si spegne nelle Impostazioni, in Aspetto.
 - Il widget per la schermata Home mostra i dispositivi e i gruppi scelti
   nelle Impostazioni, dove si regolano anche ordine, colonne, dimensione dei
   riquadri, intestazione e sfondo.
@@ -108,7 +113,7 @@ collegati al proprio account Alexa.
   se confermi, la scarica e la installa. Il controllo si può anche avviare a
   mano da "Controlla aggiornamenti" nel menu.
 - Dal menu si aprono le Impostazioni: tema chiaro, scuro o automatico,
-  lingua, notifiche, aggiornamenti, stanze, preferiti e dispositivi nascosti,
+  vibrazione, lingua, notifiche, aggiornamenti, stanze, preferiti e dispositivi nascosti,
   riquadri, timer e avvisi attivi, e il backup su file delle proprie scelte.
 - Le stanze si possono riorganizzare dentro l'app, creandone quante se ne
   vuole e scegliendo i dispositivi di ognuna, senza cambiare niente in Alexa.

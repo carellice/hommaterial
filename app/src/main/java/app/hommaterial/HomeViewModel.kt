@@ -44,6 +44,7 @@ import app.hommaterial.quick.Quick
 import app.hommaterial.quick.Schedules
 import app.hommaterial.quick.Timers
 import app.hommaterial.str
+import app.hommaterial.ui.Haptic
 import app.hommaterial.voice.ExtraCommand
 import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
@@ -106,6 +107,8 @@ data class UiState(
     val alerts: Map<String, Alert> = emptyMap(),
     /** Whether the app looks for a newer release by itself, once a day. */
     val autoUpdate: Boolean = true,
+    /** Whether touches and commands answer with a short vibration. */
+    val haptics: Boolean = true,
     /** How the tiles of the home are laid out: [LAYOUT_GRID] or [LAYOUT_LIST]. */
     val layout: Int = LAYOUT_GRID,
     /** 0 follows the phone, 1 is always light, 2 always dark. */
@@ -180,6 +183,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val messages = _messages.asSharedFlow()
 
+    // What the commands are felt as: at once when asked, and again when one fails or a custom device is done.
+    private val _haptics = MutableSharedFlow<Haptic>(extraBufferCapacity = 8)
+    val haptics = _haptics.asSharedFlow()
+
     private var refreshJob: Job? = null
     private var updateJob: Job? = null
     private var pendingBackup: JSONObject? = null
@@ -228,6 +235,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             automations = Automations.all(getApplication()),
             alerts = Alerts.all(getApplication()),
             autoUpdate = settings.getBoolean("autoUpdate", true),
+            haptics = settings.getBoolean("haptics", true),
             theme = settings.getInt("theme", 0),
             layout = settings.getInt("layout", LAYOUT_GRID),
             monitor = runCatching {
@@ -366,13 +374,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setPower(device: Device, on: Boolean) {
+        _haptics.tryEmit(if (on) Haptic.On else Haptic.Off)
+        switch(device, on)
+    }
+
+    private fun switch(device: Device, on: Boolean) {
         // A device switched off by hand no longer needs its timer.
         if (!on) cancelTimer(device)
         command(device, { it.copy(power = on) }) { api.setPower(device, on) }
     }
 
     /** Sets a color or a shade of white, by the name Alexa gives it. Lamps switch on when asked for one. */
-    fun setColor(device: Device, choice: ColorChoice) =
+    fun setColor(device: Device, choice: ColorChoice) {
+        _haptics.tryEmit(Haptic.Tick)
         command(device, { it.copy(colorName = choice.alexaName, power = true) }) {
             if (choice.white) {
                 api.setColorTemperature(device, choice.alexaName)
@@ -380,9 +394,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 api.setColor(device, choice.alexaName)
             }
         }
+    }
 
     /** Switches [device] off in [minutes] minutes. */
     fun setTimer(device: Device, minutes: Int) {
+        _haptics.tryEmit(Haptic.Confirm)
         Timers.set(getApplication(), device.applianceId, System.currentTimeMillis() + minutes * 60_000L)
         _state.update { it.copy(timers = Timers.all(getApplication())) }
     }
@@ -400,10 +416,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Switches every device of a room or group that is not already in the requested state. */
     fun setRoomPower(devices: List<Device>, on: Boolean) {
+        _haptics.tryEmit(if (on) Haptic.On else Haptic.Off)
         val s = _state.value
         devices
             .filter { it.hasPower && it.applianceId !in s.busy && s.states[it.applianceId]?.power != on }
-            .forEach { setPower(it, on) }
+            .forEach { switch(it, on) }
     }
 
     /** Applies [optimistic] right away and rolls it back if Alexa refuses the command. */
@@ -415,6 +432,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             val ok = guarded { send() }
+            if (!ok) _haptics.tryEmit(Haptic.Reject)
             _state.update { s ->
                 val states = if (ok) s.states else if (before != null) s.states + (id to before) else s.states - id
                 s.copy(states = states, busy = s.busy - id)
@@ -478,13 +496,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         when (result) {
             is VoiceResult.Run -> runVoice(result.command)
             is VoiceResult.Ask -> _state.update { it.copy(voice = result) }
-            is VoiceResult.Unknown -> _messages.tryEmit(
-                if (result.heard.isBlank()) {
-                    str(R.string.voice_nothing_heard)
-                } else {
-                    str(R.string.voice_not_understood, result.heard)
-                },
-            )
+            is VoiceResult.Unknown -> {
+                _haptics.tryEmit(Haptic.Reject)
+                _messages.tryEmit(
+                    if (result.heard.isBlank()) {
+                        str(R.string.voice_nothing_heard)
+                    } else {
+                        str(R.string.voice_not_understood, result.heard)
+                    },
+                )
+            }
         }
     }
 
@@ -566,6 +587,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Sets [action] to be carried out [at] a moment, and again on each of the [days] if there are any. */
     fun addSchedule(action: MacroAction, label: String, at: Long, days: Set<Int>) {
+        _haptics.tryEmit(Haptic.Confirm)
         val time = Calendar.getInstance().apply { timeInMillis = at }
         val schedule = Schedule(
             id = UUID.randomUUID().toString(),
@@ -688,8 +710,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun runMacro(macro: Macro) {
         if (macro.id in _state.value.busy) return
         _state.update { it.copy(busy = it.busy + macro.id) }
+        _haptics.tryEmit(Haptic.Key)
         viewModelScope.launch {
             val outcome = Quick.runMacro(getApplication(), macro.id)
+            _haptics.tryEmit(if (outcome.ok) Haptic.Confirm else Haptic.Reject)
             if (outcome.loginExpired) {
                 _state.update { it.copy(loggedIn = false, loginMessage = str(R.string.login_expired)) }
             } else {
@@ -729,6 +753,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoUpdate(on: Boolean) {
         settings.edit().putBoolean("autoUpdate", on).apply()
         _state.update { it.copy(autoUpdate = on) }
+    }
+
+    fun setHaptics(on: Boolean) {
+        settings.edit().putBoolean("haptics", on).apply()
+        _state.update { it.copy(haptics = on) }
     }
 
     fun setLayout(layout: Int) {
@@ -796,9 +825,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Presses a button of [remote]. Nothing comes back from an appliance: only a failure is told. */
     fun sendRemote(remote: Remote, command: String, parameter: String = "default", custom: Boolean = false) {
+        val haptic = when (command) {
+            "turnOn" -> Haptic.On
+            "turnOff" -> Haptic.Off
+            else -> Haptic.Key
+        }
+        send(remote, command, parameter, custom, haptic)
+    }
+
+    private fun send(remote: Remote, command: String, parameter: String, custom: Boolean, haptic: Haptic) {
         _state.update { it.copy(busy = it.busy + remote.id) }
+        _haptics.tryEmit(haptic)
         viewModelScope.launch {
-            guarded { switchBot.send(remote, command, parameter, custom) }
+            if (!guarded { switchBot.send(remote, command, parameter, custom) }) _haptics.tryEmit(Haptic.Reject)
             _state.update { it.copy(busy = it.busy - remote.id) }
         }
     }
@@ -807,7 +846,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun sendAc(remote: Remote, setting: AcSetting, on: Boolean) {
         setAc(remote, setting)
         val power = if (on) "on" else "off"
-        sendRemote(remote, "setAll", "${setting.temperature},${setting.mode},${setting.fan},$power")
+        send(remote, "setAll", "${setting.temperature},${setting.mode},${setting.fan},$power", false, if (on) Haptic.On else Haptic.Off)
     }
 
     fun setAc(remote: Remote, setting: AcSetting) {
@@ -857,6 +896,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("tiles", JSONArray(s.tileDevices.map { it ?: JSONObject.NULL }))
             .put("alerts", alerts)
             .put("autoUpdate", s.autoUpdate)
+            .put("haptics", s.haptics)
             .put("theme", s.theme)
             .put("remoteButtons", JSONObject(s.remoteButtons.mapValues { JSONArray(it.value) }))
             .put("hiddenRemotes", JSONArray(s.hiddenRemotes))
@@ -944,6 +984,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
         settings.edit()
             .putBoolean("autoUpdate", backup.optBoolean("autoUpdate", true))
+            .putBoolean("haptics", backup.optBoolean("haptics", true))
             .putInt("theme", backup.optInt("theme", 0).coerceIn(0, 2))
             .apply()
         _state.update {
@@ -960,6 +1001,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 tileDevices = local.tileDevices(),
                 alerts = Alerts.all(app),
                 autoUpdate = settings.getBoolean("autoUpdate", true),
+                haptics = settings.getBoolean("haptics", true),
                 theme = settings.getInt("theme", 0),
             )
         }

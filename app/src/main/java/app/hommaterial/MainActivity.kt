@@ -46,8 +46,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.hommaterial.ui.HomeScreen
+import app.hommaterial.ui.LocalHaptics
 import app.hommaterial.ui.LoginScreen
 import app.hommaterial.ui.OnboardingScreen
+import app.hommaterial.ui.ProvideHaptics
 import app.hommaterial.ui.RestScreen
 import app.hommaterial.ui.SettingsScreen
 import app.hommaterial.ui.UpdateDialog
@@ -129,7 +131,9 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-            HommaterialTheme(dark) {
+            HommaterialTheme(dark, haptics = state.haptics) {
+                val haptic = LocalHaptics.current
+                LaunchedEffect(vm, haptic) { vm.haptics.collect(haptic) }
                 // Every return to the app shows fresh states.
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
                     vm.refresh()
@@ -207,7 +211,7 @@ private fun isNight(at: Long, from: Int, to: Int): Boolean {
 }
 
 @Composable
-private fun HommaterialTheme(dark: Boolean, content: @Composable () -> Unit) {
+private fun HommaterialTheme(dark: Boolean, haptics: Boolean, content: @Composable () -> Unit) {
     val colors = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(LocalContext.current) else dynamicLightColorScheme(LocalContext.current)
@@ -216,6 +220,8 @@ private fun HommaterialTheme(dark: Boolean, content: @Composable () -> Unit) {
     }
     MaterialTheme(colorScheme = colors) {
         // Painted behind every screen: what a sliding screen uncovers is the theme, not the window.
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background, content = content)
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            ProvideHaptics(haptics, content)
+        }
     }
 }

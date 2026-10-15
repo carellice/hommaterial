@@ -332,6 +332,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 Chips(R.string.theme, themes.mapIndexed { i, label -> i to str(label) }, state.theme, vm::setTheme)
                 val layouts = listOf(LAYOUT_GRID to str(R.string.layout_grid), LAYOUT_LIST to str(R.string.layout_list))
                 Chips(R.string.layout, layouts, state.layout, vm::setLayout)
+                Toggle(R.string.haptics, R.string.haptics_text, state.haptics, vm::setHaptics)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     Setting(
                         title = str(R.string.language_choose),
@@ -666,16 +667,21 @@ internal fun OrderRow(
     onClick: (() -> Unit)? = null,
     onMove: (Int) -> Unit,
 ) {
+    val haptic = LocalHaptics.current
+    val move = { by: Int ->
+        haptic(Haptic.Tick)
+        onMove(by)
+    }
     Setting(
         title = name,
         text = text,
         onClick = onClick,
         trailing = {
             Row {
-                IconButton(onClick = { onMove(-1) }, enabled = !first) {
+                IconButton(onClick = { move(-1) }, enabled = !first) {
                     Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = str(R.string.move_up))
                 }
-                IconButton(onClick = { onMove(1) }, enabled = !last) {
+                IconButton(onClick = { move(1) }, enabled = !last) {
                     Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = str(R.string.move_down))
                 }
             }
@@ -691,11 +697,19 @@ internal fun Chips(
     selected: Int,
     onSelect: (Int) -> Unit,
 ) {
+    val haptic = LocalHaptics.current
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(str(title), style = MaterialTheme.typography.bodyLarge)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for ((value, label) in choices) {
-                FilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(label) })
+                FilterChip(
+                    selected = value == selected,
+                    onClick = {
+                        haptic(Haptic.Tick)
+                        onSelect(value)
+                    },
+                    label = { Text(label) },
+                )
             }
         }
     }
@@ -703,11 +717,16 @@ internal fun Chips(
 
 @Composable
 internal fun Toggle(@StringRes title: Int, @StringRes text: Int, checked: Boolean, onChange: (Boolean) -> Unit) {
+    val haptic = LocalHaptics.current
+    val change = { on: Boolean ->
+        haptic(if (on) Haptic.On else Haptic.Off)
+        onChange(on)
+    }
     Setting(
         title = str(title),
         text = str(text),
-        onClick = { onChange(!checked) },
-        trailing = { Switch(checked = checked, onCheckedChange = onChange) },
+        onClick = { change(!checked) },
+        trailing = { Switch(checked = checked, onCheckedChange = change) },
     )
 }
 

@@ -454,10 +454,15 @@ private fun Rocker(@StringRes label: Int, modifier: Modifier = Modifier, onPress
  */
 @Composable
 private fun AcControls(remote: Remote, setting: AcSetting, vm: HomeViewModel) {
+    val haptic = LocalHaptics.current
+    val adjust = { changed: AcSetting ->
+        haptic(Haptic.Tick)
+        vm.setAc(remote, changed)
+    }
     Row(Modifier.padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(str(R.string.temperature), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
         FilledTonalIconButton(
-            onClick = { vm.setAc(remote, setting.copy(temperature = setting.temperature - 1)) },
+            onClick = { adjust(setting.copy(temperature = setting.temperature - 1)) },
             enabled = setting.temperature > AC_TEMPERATURES.first,
         ) {
             Icon(Icons.Outlined.Remove, contentDescription = str(R.string.alert_lower))
@@ -468,14 +473,14 @@ private fun AcControls(remote: Remote, setting: AcSetting, vm: HomeViewModel) {
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         FilledTonalIconButton(
-            onClick = { vm.setAc(remote, setting.copy(temperature = setting.temperature + 1)) },
+            onClick = { adjust(setting.copy(temperature = setting.temperature + 1)) },
             enabled = setting.temperature < AC_TEMPERATURES.last,
         ) {
             Icon(Icons.Outlined.Add, contentDescription = str(R.string.alert_raise))
         }
     }
-    Choices(R.string.ac_mode, AC_MODES, setting.mode.coerceAtLeast(1)) { vm.setAc(remote, setting.copy(mode = it)) }
-    Choices(R.string.ac_fan_speed, AC_FANS, setting.fan) { vm.setAc(remote, setting.copy(fan = it)) }
+    Choices(R.string.ac_mode, AC_MODES, setting.mode.coerceAtLeast(1)) { adjust(setting.copy(mode = it)) }
+    Choices(R.string.ac_fan_speed, AC_FANS, setting.fan) { adjust(setting.copy(fan = it)) }
     Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         FilledTonalButton(onClick = { vm.sendAc(remote, setting, on = true) }, modifier = Modifier.weight(1f)) {
             Text(str(R.string.ac_send))

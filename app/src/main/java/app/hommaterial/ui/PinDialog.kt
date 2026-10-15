@@ -33,8 +33,10 @@ fun PinDialog(title: String, hint: String? = null, onSubmit: (String) -> Boolean
     var wrong by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
+    val haptic = LocalHaptics.current
     val submit = {
         if (typed.length >= PIN_MIN && !onSubmit(typed)) {
+            haptic(Haptic.Reject)
             wrong = true
             typed = ""
         }
