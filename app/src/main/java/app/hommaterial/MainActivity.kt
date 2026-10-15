@@ -131,7 +131,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-            HommaterialTheme(dark, haptics = state.haptics) {
+            HommaterialTheme(dark, haptics = state.haptics, hapticLevel = state.hapticLevel) {
                 val haptic = LocalHaptics.current
                 LaunchedEffect(vm, haptic) { vm.haptics.collect(haptic) }
                 // Every return to the app shows fresh states.
@@ -211,7 +211,7 @@ private fun isNight(at: Long, from: Int, to: Int): Boolean {
 }
 
 @Composable
-private fun HommaterialTheme(dark: Boolean, haptics: Boolean, content: @Composable () -> Unit) {
+private fun HommaterialTheme(dark: Boolean, haptics: Boolean, hapticLevel: Int, content: @Composable () -> Unit) {
     val colors = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(LocalContext.current) else dynamicLightColorScheme(LocalContext.current)
@@ -221,7 +221,7 @@ private fun HommaterialTheme(dark: Boolean, haptics: Boolean, content: @Composab
     MaterialTheme(colorScheme = colors) {
         // Painted behind every screen: what a sliding screen uncovers is the theme, not the window.
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            ProvideHaptics(haptics, content)
+            ProvideHaptics(haptics, hapticLevel, content)
         }
     }
 }

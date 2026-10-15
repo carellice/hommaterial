@@ -83,7 +83,8 @@ collegati al proprio account Alexa.
   accensione e spegnimento, per un dispositivo personalizzato eseguito, un
   tasto del telecomando, un timer avviato o un tag NFC scritto, piccoli scatti
   mentre si regola la luminosità, e una vibrazione d'errore quando un comando
-  non riesce. Si spegne nelle Impostazioni, in Aspetto.
+  non riesce. Nelle Impostazioni, in Aspetto, si spegne o se ne sceglie
+  l'intensità con uno slider, che mentre lo si trascina fa sentire ogni livello.
 - Il widget per la schermata Home mostra i dispositivi e i gruppi scelti
   nelle Impostazioni, dove si regolano anche ordine, colonne, dimensione dei
   riquadri, intestazione e sfondo.

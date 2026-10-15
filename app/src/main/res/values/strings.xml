@@ -461,6 +461,7 @@
     <string name="layout_grid">Grid</string>
     <string name="layout_list">List</string>
     <string name="haptics">Vibration</string>
+    <string name="haptic_level">Strength: %1$d%%</string>
     <string name="haptics_text">A short vibration when you switch, run or adjust something, and when a command fails</string>
     <string name="arrange_text">Use the arrows to move the tiles: each section has its own order, and the order holds both in the grid and in the list.</string>
     <string name="search">Search</string>

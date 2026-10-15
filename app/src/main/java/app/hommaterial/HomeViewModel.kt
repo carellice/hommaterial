@@ -44,6 +44,8 @@ import app.hommaterial.quick.Quick
 import app.hommaterial.quick.Schedules
 import app.hommaterial.quick.Timers
 import app.hommaterial.str
+import app.hommaterial.ui.HAPTIC_LEVEL_DEFAULT
+import app.hommaterial.ui.HAPTIC_LEVEL_MIN
 import app.hommaterial.ui.Haptic
 import app.hommaterial.voice.ExtraCommand
 import app.hommaterial.voice.VoiceCommand
@@ -109,6 +111,8 @@ data class UiState(
     val autoUpdate: Boolean = true,
     /** Whether touches and commands answer with a short vibration. */
     val haptics: Boolean = true,
+    /** How strong those vibrations are, in percent. */
+    val hapticLevel: Int = HAPTIC_LEVEL_DEFAULT,
     /** How the tiles of the home are laid out: [LAYOUT_GRID] or [LAYOUT_LIST]. */
     val layout: Int = LAYOUT_GRID,
     /** 0 follows the phone, 1 is always light, 2 always dark. */
@@ -236,6 +240,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             alerts = Alerts.all(getApplication()),
             autoUpdate = settings.getBoolean("autoUpdate", true),
             haptics = settings.getBoolean("haptics", true),
+            hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
             theme = settings.getInt("theme", 0),
             layout = settings.getInt("layout", LAYOUT_GRID),
             monitor = runCatching {
@@ -760,6 +765,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(haptics = on) }
     }
 
+    fun setHapticLevel(level: Int) {
+        settings.edit().putInt("hapticLevel", level).apply()
+        _state.update { it.copy(hapticLevel = level) }
+    }
+
     fun setLayout(layout: Int) {
         settings.edit().putInt("layout", layout).apply()
         _state.update { it.copy(layout = layout) }
@@ -897,6 +907,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("alerts", alerts)
             .put("autoUpdate", s.autoUpdate)
             .put("haptics", s.haptics)
+            .put("hapticLevel", s.hapticLevel)
             .put("theme", s.theme)
             .put("remoteButtons", JSONObject(s.remoteButtons.mapValues { JSONArray(it.value) }))
             .put("hiddenRemotes", JSONArray(s.hiddenRemotes))
@@ -985,6 +996,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         settings.edit()
             .putBoolean("autoUpdate", backup.optBoolean("autoUpdate", true))
             .putBoolean("haptics", backup.optBoolean("haptics", true))
+            .putInt("hapticLevel", backup.optInt("hapticLevel", HAPTIC_LEVEL_DEFAULT).coerceIn(HAPTIC_LEVEL_MIN, 100))
             .putInt("theme", backup.optInt("theme", 0).coerceIn(0, 2))
             .apply()
         _state.update {
@@ -1002,6 +1014,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 alerts = Alerts.all(app),
                 autoUpdate = settings.getBoolean("autoUpdate", true),
                 haptics = settings.getBoolean("haptics", true),
+                hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
                 theme = settings.getInt("theme", 0),
             )
         }

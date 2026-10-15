@@ -449,6 +449,7 @@
     <string name="layout_grid">Griglia</string>
     <string name="layout_list">Elenco</string>
     <string name="haptics">Vibrazione</string>
+    <string name="haptic_level">Intensità: %1$d%%</string>
     <string name="haptics_text">Una breve vibrazione quando accendi, spegni, esegui o regoli qualcosa, e quando un comando non riesce</string>
     <string name="arrange_text">Usa le frecce per spostare i riquadri: ogni sezione ha il suo ordine, e l\'ordine vale sia in griglia sia in elenco.</string>
     <string name="search">Cerca</string>

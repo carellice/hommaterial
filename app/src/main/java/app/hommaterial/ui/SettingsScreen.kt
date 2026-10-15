@@ -50,6 +50,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -60,6 +61,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,6 +93,7 @@ import app.hommaterial.quick.SHORTCUT_MACRO
 import app.hommaterial.quick.clock
 import app.hommaterial.quick.degrees
 import app.hommaterial.str
+import kotlin.math.roundToInt
 
 private const val SOURCE_URL = "https://github.com/carellice/hommaterial"
 private const val BACKUP_FILE = "hommaterial-backup.json"
@@ -333,6 +336,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 val layouts = listOf(LAYOUT_GRID to str(R.string.layout_grid), LAYOUT_LIST to str(R.string.layout_list))
                 Chips(R.string.layout, layouts, state.layout, vm::setLayout)
                 Toggle(R.string.haptics, R.string.haptics_text, state.haptics, vm::setHaptics)
+                if (state.haptics) HapticLevel(state.hapticLevel, vm::setHapticLevel)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     Setting(
                         title = str(R.string.language_choose),
@@ -712,6 +716,31 @@ internal fun Chips(
                 )
             }
         }
+    }
+}
+
+/** The strength of the vibrations: each step is felt while dragging, at the strength it stands for. */
+@Composable
+private fun HapticLevel(level: Int, onChange: (Int) -> Unit) {
+    val context = LocalContext.current
+    val vibrations = remember(context) { Vibrations(context) }
+    var value by remember(level) { mutableFloatStateOf(level.toFloat()) }
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(str(R.string.haptic_level, value.roundToInt()), style = MaterialTheme.typography.bodyLarge)
+        Slider(
+            value = value,
+            onValueChange = {
+                if (it.roundToInt() != value.roundToInt()) vibrations.play(Haptic.Tick, it.roundToInt())
+                value = it
+            },
+            onValueChangeFinished = {
+                val chosen = value.roundToInt()
+                vibrations.play(Haptic.On, chosen)
+                onChange(chosen)
+            },
+            valueRange = HAPTIC_LEVEL_MIN.toFloat()..100f,
+            steps = (100 - HAPTIC_LEVEL_MIN) / 10 - 1,
+        )
     }
 }
 
