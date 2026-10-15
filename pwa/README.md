@@ -9,6 +9,12 @@ Le parole sono quelle dell'app Android (`tools/strings.py` le prende da
 `app/src/main/res`), e il backup è lo stesso file: si esporta da una e si
 importa nell'altra.
 
+<p align="center">
+  <a href="../docs/video/hommaterial-promo.mp4"><img src="../docs/video/anteprima.gif" alt="Presentazione animata di Hommaterial" width="640"></a>
+</p>
+
+<p align="center">🎬 Il video di presentazione, con l'audio: <a href="../docs/video/hommaterial-promo.mp4"><b>orizzontale 16:9</b></a> · <a href="../docs/video/hommaterial-promo-verticale.mp4"><b>verticale 9:16</b></a></p>
+
 ## Perché serve un proxy
 
 Un sito non può parlare direttamente con Alexa né con SwitchBot: i loro server

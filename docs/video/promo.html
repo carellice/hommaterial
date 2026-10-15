@@ -1,0 +1,733 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Hommaterial promo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#05060a}
+body{font-family:-apple-system,"SF Pro Display",system-ui,sans-serif;color:#fff;-webkit-font-smoothing:antialiased}
+#stage{position:absolute;inset:0;overflow:hidden;background:#05060a}
+.abs{position:absolute}
+.glow{position:absolute;border-radius:50%;filter:blur(120px)}
+svg{display:block}
+/* logo */
+#logo{position:absolute;left:960px;top:540px;width:0;height:0}
+#icon{position:absolute;width:240px;height:240px;left:-120px;top:-120px}
+#ring{position:absolute;width:240px;height:240px;left:-120px;top:-120px;border-radius:60px;border:3px solid #6FA4FF}
+#word{white-space:nowrap;font-size:112px;font-weight:700;letter-spacing:-3.5px;display:flex}
+#word span{display:inline-block}
+.mask{overflow:hidden;padding:0 4px 18px}
+#wordMask{position:absolute;top:-80px;width:max-content}
+#tag1{position:absolute;width:max-content;white-space:nowrap;font-size:34px;font-weight:500;color:#AEB4C6;letter-spacing:-.3px}
+/* copy */
+.copy{position:absolute;left:180px;top:540px;width:720px;display:none}
+.copy .h{font-size:92px;font-weight:700;letter-spacing:-3px;line-height:1.02}
+.copy .h span{display:block}
+.copy .s{font-size:33px;font-weight:500;color:#9AA3BC;margin-top:28px;letter-spacing:-.3px;line-height:1.32;width:640px}
+.grad{background:linear-gradient(100deg,#fff 10%,#B4C5FF 60%,#6FA4FF);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* alexa */
+#alexa{position:absolute;inset:0;display:none}
+#alexaTitle{position:absolute;left:0;right:0;top:120px;text-align:center;font-size:80px;font-weight:700;letter-spacing:-2.6px}
+#alexaSub{position:absolute;left:0;right:0;top:950px;text-align:center;font-size:33px;font-weight:500;color:#9AA3BC;letter-spacing:-.3px}
+#hub{position:absolute;left:960px;top:545px;width:0;height:0}
+#hub svg.app{position:absolute;width:170px;height:170px;left:-85px;top:-85px;filter:drop-shadow(0 20px 50px rgba(30,80,255,.5))}
+.bub{position:absolute;width:118px;height:118px;margin:-59px 0 0 -59px;border-radius:50%;background:linear-gradient(160deg,rgba(255,255,255,.14),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center}
+.bub svg{width:50px;height:50px;fill:#DBE1FF}
+.bub b{position:absolute;top:128px;font-size:20px;font-weight:600;color:#AEB4C6;white-space:nowrap}
+#links{position:absolute;left:0;top:0}
+/* phone */
+#phoneWrap{position:absolute;left:1260px;top:540px;width:0;height:0;perspective:2200px}
+#phone{position:absolute;width:430px;height:900px;left:-215px;top:-450px;border-radius:68px;background:#15161b;padding:13px;
+  box-shadow:0 0 0 2px #2b2d35,0 0 0 4px #0b0c10,0 60px 140px rgba(0,0,0,.65),0 0 120px rgba(61,139,255,.12)}
+#screen{position:relative;width:100%;height:100%;border-radius:56px;overflow:hidden;background:#121318;color:#E3E1E9}
+.status{height:46px;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0;font-size:16px;font-weight:600;position:relative;z-index:2}
+.cam{position:absolute;top:16px;left:50%;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:#000;z-index:60}
+.appbar{display:flex;align-items:center;padding:12px 22px 6px 26px;height:70px}
+.appbar .t{font-size:30px;font-weight:600;flex:1;letter-spacing:-.5px}
+.appbar svg{width:26px;height:26px;fill:#C5C6D0;margin-left:22px}
+.sec{display:flex;align-items:center;padding:14px 26px 10px;font-size:16px;font-weight:600;color:#B4C5FF}
+.sec .pw{margin-left:auto;width:34px;height:34px;border-radius:50%;background:#292A2F;display:flex;align-items:center;justify-content:center}
+.sec .pw svg{width:18px;height:18px;fill:#C5C6D0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px}
+.tile{position:relative;height:118px;border-radius:24px;background:#292A2F;padding:16px 16px 14px;display:flex;flex-direction:column;overflow:hidden}
+.tile .ic{width:30px;height:30px;fill:currentColor}
+.tile .n{margin-top:auto;font-size:18px;font-weight:600;letter-spacing:-.2px}
+.tile .st{font-size:14px;opacity:.72;margin-top:2px;white-space:nowrap}
+.tile .on{position:absolute;inset:0;opacity:0;background:#26418F;border-radius:24px}
+.tile .fg{position:relative;display:flex;flex-direction:column;height:100%}
+.tile .corner{position:absolute;right:0;top:2px;width:18px;height:18px;fill:currentColor;opacity:.55}
+.touch{position:absolute;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 0 0 2px rgba(255,255,255,.35);z-index:80;display:none}
+#scrim{position:absolute;inset:0;background:#000;opacity:0}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#1E1F25;border-radius:32px 32px 0 0;padding:0 24px 40px;transform:translateY(110%)}
+.sheet .handle{width:36px;height:5px;border-radius:3px;background:#8F909A;opacity:.5;margin:14px auto 18px}
+.sheet .tt{font-size:26px;font-weight:600}
+.sheet .sub{font-size:15px;color:#C5C6D0;margin-top:2px}
+.btns{display:flex;gap:10px;margin-top:18px}
+.btns div{flex:1;height:52px;border-radius:26px;background:#41465A;color:#DDE1F9;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600}
+.lbl{font-size:15px;font-weight:600;color:#B4C5FF;margin:22px 0 12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative;height:38px;border-radius:10px;border:1px solid #8F909A;padding:0 14px;display:flex;align-items:center;font-size:15px;font-weight:500;color:#E3E1E9;overflow:hidden}
+.chip .sel{position:absolute;inset:0;background:#41465A;opacity:0}
+.chip span,.chip svg{position:relative}
+.chip svg{width:18px;height:18px;fill:#DDE1F9;margin-right:6px}
+.slider{position:relative;height:44px}
+.slider .tr{position:absolute;left:0;right:0;top:14px;height:16px;border-radius:8px;background:#34343A}
+.slider .fill{position:absolute;left:0;top:14px;height:16px;border-radius:8px;background:#B4C5FF}
+.slider .th{position:absolute;top:4px;width:6px;height:36px;margin-left:-3px;border-radius:3px;background:#B4C5FF}
+.sw{display:flex;gap:14px}
+.sw div{width:42px;height:42px;border-radius:50%;box-shadow:0 0 0 0 #B4C5FF}
+.keys{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:20px}
+.key{position:relative;height:64px;border-radius:20px;background:#292A2F;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;overflow:hidden}
+.key svg{width:28px;height:28px;fill:#E3E1E9;position:relative}
+.key .hl{position:absolute;inset:0;background:#B4C5FF;opacity:0}
+.key.pw{background:#93000A}
+.rock{grid-row:span 2;height:140px;flex-direction:column;justify-content:space-around;background:#41465A;border-radius:32px}
+.rock .lab{font-size:13px;color:#C5C6D0;position:relative}
+#voice{position:absolute;left:16px;right:16px;bottom:24px;height:150px;border-radius:30px;background:#292A2F;padding:22px 24px;transform:translateY(200px)}
+#voice .vt{font-size:15px;color:#B4C5FF;font-weight:600}
+#voice .said{font-size:24px;font-weight:600;margin-top:8px;min-height:30px;letter-spacing:-.3px}
+#bars{display:flex;gap:6px;align-items:center;height:36px;margin-top:12px}
+#bars i{display:block;width:6px;border-radius:3px;background:#B4C5FF}
+#toast{position:absolute;left:24px;right:24px;bottom:30px;height:58px;border-radius:14px;background:#E3E1E9;color:#2F3036;display:flex;align-items:center;padding:0 18px;font-size:16px;font-weight:500;opacity:0}
+#toast svg{width:22px;height:22px;fill:#3D5BA9;margin-right:12px}
+/* launcher */
+#launcher{position:absolute;inset:0;opacity:0;background:radial-gradient(120% 70% at 20% 10%,#3448a8 0%,transparent 60%),radial-gradient(90% 60% at 90% 90%,#6b2fa0 0%,transparent 60%),#0d1030;z-index:40}
+#lClock{position:absolute;left:0;right:0;top:80px;text-align:center;font-size:82px;font-weight:300;letter-spacing:-2px}
+#lDate{position:absolute;left:0;right:0;top:182px;text-align:center;font-size:17px;font-weight:500;color:#DDE1F9}
+#widget{position:absolute;left:18px;right:18px;top:250px;border-radius:30px;background:rgba(18,19,24,.78);padding:16px}
+#widget .wh{display:flex;align-items:center;font-size:15px;font-weight:600;color:#C5C6D0;margin:0 0 12px 4px;gap:8px}
+#widget .wh svg{width:22px;height:22px}
+#widget .grid{padding:0}
+#widget .tile{height:96px}
+#dock{position:absolute;left:30px;right:30px;bottom:60px;display:flex;justify-content:space-between}
+#dock > div{width:66px;height:66px;border-radius:50%;background:rgba(255,255,255,.18)}
+#dock svg{width:66px;height:66px}
+#menu{position:absolute;right:20px;bottom:150px;width:250px;border-radius:24px;background:#292A2F;padding:8px 0;transform-origin:85% 100%}
+#menu div{display:flex;align-items:center;gap:14px;padding:13px 20px;font-size:17px;font-weight:500}
+#menu svg{width:22px;height:22px;fill:#B4C5FF}
+/* nfc tag */
+#nfc{position:absolute;width:260px;height:260px;left:-130px;top:-130px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#ffffff,#dfe4f0 55%,#b9c1d6);box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 -6px 18px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center}
+#nfc svg{width:90px;height:90px}
+.wave{position:absolute;width:260px;height:260px;left:-130px;top:-130px;border-radius:50%;border:3px solid #6FA4FF}
+/* web */
+#web{position:absolute;inset:0;display:none;perspective:2400px}
+#win{position:absolute;left:880px;top:190px;width:960px;height:640px;border-radius:22px;background:#121318;overflow:hidden;
+  box-shadow:0 0 0 1px #2b2d35,0 60px 140px rgba(0,0,0,.7)}
+#win .bar{height:50px;background:#1E1F25;display:flex;align-items:center;padding:0 18px;gap:8px}
+#win .bar i{width:13px;height:13px;border-radius:50%;background:#3a3b42;display:block}
+#win .url{margin-left:24px;flex:1;max-width:520px;height:32px;border-radius:16px;background:#121318;color:#C5C6D0;font-size:15px;display:flex;align-items:center;padding:0 16px;gap:8px}
+#win .url svg{width:14px;height:14px;fill:#8F909A}
+#win .body{display:flex;height:590px}
+#win .rail{width:110px;padding-top:18px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.ri{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#C5C6D0}
+.ri .pill{width:56px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.ri svg{width:22px;height:22px;fill:#C5C6D0}
+.ri.act .pill{background:#41465A}
+#win .main{flex:1;padding:16px 24px 0 6px}
+#win .main .t{font-size:30px;font-weight:600;letter-spacing:-.5px;margin:4px 0 8px 2px}
+#win .grid{grid-template-columns:repeat(4,1fr);padding:0}
+#win .sec{padding:14px 2px 10px}
+#win .tile{height:112px}
+#cursor{position:absolute;width:28px;height:28px;z-index:9}
+#tablet{position:absolute;left:1280px;top:600px;width:600px;height:400px;border-radius:34px;background:#15161b;padding:12px;
+  box-shadow:0 0 0 2px #2b2d35,0 50px 120px rgba(0,0,0,.75)}
+#tablet .scr{width:100%;height:100%;border-radius:24px;background:#0d0e13;display:flex;padding:30px;gap:24px;overflow:hidden}
+#tablet .clk{font-size:96px;font-weight:200;letter-spacing:-3px;line-height:1}
+#tablet .dt{font-size:16px;color:#C5C6D0;margin-top:10px}
+#tablet .tm{font-size:15px;color:#B4C5FF;margin-top:auto;font-weight:600}
+#tablet .grid{padding:0;flex:1}
+#tablet .tile{height:150px}
+/* feature cards */
+#feat{position:absolute;inset:0;display:none}
+#featTitle{position:absolute;left:0;right:0;top:120px;text-align:center;font-size:80px;font-weight:700;letter-spacing:-2.6px}
+.card{position:absolute;width:396px;height:250px;border-radius:34px;background:linear-gradient(160deg,rgba(255,255,255,.09),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.09);padding:30px 30px}
+.card .ci{width:60px;height:60px;border-radius:19px;background:#26418F;display:flex;align-items:center;justify-content:center}
+.card .ci svg{width:32px;height:32px;fill:#DBE1FF}
+.card .cl{font-size:31px;font-weight:700;letter-spacing:-.8px;margin-top:26px}
+.card .cs{font-size:20px;color:#9AA3BC;margin-top:6px;line-height:1.3}
+/* end */
+#endSub{position:absolute;left:0;right:0;top:600px;text-align:center;font-size:36px;font-weight:500;color:#AEB4C6;letter-spacing:-.3px;opacity:0}
+#endUrl{position:absolute;left:0;right:0;top:660px;text-align:center;font-size:24px;font-weight:500;color:#6FA4FF;opacity:0}
+#endNote{position:absolute;left:0;right:0;top:985px;text-align:center;font-size:19px;color:#5E6477;letter-spacing:.2px;opacity:0}
+#fade{position:absolute;inset:0;background:#000;pointer-events:none}
+/* vertical 9:16 */
+html.v,html.v body{width:1080px;height:1920px}
+html.v #logo{left:540px;top:960px}
+html.v .copy{left:80px;top:420px;width:920px}
+html.v .copy .s{width:900px;font-size:38px}
+html.v .copy .h{font-size:100px}
+html.v #alexaTitle{top:250px;font-size:84px;padding:0 90px;line-height:1.05}
+html.v #alexaSub{top:1580px;padding:0 120px;line-height:1.3}
+html.v #hub{left:540px;top:1000px}
+html.v #phoneWrap{left:540px;top:1260px}
+html.v #win{left:60px;top:760px}
+html.v #tablet{left:420px;top:1330px}
+html.v #featTitle{top:300px}
+html.v #endSub{top:1020px}
+html.v #endUrl{top:1080px}
+html.v #endNote{top:1800px}
+</style></head><body>
+<div id="stage">
+  <div class="glow" id="g1" style="width:1100px;height:1100px;background:#2F6BFF"></div>
+  <div class="glow" id="g2" style="width:900px;height:900px;background:#7A3CFF"></div>
+  <div class="glow" id="g3" style="width:700px;height:700px;background:#FFB547;opacity:0"></div>
+
+  <!-- logo -->
+  <div id="logo">
+    <div id="ring"></div>
+    <svg id="icon" viewBox="0 0 108 108">
+      <defs><linearGradient id="g" x1="18" y1="18" x2="90" y2="90" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3D8BFF"/><stop offset="1" stop-color="#1A3FB0"/></linearGradient>
+      <filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2.2" stdDeviation="1.6" flood-color="#0A1E5A" flood-opacity=".35"/></filter></defs>
+      <rect width="108" height="108" rx="26" fill="url(#g)"/>
+      <g transform="translate(54 54) scale(1.12) translate(-54 -54)">
+        <g id="house"><path filter="url(#sh)" d="M49.1,30.63Q54,26.36 58.9,30.63L75.6,45.14Q80.5,49.41 80.5,55.91L80.5,73Q80.5,79.5 74,79.5L34,79.5Q27.5,79.5 27.5,73L27.5,55.91Q27.5,49.41 32.4,45.14Z" fill="#fff"/></g>
+        <path id="arc" d="M60.106,54.723A9.5,9.5 0,1 1,47.894 54.723" fill="none" stroke="#1A3FB0" stroke-linecap="round" stroke-width="3.6"/>
+        <path id="bar" d="M54,50L54,59.5" stroke="#1A3FB0" stroke-linecap="round" stroke-width="3.6"/>
+      </g>
+    </svg>
+    <div class="mask" id="wordMask"><div id="word"></div></div>
+    <div id="tag1">La casa, a portata di tocco.</div>
+  </div>
+
+  <!-- alexa -->
+  <div id="alexa">
+    <svg id="links" width="1920" height="1080"></svg>
+    <div id="hub"><svg class="app" viewBox="0 0 108 108"><use href="#appIcon"/></svg></div>
+    <div id="alexaTitle">Tutti i tuoi dispositivi <span class="grad">Alexa.</span></div>
+    <div id="alexaSub">Accedi con il tuo account Amazon: stanze e dispositivi arrivano da soli.</div>
+  </div>
+
+  <div id="copies"></div>
+
+  <!-- nfc tag -->
+  <div class="abs" id="nfcWrap" style="width:0;height:0;display:none">
+    <div class="wave" id="w1"></div><div class="wave" id="w2"></div><div class="wave" id="w3"></div>
+    <div id="nfc"><svg viewBox="0 0 108 108"><use href="#appIcon"/></svg></div>
+  </div>
+
+  <!-- phone -->
+  <div id="phoneWrap"><div id="phone"><div id="screen">
+    <div class="cam"></div>
+    <div class="status"><span>9:41</span><span style="display:flex;gap:6px;align-items:center">
+      <svg width="18" height="14" viewBox="0 0 18 14"><path d="M1 13h3V9H1zM6 13h3V6H6zM11 13h3V3h-3zM16 13h2V0h-2z" fill="#E3E1E9"/></svg>
+      <svg width="26" height="13" viewBox="0 0 26 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="#E3E1E9" opacity=".5"/><rect x="2.5" y="2.5" width="15" height="8" rx="2" fill="#E3E1E9"/><rect x="23.5" y="4" width="2" height="5" rx="1" fill="#E3E1E9" opacity=".5"/></svg></span></div>
+    <div class="appbar"><div class="t">Casa</div>
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.110 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.230-1.57l.27.28v.79l5 4.99L20.49 19l-4.990-5zm-6 0C7.010 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.010 14 9.5 11.99 14 9.5 14z"/></svg>
+      <svg id="micBtn" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+    </div>
+    <div id="rooms"></div>
+    <div id="scrim"></div>
+
+    <div class="sheet" id="sLight">
+      <div class="handle"></div><div class="tt">Lampada</div><div class="sub">Salotto</div>
+      <div class="btns"><div>Accendi</div><div>Spegni</div></div>
+      <div class="lbl">Luminosità · <span id="brTxt">80%</span></div>
+      <div class="slider" id="slider"><div class="tr"></div><div class="fill" id="sFill"></div><div class="th" id="sTh"></div></div>
+      <div class="lbl">Colore</div>
+      <div class="sw" id="swatches"></div>
+    </div>
+
+    <div class="sheet" id="sTimer">
+      <div class="handle"></div><div class="tt">TV</div><div class="sub">Salotto</div>
+      <div class="btns"><div>Accendi</div><div>Spegni</div></div>
+      <div class="lbl">Timer</div>
+      <div class="chips"><div class="chip" id="chOff" style="border-color:transparent"><div class="sel" id="selOff" style="opacity:1"></div><svg id="ckOff" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>Spegni</span></div>
+        <div class="chip" id="chOn"><div class="sel" id="selOn"></div><svg id="ckOn" viewBox="0 0 24 24" style="display:none"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>Accendi</span></div></div>
+      <div class="chips" style="margin-top:10px">
+        <div class="chip"><span>15 min</span></div><div class="chip" id="ch30"><div class="sel" id="sel30"></div><span>30 min</span></div><div class="chip"><span>1 h</span></div><div class="chip"><span>2 h</span></div><div class="chip"><span>Personalizzato…</span></div>
+      </div>
+    </div>
+
+    <div class="sheet" id="sRemote">
+      <div class="handle"></div><div class="tt">TV Camera</div><div class="sub">Telecomando SwitchBot</div>
+      <div class="keys" id="keys"></div>
+    </div>
+
+    <div id="voice"><div class="vt">In ascolto…</div><div class="said" id="said"></div><div id="bars"></div></div>
+    <div id="toast"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 18H4V4h16v16zM18 6h-5c-1.1 0-2 .9-2 2v2.28c-.6.35-1 .98-1 1.72 0 1.1.9 2 2 2s2-.9 2-2c0-.74-.4-1.38-1-1.72V8h3v8H8V8h2V6H6v12h12V6z"/></svg>Faretti accesi</div>
+
+    <div id="launcher">
+      <div id="lClock">9:41</div><div id="lDate">Giovedì 15 ottobre</div>
+      <div id="widget"><div class="wh"><svg viewBox="0 0 108 108"><use href="#appIcon"/></svg>Hommaterial</div><div class="grid" id="g-widget"></div></div>
+      <div id="dock"><div></div><div></div><div></div><svg id="appDock" viewBox="0 0 108 108"><use href="#appIcon"/></svg></div>
+      <div id="menu"></div>
+    </div>
+    <div class="touch" id="touch"></div>
+  </div></div></div>
+
+  <!-- web -->
+  <div id="web">
+    <div id="win">
+      <div class="bar"><i></i><i></i><i></i><div class="url"><svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6z"/></svg>carellice.github.io/hommaterial</div></div>
+      <div class="body"><div class="rail" id="rail"></div><div class="main"><div class="t">Tutto</div><div id="webRooms"></div></div></div>
+      <svg id="cursor" viewBox="0 0 24 24"><path d="M5 2l14 11.5-6.2.6 3.7 7.4-2.6 1.3-3.6-7.5L5 19.5z" fill="#fff" stroke="#000" stroke-width="1.2" stroke-linejoin="round"/></svg>
+    </div>
+    <div id="tablet"><div class="scr"><div style="display:flex;flex-direction:column;width:230px"><div class="clk">21:30</div><div class="dt">Giovedì 15 ottobre</div><div class="tm">Modalità monitor</div></div><div class="grid" id="g-tablet"></div></div></div>
+  </div>
+
+  <!-- features -->
+  <div id="feat"><div id="featTitle">E molto <span class="grad">altro.</span></div></div>
+
+  <!-- end -->
+  <div id="endSub">Per Android e per il web.</div>
+  <div id="endUrl">github.com/carellice/hommaterial</div>
+  <div id="endNote">App non ufficiale, non affiliata ad Amazon o SwitchBot.</div>
+  <div id="fade"></div>
+</div>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <g id="appIcon"><rect width="108" height="108" rx="26" fill="url(#g)"/><g transform="translate(54 54) scale(1.12) translate(-54 -54)"><path d="M49.1,30.63Q54,26.36 58.9,30.63L75.6,45.14Q80.5,49.41 80.5,55.91L80.5,73Q80.5,79.5 74,79.5L34,79.5Q27.5,79.5 27.5,73L27.5,55.91Q27.5,49.41 32.4,45.14Z" fill="#fff"/><path d="M60.106,54.723A9.5,9.5 0,1 1,47.894 54.723" fill="none" stroke="#1A3FB0" stroke-linecap="round" stroke-width="3.6"/><path d="M54,50L54,59.5" stroke="#1A3FB0" stroke-linecap="round" stroke-width="3.6"/></g></g>
+</defs></svg>
+
+<script>
+const P = {
+  bulb:'M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z',
+  tv:'M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z',
+  ac:'M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.170V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z',
+  remote:'M15 9H9c-.55 0-1 .45-1 1v12c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V10c0-.55-.45-1-1-1zm-3 6c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM7.05 6.05l1.41 1.41C9.37 6.56 10.62 6 12 6s2.63.56 3.54 1.46l1.41-1.41C15.68 4.78 13.93 4 12 4s-3.68.78-4.95 2.05zM12 0C8.96 0 6.21 1.23 4.22 3.22l1.41 1.41C7.26 3.01 9.51 2 12 2s4.74 1.01 6.36 2.64l1.41-1.41C17.79 1.23 15.04 0 12 0z',
+  coffee:'M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z',
+  timer:'M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z',
+  widgets:'M13 13v8h8v-8h-8zM3 21h8v-8H3v8zM3 3v8h8V3H3zm13.66-1.31L11 7.34 16.66 13l5.66-5.66-5.66-5.65z',
+  dash:'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
+  mic:'M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z',
+  chart:'M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z',
+  home:'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+  plug:'M16 7V3h-2v4h-4V3H8v4h-.01C6.9 6.99 6 7.89 6 8.98v5.52L9.5 18v3h5v-3l3.5-3.51v-5.5c0-1.1-.9-2-2-2z',
+  therm:'M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1h-1v1h1v2h-1v1h1v2h-2V5z',
+  fan:'M12 11c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm.5-9C17 2 17.11 5.57 14.75 6.75c-.99.49-1.43 1.54-1.62 2.47.48.2.9.51 1.22.91 3.7-2 7.68-1.21 7.68 2.37 0 4.5-3.57 4.6-4.75 2.25-.5-.99-1.56-1.43-2.49-1.62-.2.48-.51.89-.91 1.22 1.99 3.69 1.2 7.67-2.38 7.67-4.5 0-4.59-3.57-2.25-4.75.98-.49 1.42-1.53 1.62-2.46-.49-.2-.92-.52-1.24-.92C5.96 15.87 2 15.08 2 11.5 2 7 5.56 6.89 6.74 9.25c.5.99 1.55 1.42 2.48 1.62.19-.48.51-.9.92-1.22C8.15 5.97 8.94 2 12.5 2z',
+  power:'M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.170C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z',
+  mute:'M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z',
+  input:'M21 3.01H3c-1.1 0-2 .9-2 2V9h2V4.99h18v14.03H3V15H1v4.01c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98v-14c0-1.1-.9-2-2-2zM11 16l4-4-4-4v3H1v2h10v3z',
+  up:'M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z',
+  down:'M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z',
+  ok:'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z',
+  home2:'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+  star:'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z',
+  sofa:'M21 9V7c0-1.65-1.35-3-3-3H6C4.35 4 3 5.35 3 7v2c-1.65 0-3 1.35-3 3v5c0 1.65 1.35 3 3 3v1c0 .55.45 1 1 1s1-.45 1-1v-1h14v1c0 .55.45 1 1 1s1-.45 1-1v-1c1.65 0 3-1.35 3-3v-5c0-1.65-1.35-3-3-3zM5 7c0-.55.45-1 1-1h12c.55 0 1 .45 1 1v2.78c-.61.55-1 1.34-1 2.22v2H6v-2c0-.88-.39-1.67-1-2.22V7z',
+  kitchen:'M18 2.01L6 2c-1.11 0-2 .89-2 2v16c0 1.11.89 2 2 2h12c1.11 0 2-.89 2-2V4c0-1.11-.89-1.99-2-1.99zM18 20H6v-9.02h12V20zm0-11H6V4h12v5zM8 5h2v3H8zm0 7h2v5H8z',
+  bed:'M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z',
+  sched:'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z',
+  auto:'M7 2v11h3v9l7-12h-4l4-8z',
+  bell:'M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z',
+  tablet:'M21 4H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 1.99-.9 1.99-2L23 6c0-1.1-.9-2-2-2zm-2 14H5V6h14v12z',
+  backup:'M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z',
+  nfc:'M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 18H4V4h16v16zM18 6h-5c-1.1 0-2 .9-2 2v2.28c-.6.35-1 .98-1 1.72 0 1.1.9 2 2 2s2-.9 2-2c0-.74-.4-1.38-1-1.72V8h3v8H8V8h2V6H6v12h12V6z',
+  moon:'M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z',
+  touch:'M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74z',
+};
+const V = location.search.includes('v');
+if (V) document.documentElement.classList.add('v');
+const W = V ? 1080 : 1920, H = V ? 1920 : 1080;
+const CX = W / 2, CY = V ? 1000 : 545;
+const svg = (d, cls='') => `<svg class="${cls}" viewBox="0 0 24 24"><path d="${d}"/></svg>`;
+const $ = id => document.getElementById(id);
+const pwBtn = `<div class="pw">${svg(P.power)}</div>`;
+
+// ---------- the app home ----------
+const tiles = {};
+function makeTile(parent, key, icon, name, off, on, corner) {
+  const el = document.createElement('div');
+  el.className = 'tile';
+  el.innerHTML = `<div class="on"></div><div class="fg">${svg(P[icon],'ic')}${corner ? svg(P[corner],'corner') : ''}<div class="n">${name}</div><div class="st">${off}</div></div>`;
+  parent.appendChild(el);
+  if (key) tiles[key] = {el, on: el.querySelector('.on'), st: el.querySelector('.st'), off, onTxt: on, fg: el.querySelector('.fg')};
+  return el;
+}
+function room(parent, name, list, prefix='') {
+  const s = document.createElement('div'); s.className = 'sec'; s.innerHTML = name + pwBtn; parent.appendChild(s);
+  const g = document.createElement('div'); g.className = 'grid'; parent.appendChild(g);
+  list.forEach(a => makeTile(g, a[0] && prefix + a[0], ...a.slice(1)));
+}
+room($('rooms'), 'Salotto', [['lamp','bulb','Lampada','Spenta','Accesa'],['tv','tv','TV','Spenta','Accesa'],['ac','ac','Clima','Spento','Acceso · 22°'],['led','bulb','Striscia LED','Spenta','Accesa']]);
+room($('rooms'), 'Cucina', [['spot','bulb','Faretti','Spenti','Accesi'],['coffee','coffee','Macchina caffè','Spenta','Accesa']]);
+room($('rooms'), 'Camera', [['tvc','remote','TV Camera','Telecomando','Telecomando','touch'],['temp','therm','Sensore','21,4° · 48%','21,4° · 48%']]);
+
+// light sheet swatches
+const SW = ['#FFD9A0','#FFFFFF','#CFE3FF','#FF8A65','#B57BFF','#6BE3A8'];
+SW.forEach((c,i) => { const d = document.createElement('div'); d.style.background = c; d.id = 'sw' + i; $('swatches').appendChild(d); });
+// remote keys
+[['power','','pw'],['mute'],['input'],['up','Vol','rock'],['home2'],['up','Can','rock'],['ok']].forEach(([ic, lab, cls], i) => {
+  const k = document.createElement('div'); k.className = 'key ' + (cls || ''); k.id = 'key' + i;
+  k.innerHTML = cls === 'rock' ? `<div class="hl"></div>${svg(P.up)}<span class="lab">${lab}</span>${svg(P.down)}` : `<div class="hl"></div>${svg(P[ic])}`;
+  $('keys').appendChild(k);
+});
+// voice bars
+for (let i = 0; i < 22; i++) $('bars').appendChild(document.createElement('i'));
+// launcher widget + menu
+const wg = $('g-widget');
+const wTiles = {};
+[['lamp','bulb','Lampada','Accesa'],['spot','bulb','Faretti','Accesi'],['tv','tv','TV','Spenta'],['ac','ac','Clima','Spento']].forEach(([k,i,n,s]) => { wTiles[k] = makeTile(wg, null, i, n, s); });
+$('menu').innerHTML = [['bulb','Lampada'],['bulb','Faretti'],['moon','Gruppo Notte']].map(([i,n]) => `<div>${svg(P[i])}${n}</div>`).join('');
+
+// web window
+$('rail').innerHTML = [['home','Tutto',1],['star','Preferiti'],['dash','Gruppi'],['sofa','Salotto'],['kitchen','Cucina'],['bed','Camera']]
+  .map(([i,n,a]) => `<div class="ri ${a?'act':''}"><div class="pill">${svg(P[i])}</div>${n}</div>`).join('');
+const webTiles = {};
+(() => {
+  const r = $('webRooms');
+  const add = (name, list) => { const s = document.createElement('div'); s.className='sec'; s.innerHTML = name + pwBtn; r.appendChild(s);
+    const g = document.createElement('div'); g.className='grid'; r.appendChild(g); list.forEach(([k,i,n,st,on]) => { const el = makeTile(g, null, i, n, st); webTiles[k] = {el, on: el.querySelector('.on'), st: el.querySelector('.st'), off: st, onTxt: on}; }); };
+  add('Salotto', [['lamp','bulb','Lampada','Spenta','Accesa'],['tv','tv','TV','Spenta','Accesa'],['ac','ac','Clima','Spento','Acceso'],['led','bulb','Striscia LED','Spenta','Accesa']]);
+  add('Cucina', [['spot','bulb','Faretti','Spenti','Accesi'],['coffee','coffee','Macchina caffè','Spenta','Accesa'],['fan','fan','Ventilatore','Spento','Acceso'],['temp','therm','Sensore','21,4° · 48%','']]);
+})();
+const tabTiles = [];
+[['bulb','Lampada'],['bulb','Faretti'],['tv','TV'],['ac','Clima']].forEach(([i,n]) => tabTiles.push(makeTile($('g-tablet'), null, i, n, 'Spenta')));
+
+// alexa bubbles
+const BUBS = [['bulb','Luci'],['plug','Prese'],['ac','Clima'],['therm','Termostati'],['fan','Ventilatori'],['tv','TV'],['chart','Sensori'],['coffee','Elettrodomestici']];
+const bubs = BUBS.map(([i,n]) => { const d = document.createElement('div'); d.className = 'bub'; d.innerHTML = svg(P[i]) + `<b>${n}</b>`; $('alexa').appendChild(d); return d; });
+const NS = 'http://www.w3.org/2000/svg';
+$('links').setAttribute('width', W); $('links').setAttribute('height', H);
+const lines = BUBS.map(() => { const l = document.createElementNS(NS, 'line'); l.setAttribute('stroke', '#6FA4FF'); l.setAttribute('stroke-width', '2'); $('links').appendChild(l); return l; });
+const dots = BUBS.map(() => { const c = document.createElementNS(NS, 'circle'); c.setAttribute('r', '5'); c.setAttribute('fill', '#B4C5FF'); $('links').appendChild(c); return c; });
+
+// wordmark letters
+'Hommaterial'.split('').forEach(c => { const s = document.createElement('span'); s.textContent = c; $('word').appendChild(s); });
+
+// copy beats
+const COPY = [
+  ['tap', 8.9, 11.9, 'Un tocco.', 'E si accende.', 'Ogni stanza, come l\'hai creata in Alexa. Un tocco accende, un altro spegne.'],
+  ['light', 12.1, 15.1, 'Luce,', 'come la vuoi.', 'Luminosità e colore, dal pannello di ogni lampada.'],
+  ['timer', 15.3, 18.5, 'Timer,', 'come vuoi tu.', 'Accende o spegne tra 30 minuti, o dopo il tempo che scegli.'],
+  ['voice', 18.7, 21.9, 'Basta', 'dirlo.', '«Spegni tutto in salotto»: il microfono comanda dispositivi e stanze intere.'],
+  ['remote', 22.1, 25.3, 'Anche i', 'telecomandi.', 'Con SwitchBot, TV e condizionatori a infrarossi entrano nell\'app.'],
+  ['nfc', 25.5, 28.7, 'Avvicina.', 'Fatto.', 'Un tag NFC comanda la casa, anche con l\'app chiusa.'],
+  ['widget', 28.9, 32.1, 'Anche fuori', 'dall\'app.', 'Widget su Home e schermata di blocco, Impostazioni rapide, scorciatoie sull\'icona.'],
+  ['web', 32.5, 36.6, 'Anche nel', 'browser.', 'Su computer, tablet e iPhone, senza installare nulla. E un tablet diventa il pannello della casa.'],
+];
+const copies = COPY.map(([id, a, b, l1, l2, s]) => {
+  const d = document.createElement('div'); d.className = 'copy';
+  d.innerHTML = `<div class="h"><div class="mask"><span>${l1}</span></div><div class="mask"><span class="grad">${l2}</span></div></div><div class="s">${s}</div>`;
+  $('copies').appendChild(d); return {d, a, b};
+});
+
+// feature cards
+const FEATS = [
+  ['dash','Gruppi','Più stanze, un solo tocco'],
+  ['sched','Programmazioni','All\'ora e nei giorni scelti'],
+  ['auto','Automazioni','Quando un sensore supera una soglia'],
+  ['bell','Avvisi','Una notifica se fa troppo caldo'],
+  ['chart','Sensori','Grafici di temperatura e umidità'],
+  ['star','Preferiti e stanze','La casa organizzata a modo tuo'],
+  ['tablet','Modalità monitor','Il tablet come pannello di casa'],
+  ['backup','Backup','Le tue scelte in un file'],
+];
+const cards = FEATS.map(([i,l,s]) => {
+  const el = document.createElement('div'); el.className = 'card';
+  el.innerHTML = `<div class="ci">${svg(P[i])}</div><div class="cl">${l}</div><div class="cs">${s}</div>`;
+  $('feat').appendChild(el); return el;
+});
+
+// ---------- timing helpers ----------
+const clamp = (x,a=0,b=1) => Math.min(b, Math.max(a, x));
+const prog = (t,a,b) => clamp((t-a)/(b-a));
+const easeOut = p => 1 - Math.pow(1-p, 4);
+const easeIn = p => p*p*p;
+const easeInOut = p => p<.5 ? 8*p*p*p*p : 1 - Math.pow(-2*p+2,4)/2;
+const spring = p => p<=0 ? 0 : p>=1 ? 1 : 1 - Math.exp(-6.5*p) * Math.cos(9.5*p);
+const lerp = (a,b,p) => a + (b-a)*p;
+const S = (el, o) => { const s = el.style; for (const k in o) s[k] = o[k]; };
+const win = (t, a, b) => t >= a && t <= b;
+
+function beat(c, t) {
+  const {d, a, b} = c;
+  const vis = t > a - .01 && t < b + .01;
+  d.style.display = vis ? 'block' : 'none';
+  if (!vis) return;
+  d.querySelectorAll('.mask span').forEach((sp, i) => {
+    const pi = easeOut(prog(t, a + i*.1, a + i*.1 + .85));
+    const po = easeIn(prog(t, b-.5 + i*.05, b));
+    S(sp, {transform:`translateY(${(1-pi)*110 - po*40}%)`, opacity: 1 - po});
+  });
+  const sp = easeOut(prog(t, a+.3, a+1.2)), so = easeIn(prog(t, b-.5, b));
+  S(d.querySelector('.s'), {opacity: sp*(1-so), transform:`translateY(${(1-sp)*24 - so*16}px)`, filter:`blur(${so*8}px)`});
+  S(d, {transform:'translateY(-50%)'});
+}
+
+// a sheet that slides up at a and down at b
+function sheet(el, t, a, b) {
+  const v = easeOut(prog(t, a, a + .45)) * (1 - easeInOut(prog(t, b, b + .4)));
+  el.style.transform = `translateY(${(1-v)*110}%)`;
+  return v;
+}
+
+// state of a switch over time, from a list of [time, on]
+function level(events, t, dur=.35) {
+  let v = 0;
+  for (const [at, on] of events) if (t >= at) { const p = easeOut(prog(t, at, at + dur)); v = lerp(v, on ? 1 : 0, p); }
+  return v;
+}
+
+const pos = {};
+let wordW = 690;
+function measure() {
+  const off = (el) => { let x = 0, y = 0; while (el && el.id !== 'screen') { x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent; } return {x, y}; };
+  const c = (el) => { const o = off(el); return {x: o.x + el.offsetWidth/2, y: o.y + el.offsetHeight/2}; };
+  for (const k in tiles) pos[k] = c(tiles[k].el);
+  ['chOn','ch30','micBtn','sw4','key0','key3','appDock'].forEach(id => pos[id] = c($(id)));
+  pos.wSpot = c(wTiles.spot);
+  const so = off($('slider')); pos.slider = {x: so.x, y: so.y + 22, w: $('slider').offsetWidth};
+  wordW = $('word').offsetWidth;
+}
+
+const PHONE_IN = 8.2, PHONE_OUT = 32.2;
+
+function render(t) {
+  // ---------- ambient ----------
+  const drift = t * .3;
+  S($('g1'), {left:`${W/2 - 550 + Math.sin(drift)*140}px`, top:`${H/2 - 550 + Math.cos(drift*.8)*90}px`, opacity: .22 * easeOut(prog(t, 0, 1.8)) + .05*Math.sin(t*1.1)});
+  S($('g2'), {left:`${(V ? 300 : 420) - 450 + Math.cos(drift*.9)*180}px`, top:`${(V ? 1350 : 760) - 450 + Math.sin(drift)*100}px`, opacity: .13 * easeOut(prog(t, .6, 2.8))});
+  const lampOn = level([[9.9,1],[20.9,0]], t, .6);
+  const purple = easeOut(prog(t, 14.25, 14.8));
+  S($('g3'), {left: V ? '190px' : '910px', top: V ? '400px' : '-50px', opacity: lampOn * .24 * (1 - prog(t, PHONE_OUT - .5, PHONE_OUT)),
+    background: `rgb(${Math.round(lerp(255,181,purple))},${Math.round(lerp(181,123,purple))},${Math.round(lerp(71,255,purple))})`});
+
+  // ---------- logo intro ----------
+  if (t < 4.6) {
+    const iconIn = spring(prog(t, .2, 1.4));
+    const logoOut = easeInOut(prog(t, 3.8, 4.5));
+    const shrink = easeInOut(prog(t, 2.1, 3.1));
+    const sc = lerp(1, .62, shrink);
+    const shift = -lerp(0, (wordW + 40) / 2, shrink);
+    S($('logo'), {display:'block', opacity: 1 - logoOut, transform:`translate(0, ${-logoOut*60}px) scale(${1 - logoOut*.06})`, filter:`blur(${logoOut*10}px)`});
+    S($('icon'), {opacity: clamp(prog(t,.2,.6)), transform:`translateX(${shift}px) scale(${(.55 + .45*iconIn) * sc})`,
+      filter:`blur(${(1-clamp(prog(t,.2,.85)))*18}px) drop-shadow(0 ${30*sc}px ${60*sc}px rgba(30,80,255,${.45*clamp(prog(t,.4,1.2))}))`});
+    const houseP = spring(prog(t, .55, 1.6));
+    $('house').setAttribute('transform', `translate(54 ${54 + (1-houseP)*14}) scale(${.6 + .4*houseP}) translate(-54 -54)`);
+    S($('house'), {opacity: clamp(prog(t,.55,.9))});
+    const arcP = easeInOut(prog(t, 1.15, 1.9)), barP = easeOut(prog(t, 1.5, 1.9));
+    S($('arc'), {strokeDasharray: 50, strokeDashoffset: 50 * (1 - arcP), opacity: arcP > 0 ? 1 : 0});
+    S($('bar'), {strokeDasharray: 10, strokeDashoffset: 10 * (1 - barP), opacity: barP > 0 ? 1 : 0});
+    const ringP = prog(t, 1.85, 2.9);
+    S($('ring'), {opacity: ringP > 0 && ringP < 1 ? .7 * (1 - ringP) : 0, transform:`translateX(${shift}px) scale(${1 + easeOut(ringP)*1.6})`});
+    const wx = shift + 120*sc + 36;
+    S($('wordMask'), {left:`${wx}px`});
+    [...$('word').children].forEach((s, i) => { const p = easeOut(prog(t, 2.3 + i*.04, 2.3 + i*.04 + .8)); S(s, {transform:`translateY(${(1-p)*120}%)`, opacity: p}); });
+    const tg = easeOut(prog(t, 2.9, 3.6));
+    S($('tag1'), {left:`${wx + 4}px`, top:'58px', opacity: tg, transform:`translateY(${(1-tg)*16}px)`});
+  } else if (t < 39.4) $('logo').style.display = 'none';
+
+  // ---------- alexa ----------
+  const av = win(t, 4.2, 8.7);
+  $('alexa').style.display = av ? 'block' : 'none';
+  if (av) {
+    const ti = easeOut(prog(t, 4.4, 5.3)), out = easeInOut(prog(t, 7.9, 8.6));
+    S($('alexaTitle'), {opacity: ti*(1-out), transform:`translateY(${(1-ti)*40 - out*30}px)`, filter:`blur(${(1-ti)*10 + out*10}px)`});
+    const si = easeOut(prog(t, 5.6, 6.4));
+    S($('alexaSub'), {opacity: si*(1-out), transform:`translateY(${(1-si)*20}px)`});
+    const hi = spring(prog(t, 4.3, 5.3));
+    S($('hub'), {transform:`scale(${(.4 + .6*hi) * (1 - out*.5)})`, opacity: clamp(prog(t,4.3,4.6)) * (1 - out)});
+    const rot = t * .12;
+    bubs.forEach((b, i) => {
+      const d = 4.7 + i*.12;
+      const p = spring(prog(t, d, d + 1.2));
+      const ang = rot + i / bubs.length * Math.PI * 2;
+      const r = lerp(900, 330, p) * (1 - easeIn(prog(t, 7.85 + i*.03, 8.5 + i*.03)));
+      const x = CX + Math.cos(ang) * r * (V ? 1.0 : 1.25), y = CY + Math.sin(ang) * r * (V ? 1.3 : .7);
+      S(b, {left: x + 'px', top: y + 'px', opacity: clamp(prog(t, d, d + .4)) * (1 - out), transform:`scale(${.7 + .3*p})`});
+      const lp = easeOut(prog(t, d + .5, d + 1.2)) * (1 - out);
+      lines[i].setAttribute('x1', CX); lines[i].setAttribute('y1', CY); lines[i].setAttribute('x2', x); lines[i].setAttribute('y2', y);
+      lines[i].setAttribute('opacity', .22 * lp);
+      const q = ((t - d - .9) * .8 + i * .37) % 1;
+      dots[i].setAttribute('cx', lerp(x, CX, q)); dots[i].setAttribute('cy', lerp(y, CY, q));
+      dots[i].setAttribute('opacity', t > d + .9 ? lp * Math.sin(q * Math.PI) : 0);
+    });
+  }
+
+  // ---------- copy ----------
+  copies.forEach(c => beat(c, t));
+
+  // ---------- phone ----------
+  const pin = easeOut(prog(t, PHONE_IN, PHONE_IN + 1.3));
+  const pout = easeInOut(prog(t, PHONE_OUT, PHONE_OUT + .7));
+  const toNfc = easeInOut(prog(t, 26.0, 26.6)) * (1 - easeInOut(prog(t, 27.6, 28.2)));
+  const pv = t > PHONE_IN - .1 && t < PHONE_OUT + .8;
+  S($('phoneWrap'), {display: pv ? 'block' : 'none'});
+  if (pv) {
+    const float = Math.sin(t*1.1) * 6;
+    const rotY = (lerp(-32, -9, pin) + toNfc*-6 + Math.sin(t*.7)*1.2) * (V ? .6 : 1);
+    S($('phone'), {transform:`translate(${toNfc*80}px, ${(1-pin)*(V ? 1100 : 820) + float - toNfc*40 - pout*40}px) rotateX(${lerp(28, 4, pin)}deg) rotateY(${rotY}deg) rotateZ(${toNfc*14}deg) scale(${(.92 + .08*pin) * (1 - pout*.25) * (V ? 1.1 : 1)})`,
+      opacity: 1 - pout, filter:`blur(${pout*14}px)`});
+
+    // tiles
+    const EV = {lamp:[[9.95,1],[20.9,0]], ac:[[10.85,1],[20.95,0]], spot:[[27.0,1]]};
+    const brightness = Math.round(t < 13.0 ? 80 : t < 13.6 ? lerp(80, 35, easeInOut(prog(t, 13.0, 13.6))) : lerp(35, 70, easeInOut(prog(t, 13.65, 14.1))));
+    for (const k in tiles) {
+      const T = tiles[k];
+      const p = EV[k] ? level(EV[k], t) : 0;
+      T.on.style.opacity = p;
+      T.on.style.transform = `scale(${lerp(.6, 1, p)})`;
+      T.fg.style.color = p > .5 ? '#DBE1FF' : '#E3E1E9';
+      T.st.textContent = p > .4 ? (k === 'lamp' ? `Accesa · ${brightness}%` : T.onTxt) : T.off;
+      let press = 0;
+      const presses = {lamp:[9.95], ac:[10.85], tv:[], tvc:[22.4]}[k] || [];
+      presses.forEach(a => { const q = prog(t, a - .12, a + .3); press = Math.max(press, Math.sin(q*Math.PI)); });
+      if (k === 'lamp') press = Math.max(press, prog(t, 12.4, 12.8) * (1 - prog(t, 12.8, 12.95)));
+      if (k === 'tv') press = Math.max(press, prog(t, 15.7, 16.1) * (1 - prog(t, 16.1, 16.25)));
+      T.el.style.transform = `scale(${1 - press*.05})`;
+    }
+    if (t > 18.15) {
+      const q = easeOut(prog(t, 18.15, 18.5));
+      tiles.tv.st.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;color:#B4C5FF;opacity:${q}"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#B4C5FF"><path d="${P.timer}"/></svg>Si accende tra 30 min</span>`;
+    }
+    // lamp tint follows the chosen colour
+    tiles.lamp.on.style.background = purple > 0 && t < 21.5 ? `rgb(${Math.round(lerp(38,91,purple))},${Math.round(lerp(65,58,purple))},${Math.round(lerp(143,160,purple))})` : '#26418F';
+
+    // sheets
+    const v1 = sheet($('sLight'), t, 12.85, 14.75);
+    const v2 = sheet($('sTimer'), t, 16.1, 18.0);
+    const v3 = sheet($('sRemote'), t, 22.6, 24.9);
+    $('scrim').style.opacity = Math.max(v1, v2, v3) * .45;
+    // slider
+    S($('sFill'), {width: brightness + '%'}); S($('sTh'), {left: brightness + '%'}); $('brTxt').textContent = brightness + '%';
+    SW.forEach((c, i) => $('sw' + i).style.boxShadow = `0 0 0 ${i === 0 ? 3*(1-purple) : i === 4 ? 3*purple : 0}px #121318, 0 0 0 ${i === 0 ? 6*(1-purple) : i === 4 ? 6*purple : 0}px #B4C5FF`);
+    // timer chips
+    const onSel = easeOut(prog(t, 16.85, 17.05));
+    S($('selOn'), {opacity: onSel}); S($('ckOn'), {display: onSel > .3 ? 'block' : 'none'});
+    S($('selOff'), {opacity: 1 - onSel}); S($('ckOff'), {display: onSel > .3 ? 'none' : 'block'});
+    S($('chOn'), {borderColor: onSel > .5 ? 'transparent' : '#8F909A'}); S($('chOff'), {borderColor: onSel > .5 ? '#8F909A' : 'transparent'});
+    const s30 = easeOut(prog(t, 17.4, 17.55));
+    S($('sel30'), {opacity: s30}); S($('ch30'), {borderColor: s30 > .5 ? 'transparent' : '#8F909A'});
+    // remote key presses
+    const kp = (id, a) => { const q = prog(t, a - .05, a + .35); $(id).querySelector('.hl').style.opacity = Math.sin(q * Math.PI) * .3; $(id).style.transform = `scale(${1 - Math.sin(q*Math.PI)*.05})`; };
+    kp('key0', 23.3); kp('key3', 23.9); kp('key3', t < 24.2 ? 23.9 : 24.3);
+
+    // voice
+    const vv = easeOut(prog(t, 19.5, 19.9)) * (1 - easeInOut(prog(t, 21.3, 21.6)));
+    S($('voice'), {transform:`translateY(${(1-vv)*200}px)`});
+    const phrase = 'Spegni tutto in salotto';
+    const n = Math.round(clamp(prog(t, 19.9, 20.75)) * phrase.length);
+    $('said').textContent = phrase.slice(0, n);
+    [...$('bars').children].forEach((b, i) => {
+      const talk = t > 19.8 && t < 20.85 ? 1 : .15;
+      b.style.height = `${6 + talk * 26 * Math.abs(Math.sin(t*9 + i*1.7) * Math.sin(t*5.3 + i*.6))}px`;
+    });
+
+    // toast (NFC)
+    const tIn = easeOut(prog(t, 27.1, 27.4)), tOut = easeIn(prog(t, 27.9, 28.2));
+    S($('toast'), {opacity: tIn*(1-tOut), transform:`translateY(${(1-tIn)*80}px)`});
+
+    // launcher
+    const lv = easeOut(prog(t, 28.9, 29.5));
+    S($('launcher'), {opacity: lv, transform:`scale(${lerp(1.08, 1, lv)})`});
+    const wv = spring(prog(t, 29.3, 30.3));
+    S($('widget'), {opacity: clamp(prog(t, 29.3, 29.6)), transform:`translateY(${(1-wv)*40}px) scale(${.9 + .1*wv})`});
+    const ws = 1 - level([[30.45, 1]], t);
+    wTiles.spot.querySelector('.on').style.opacity = ws;
+    wTiles.spot.querySelector('.st').textContent = ws > .5 ? 'Accesi' : 'Spenti';
+    wTiles.spot.querySelector('.fg').style.color = ws > .5 ? '#DBE1FF' : '#E3E1E9';
+    wTiles.lamp.querySelector('.on').style.opacity = 1;
+    wTiles.lamp.querySelector('.fg').style.color = '#DBE1FF';
+    const wsp = Math.sin(prog(t, 30.33, 30.75) * Math.PI);
+    wTiles.spot.style.transform = `scale(${1 - wsp*.05})`;
+    const mv = spring(prog(t, 31.25, 31.8)) * (1 - easeIn(prog(t, 32.0, 32.2)));
+    S($('menu'), {opacity: clamp(prog(t, 31.25, 31.4)), transform:`scale(${.6 + .4*mv})`});
+    if (t < 31.25) $('menu').style.opacity = 0;
+    $('appDock').style.transform = `scale(${1 - .08*prog(t, 30.9, 31.2) * (1 - prog(t, 31.2, 31.35))})`;
+
+    // touches
+    const sl = pos.slider;
+    const TOUCHES = [
+      {at:9.95, k:'lamp'}, {at:10.85, k:'ac'},
+      {at:12.45, k:'lamp', hold:.4},
+      {at:13.0, f: () => ({x: sl.x + sl.w * brightness / 100, y: sl.y}), hold: 1.1},
+      {at:14.3, k:'sw4'},
+      {at:15.75, k:'tv', hold:.4}, {at:16.85, k:'chOn'}, {at:17.4, k:'ch30'},
+      {at:19.35, k:'micBtn'},
+      {at:22.4, k:'tvc'}, {at:23.3, k:'key0'}, {at:23.9, k:'key3', hold:.5},
+      {at:30.45, k:'wSpot'}, {at:30.95, k:'appDock', hold:.35},
+    ];
+    let shown = false;
+    for (const tc of TOUCHES) {
+      const hold = tc.hold || 0, a = tc.at - .2, b = tc.at + hold + .3;
+      if (t < a || t > b) continue;
+      let p = tc.f ? tc.f() : pos[tc.k]; if (!p) continue;
+      if (tc.k === 'key3') p = {x: p.x, y: p.y - 40};
+      const pi = easeOut(prog(t, a, tc.at)), po = prog(t, tc.at + hold + .05, b);
+      const grow = hold && !tc.f ? 1 + .3*prog(t, tc.at, tc.at + hold) : 1;
+      S($('touch'), {display:'block', left: p.x + 'px', top: p.y + 'px', opacity: pi * (1 - po) * .9, transform:`scale(${lerp(1.6, 1, pi) * grow * (1 - po*.3)})`});
+      shown = true;
+    }
+    if (!shown) $('touch').style.display = 'none';
+  }
+
+  // ---------- nfc tag ----------
+  const nv = win(t, 25.8, 28.6);
+  $('nfcWrap').style.display = nv ? 'block' : 'none';
+  if (nv) {
+    const nIn = easeOut(prog(t, 25.85, 26.5)), nOut = easeIn(prog(t, 27.85, 28.5));
+    S($('nfcWrap'), {left: (lerp(V ? 1400 : 2250, V ? 880 : 1640, nIn) + nOut * 600) + 'px', top: ((V ? 900 : 300) + Math.sin(t*1.3)*6) + 'px'});
+    S($('nfc'), {transform:`rotate(${lerp(40, 0, nIn) - nOut*30}deg)`});
+    ['w1','w2','w3'].forEach((w, i) => {
+      const q = prog(t, 26.6 + i*.2, 26.6 + i*.2 + 1.0);
+      S($(w), {opacity: q > 0 && q < 1 ? (1 - q) * .8 : 0, transform:`scale(${1 + easeOut(q)*1.4})`});
+    });
+  }
+
+  // ---------- web ----------
+  const webV = win(t, 32.4, 37.2);
+  $('web').style.display = webV ? 'block' : 'none';
+  if (webV) {
+    const wi = easeOut(prog(t, 32.5, 33.8)), wo = easeInOut(prog(t, 36.4, 37.1));
+    S($('win'), {opacity: clamp(prog(t, 32.5, 32.9)) * (1 - wo), filter:`blur(${wo*12}px)`,
+      transform:`translateY(${(1-wi)*500 - wo*40}px) rotateX(${(1-wi)*20}deg) rotateY(${lerp(-18, -6, wi)}deg) scale(${1 - wo*.1})`});
+    // cursor glides to a tile and clicks it
+    const cp = easeInOut(prog(t, 33.7, 34.5));
+    const tgt = webTiles.spot.el, tx = tgt.offsetLeft + 70, ty = tgt.offsetTop + 62;
+    S($('cursor'), {left: lerp(900, tx, cp) + 'px', top: lerp(560, ty, cp) + 'px', opacity: clamp(prog(t, 33.6, 33.8)), transform:`scale(${1 - .15*Math.sin(prog(t,34.6,34.85)*Math.PI)})`});
+    const ws = level([[34.7, 1]], t);
+    webTiles.spot.on.style.opacity = ws; webTiles.spot.st.textContent = ws > .4 ? 'Accesi' : 'Spenti';
+    webTiles.spot.el.querySelector('.fg').style.color = ws > .5 ? '#DBE1FF' : '#E3E1E9';
+    webTiles.lamp.on.style.opacity = 1; webTiles.lamp.st.textContent = 'Accesa'; webTiles.lamp.el.querySelector('.fg').style.color = '#DBE1FF';
+    const ti = spring(prog(t, 34.9, 36.0));
+    S($('tablet'), {opacity: clamp(prog(t, 34.9, 35.2)) * (1 - wo), transform:`translate(${(1-ti)*300}px, ${(1-ti)*120 - wo*40}px) rotate(${lerp(8, -3, ti)}deg)`, filter:`blur(${wo*12}px)`});
+    tabTiles.forEach((el, i) => { const on = i < 2 && (i === 0 || t > 34.7); el.querySelector('.on').style.opacity = on ? 1 : 0; el.querySelector('.st').textContent = on ? 'Accesa' : 'Spenta'; el.querySelector('.fg').style.color = on ? '#DBE1FF' : '#E3E1E9'; });
+  }
+
+  // ---------- features ----------
+  const fv = win(t, 36.9, 40.0);
+  $('feat').style.display = fv ? 'block' : 'none';
+  if (fv) {
+    const ti = easeOut(prog(t, 37.0, 37.8)), to = easeInOut(prog(t, 39.2, 39.7));
+    S($('featTitle'), {opacity: ti*(1-to), transform:`translateY(${(1-ti)*40 - to*30}px)`, filter:`blur(${(1-ti)*10 + to*10}px)`});
+    cards.forEach((c, i) => {
+      const cols = V ? 2 : 4, col = i % cols, row = Math.floor(i / cols), mid = (cols - 1) / 2;
+      const x = CX + (col - mid) * (V ? 432 : 420) - 198, y = (V ? 520 : 330) + row * (V ? 290 : 276);
+      const d = 37.2 + i * .08;
+      const p = spring(prog(t, d, d + 1.0)), po = easeIn(prog(t, 39.1 + i*.03, 39.6 + i*.03));
+      const parallax = (t - 38) * (col - mid) * 6;
+      S(c, {left: lerp(x, CX - 198, po) + parallax + 'px', top: lerp(y, H/2 - 125, po) + 'px', opacity: clamp(prog(t, d, d + .3)) * (1 - po),
+        transform:`translateY(${(1-p)*90}px) scale(${(.85 + .15*p) * (1 - po*.7)})`, filter:`blur(${po*12}px)`});
+    });
+  }
+
+  // ---------- end card ----------
+  if (t > 39.4) {
+    const e = spring(prog(t, 39.5, 40.5));
+    const sc = .62, shift = -(wordW + 40) / 2;
+    S($('logo'), {display:'block', opacity: clamp(prog(t, 39.5, 39.8)), transform:'translate(0, -40px)', filter:'none'});
+    S($('icon'), {opacity: 1, transform:`translateX(${shift}px) scale(${(.4 + .6*e) * sc})`, filter:'drop-shadow(0 24px 50px rgba(30,80,255,.45))'});
+    $('house').setAttribute('transform', 'translate(54 54) scale(1) translate(-54 -54)');
+    S($('house'), {opacity: 1}); S($('arc'), {strokeDashoffset: 0, opacity: 1}); S($('bar'), {strokeDashoffset: 0, opacity: 1});
+    const rp = prog(t, 39.9, 41.0);
+    S($('ring'), {opacity: rp > 0 && rp < 1 ? .5*(1-rp) : 0, transform:`translateX(${shift}px) scale(${sc*(1 + easeOut(rp)*1.8)})`});
+    const wx = shift + 120*sc + 36;
+    S($('wordMask'), {left: wx + 'px'});
+    [...$('word').children].forEach((s, i) => { const p = easeOut(prog(t, 39.75 + i*.035, 39.75 + i*.035 + .7)); S(s, {transform:`translateY(${(1-p)*120}%)`, opacity: p}); });
+    S($('tag1'), {opacity: 0});
+    const es = easeOut(prog(t, 40.4, 41.1));
+    S($('endSub'), {opacity: es, transform:`translateY(${(1-es)*20}px)`});
+    const eu = easeOut(prog(t, 40.8, 41.5));
+    S($('endUrl'), {opacity: eu, transform:`translateY(${(1-eu)*16}px)`});
+    S($('endNote'), {opacity: easeOut(prog(t, 41.0, 41.7))});
+  }
+
+  S($('fade'), {opacity: Math.max(1 - easeOut(prog(t, 0, .5)), easeIn(prog(t, 43.4, 44.0)))});
+}
+
+window.DURATION = 44.0;
+window.seek = t => render(t);
+document.fonts.ready.then(() => { render(0); measure(); render(0); window.ready = true; });
+if (location.search.includes('play')) { const t0 = performance.now(); const loop = () => { render(((performance.now() - t0)/1000) % DURATION); requestAnimationFrame(loop); }; document.fonts.ready.then(() => requestAnimationFrame(loop)); }
+</script>
+</body></html>

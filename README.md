@@ -10,6 +10,12 @@
 
 <p align="center"><a href="https://carellice.github.io/hommaterial/"><b>Apri la versione web</b></a> · <a href="pwa/README.md">Guida di configurazione</a></p>
 
+<p align="center">
+  <a href="docs/video/hommaterial-promo.mp4"><img src="docs/video/anteprima.gif" alt="Presentazione animata di Hommaterial" width="720"></a>
+</p>
+
+<p align="center">🎬 Il video di presentazione, con l'audio: <a href="docs/video/hommaterial-promo.mp4"><b>orizzontale 16:9</b></a> · <a href="docs/video/hommaterial-promo-verticale.mp4"><b>verticale 9:16</b></a></p>
+
 Un'app Android nativa, veloce e minimale per comandare i dispositivi smart home
 collegati al proprio account Alexa.
 
