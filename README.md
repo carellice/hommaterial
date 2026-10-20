@@ -6,7 +6,7 @@
 
 <p align="center"><b>Comanda la tua smart home Alexa, senza fronzoli.</b></p>
 
-<p align="center">App Android · Gratuita · Open source · Italiano e inglese</p>
+<p align="center">Android · Web · Windows 11 (anteprima) · Gratuita · Open source</p>
 
 <p align="center"><a href="https://carellice.github.io/hommaterial/"><b>Apri la versione web</b></a> · <a href="pwa/README.md">Guida di configurazione</a></p>
 
@@ -199,6 +199,15 @@ quando il telefono legge lo stato, non nell'istante in cui cambia.
 
 Gli avvisi di temperatura li controlla il telefono, circa ogni 15 minuti e
 più di rado quando è fermo da un po': non sono un allarme in tempo reale.
+
+## Versione Windows 11
+
+Nella cartella [`windows`](windows/README.md) c'è la prima versione nativa in
+**C# e WinUI 3**, con stanze Alexa, preferiti, ricerca, luci, sensori e timer
+mentre l'app è aperta. Include una modalità demo per provarla senza account,
+build autonoma x64/ARM64 e preparazione del pacchetto MSIX per una futura
+distribuzione sul Microsoft Store. Le funzioni avanzate sono ancora in porting:
+consulta [funzioni, limiti e istruzioni di prova](windows/README.md).
 
 ## Versione web
 

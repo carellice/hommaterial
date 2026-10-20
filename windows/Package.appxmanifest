@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         IgnorableNamespaces="uap rescap">
+  <Identity Name="Hommaterial.Windows.Dev" Publisher="CN=Hommaterial" Version="0.1.0.0" ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>Hommaterial</DisplayName>
+    <PublisherDisplayName>Hommaterial</PublisherDisplayName>
+    <Description>La tua casa Alexa, a portata di clic.</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0" /></Dependencies>
+  <Resources><Resource Language="it-IT" /></Resources>
+  <Applications>
+    <Application Id="App" Executable="Hommaterial.Windows.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="Hommaterial" Description="La tua casa Alexa, a portata di clic."
+                          BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
+    </Application>
+  </Applications>
+  <Capabilities><Capability Name="internetClient" /><rescap:Capability Name="runFullTrust" /></Capabilities>
+</Package>

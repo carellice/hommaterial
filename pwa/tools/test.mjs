@@ -155,6 +155,28 @@ await test('strings are formatted as on Android', async () => {
   assert.equal(model.statusText({ isSensor: true }, state({ temperature: 21.46, humidity: 50 })), '21,5° · 50%');
 });
 
+const { createBackup, parseBackup } = await import('../js/backup.js');
+await test('portable backup carries automations and schedules without account or PIN', () => {
+  const action = { type: 'power', target: '1', value: 'off', custom: false };
+  const s = { favorites: ['1'], schedules: [{ id: 's', action, at: at(20, 18, 0), hour: 18, minute: 0, days: [2, 4], enabled: true }],
+    automations: [{ id: 'a', device: '5', trigger: 'temperatureAbove', threshold: 25, action, enabled: true }],
+    monitor: { enabled: true, pin: 'not-portable', monitorPin: 'not-portable' }, refreshToken: 'not-portable' };
+  const backup = parseBackup(JSON.stringify(createBackup(s, { token: 'test-token', secret: 'test-secret' })));
+  assert.deepEqual(backup.schedules[0].days, [2, 4]);
+  assert.equal(backup.automations[0].action.target, '1');
+  assert.equal(backup.switchBot.secret, 'test-secret');
+  assert.equal(backup.refreshToken, undefined);
+  assert.equal(backup.monitor.pin, undefined);
+  assert.equal(backup.monitor.monitorPin, undefined);
+  assert.equal(s.monitor.pin, 'not-portable');
+});
+await test('old v1 backups remain readable and malformed schedules fail before restore', () => {
+  assert.equal(parseBackup('{"app":"hommaterial","version":1,"favorites":["1"]}').favorites[0], '1');
+  assert.throws(() => parseBackup('{"app":"hommaterial","version":2}'));
+  assert.throws(() => parseBackup('{"app":"hommaterial","version":1,"schedules":[null]}'));
+  assert.throws(() => parseBackup('{"app":"hommaterial","version":1,"macros":[{"steps":[{"type":"macro","target":"self","value":""}]}]}'));
+});
+
 if (failures) {
   console.log(`${failures} failed`);
   process.exit(1);

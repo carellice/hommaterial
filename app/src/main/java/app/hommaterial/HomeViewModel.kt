@@ -900,6 +900,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("roomList", JSONArray(s.roomList))
             .put("groups", JSONArray(s.groups.map { it.toJson() }))
             .put("macros", JSONArray(s.macros.map { it.toJson() }))
+            .put("schedules", JSONArray(s.schedules.map { it.toJson() }))
+            .put("automations", JSONArray(s.automations.map { it.toJson() }))
+            .put("layout", s.layout)
             .put("order", JSONObject(s.order.mapValues { JSONArray(it.value) }))
             .put("shortcuts", s.shortcuts?.let { JSONArray(it) } ?: JSONObject.NULL)
             .put("widget", s.widget.toJson())
@@ -968,6 +971,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         local.putRoomList(list("roomList").orEmpty())
         local.putGroups(backup.optJSONArray("groups")?.mapObjects(Group::fromJson).orEmpty())
         local.putMacros(backup.optJSONArray("macros")?.mapObjects(Macro::fromJson).orEmpty())
+        Schedules.cancelAll(app)
+        backup.optJSONArray("schedules")?.mapObjects(Schedule::fromJson)?.forEach { Schedules.put(app, it) }
+        Automations.all(app).forEach { Automations.delete(app, it.id) }
+        backup.optJSONArray("automations")?.mapObjects(Automation::fromJson)?.forEach { automation ->
+            val already = automation.holds(local.states()[automation.device] ?: DeviceState()) == true
+            Automations.put(app, automation, already)
+        }
         val order = backup.optJSONObject("order") ?: JSONObject()
         local.putOrder(
             order.keys().asSequence().associateWith { section ->
@@ -998,6 +1008,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .putBoolean("haptics", backup.optBoolean("haptics", true))
             .putInt("hapticLevel", backup.optInt("hapticLevel", HAPTIC_LEVEL_DEFAULT).coerceIn(HAPTIC_LEVEL_MIN, 100))
             .putInt("theme", backup.optInt("theme", 0).coerceIn(0, 2))
+            .putInt("layout", backup.optInt("layout", 0).coerceIn(0, 1))
             .apply()
         _state.update {
             it.copy(
@@ -1007,6 +1018,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 roomList = local.roomList(),
                 groups = local.groups(),
                 macros = local.macros(),
+                schedules = Schedules.all(app),
+                automations = Automations.all(app),
+                layout = settings.getInt("layout", 0),
                 order = local.order(),
                 shortcuts = local.shortcuts(),
                 widget = local.widget(),

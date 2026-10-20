@@ -1,0 +1,29 @@
+name: Windows native
+on:
+  push:
+    paths: ['windows/**', 'pwa/icons/icon-512.png', '.github/workflows/windows.yml']
+  pull_request:
+    paths: ['windows/**', 'pwa/icons/icon-512.png', '.github/workflows/windows.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        architecture: [x64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify, publish and validate MSIX
+        shell: pwsh
+        run: ./windows/build.ps1 -Architecture ${{ matrix.architecture }} -Package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hommaterial-Windows-${{ matrix.architecture }}
+          path: |
+            windows/artifacts/${{ matrix.architecture }}/app/**
+            windows/artifacts/*.msix

@@ -8,3 +8,12 @@ local.properties
 .claude/
 *.jks
 *.keystore
+
+# Windows / .NET
+**/bin/
+**/obj/
+windows/artifacts/
+windows/.dotnet-home/
+windows/.nuget/
+*.pfx
+*.cer

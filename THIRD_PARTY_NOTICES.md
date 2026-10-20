@@ -21,3 +21,16 @@ questa app non esisterebbe.
 
 Il testo della licenza Apache 2.0 è disponibile su
 <https://www.apache.org/licenses/LICENSE-2.0>.
+
+## Dipendenze della versione Windows
+
+La versione Windows usa .NET 8, Windows Forms per l'area di notifica e WinUI 3 tramite
+[Microsoft.WindowsAppSDK 2.5.1](https://www.nuget.org/packages/Microsoft.WindowsAppSDK/2.5.1).
+La compilazione e la creazione MSIX usano
+[Microsoft.Windows.SDK.BuildTools](https://www.nuget.org/packages/Microsoft.Windows.SDK.BuildTools/10.0.26100.4654).
+Il ripristino NuGet risolve anche le rispettive dipendenze transitive.
+
+La build autonoma include runtime e componenti Microsoft: la licenza MIT di Hommaterial
+non sostituisce le licenze di tali componenti. I testi e gli avvisi applicabili sono
+nei pacchetti NuGet e nei relativi progetti; prima della distribuzione pubblica occorre
+verificare gli avvisi da includere per la build effettivamente pubblicata.

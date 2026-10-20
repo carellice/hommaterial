@@ -11,6 +11,7 @@ import {
   emptyState, holds, cleared, macroKey, remoteKey, nextTime, placed, shownRemotes,
 } from './model.js';
 import { APP_VERSION } from './version.js';
+import { createBackup, parseBackup } from './backup.js';
 
 const cache = new Prefs('cache');
 const settings = new Prefs('settings');
@@ -998,31 +999,7 @@ export async function checkPin(pin) {
 
 export function exportBackup() {
   const s = state;
-  const backup = {
-    app: BACKUP_APP,
-    version: 1,
-    favorites: s.favorites,
-    hidden: s.hidden,
-    rooms: s.rooms,
-    roomList: s.roomList,
-    groups: s.groups,
-    macros: s.macros,
-    order: s.order,
-    // Only the Android app has shortcuts, a widget and tiles: what it chose there travels along.
-    shortcuts: s.shortcuts,
-    widget: s.widget ?? {},
-    tiles: s.tiles,
-    alerts: s.alerts,
-    autoUpdate: s.autoUpdate,
-    theme: s.theme,
-    remoteButtons: s.remoteButtons,
-    hiddenRemotes: s.hiddenRemotes,
-    // Without the PIN: a file that travels must not carry it, not even scrambled.
-    monitor: s.monitor,
-  };
-  // The keys of SwitchBot travel along, so that another browser or phone links again by itself.
-  const keys = switchBot.keys();
-  if (keys) backup.switchBot = keys;
+  const backup = createBackup(s, switchBot.keys());
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -1038,7 +1015,7 @@ let pendingBackup = null;
 export async function importBackup(file) {
   let backup = null;
   try {
-    backup = JSON.parse(await file.text());
+    backup = parseBackup(await file.text());
   } catch {
     // Told below.
   }
@@ -1078,15 +1055,22 @@ function restore(backup, monitor) {
       id: m.id, name: m.name, condition: m.condition ?? null, steps: m.steps || [], otherwise: m.otherwise || [],
     })),
     order: backup.order || {},
+    schedules: (backup.schedules || []).map((s) => ({ ...s, days: list(s.days).map(Number) })),
+    automations: (backup.automations || []).map((a) => ({ ...a })),
     shortcuts: backup.shortcuts ?? null,
     widget: backup.widget ?? null,
     tiles,
     alerts,
   };
-  cache.edit({ ...values, alertsTripped: [] });
+  // Restored automations wait for a new crossing when their condition already holds.
+  const automationsTripped = values.automations.filter((a) => holds(a, state.states[a.device] ?? emptyState()) === true).map((a) => a.id);
+  cache.edit({ ...values, alertsTripped: [], automationsTripped });
   const theme = clamp(Number(backup.theme ?? 0), 0, 2);
-  settings.edit({ autoUpdate: backup.autoUpdate ?? true, theme });
-  update({ ...values, autoUpdate: backup.autoUpdate ?? true, theme });
+  const layout = clamp(Number(backup.layout ?? 0), 0, 1);
+  const language = backup.language || 'auto';
+  settings.edit({ autoUpdate: backup.autoUpdate ?? true, theme, layout, language });
+  applyLanguage(language);
+  update({ ...values, autoUpdate: backup.autoUpdate ?? true, theme, layout, language });
   if (backup.remoteButtons) {
     switchBot.putButtons(backup.remoteButtons);
     update({ remoteButtons: backup.remoteButtons });
