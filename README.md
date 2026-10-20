@@ -8,7 +8,13 @@
 
 <p align="center">Android · Web · Windows 11 (anteprima) · Gratuita · Open source</p>
 
-<p align="center"><a href="https://carellice.github.io/hommaterial/"><b>Apri la versione web</b></a> · <a href="pwa/README.md">Guida di configurazione</a></p>
+<p align="center">
+  <a href="https://github.com/carellice/hommaterial/releases/latest" title="Scarica il file APK dall'ultima release"><img src="https://img.shields.io/badge/Android-Scarica_APK-3DDC84?style=for-the-badge&amp;logo=android&amp;logoColor=white" alt="Android — Scarica APK"></a>
+  <a href="https://carellice.github.io/hommaterial/"><img src="https://img.shields.io/badge/Web-Apri_online-6750A4?style=for-the-badge" alt="Web — Apri online"></a>
+  <a href="https://github.com/carellice/hommaterial/releases/latest" title="Scarica lo ZIP Windows dall'ultima release"><img src="https://img.shields.io/badge/Windows_11-Scarica_ZIP-0078D4?style=for-the-badge" alt="Windows 11 — Scarica ZIP"></a>
+</p>
+
+<p align="center"><a href="pwa/README.md">Guida di configurazione web</a> · <a href="windows/README.md">Guida Windows</a></p>
 
 **Windows 11:** scarica lo ZIP Windows dalle [release GitHub](https://github.com/carellice/hommaterial/releases),
 estrailo interamente in una cartella personale e avvia `Hommaterial.Windows.exe`.
