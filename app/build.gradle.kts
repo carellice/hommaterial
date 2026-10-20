@@ -16,6 +16,13 @@ android {
         versionName = "1.33"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // Reuse the original Mac key on Windows; never commit the keystore.
+            System.getenv("HOMMATERIAL_ANDROID_KEYSTORE")?.let { storeFile = file(it) }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

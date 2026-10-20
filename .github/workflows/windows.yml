@@ -1,9 +1,9 @@
 name: Windows native
 on:
   push:
-    paths: ['windows/**', 'pwa/icons/icon-512.png', '.github/workflows/windows.yml']
+    paths: ['windows/**', 'app/build.gradle.kts', 'pwa/icons/icon-512.png', '.github/workflows/windows.yml']
   pull_request:
-    paths: ['windows/**', 'pwa/icons/icon-512.png', '.github/workflows/windows.yml']
+    paths: ['windows/**', 'app/build.gradle.kts', 'pwa/icons/icon-512.png', '.github/workflows/windows.yml']
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,0 +1,9 @@
+<Project>
+  <!-- Android is the version source for every desktop build, including CI. -->
+  <PropertyGroup>
+    <AndroidVersionSource>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\app\build.gradle.kts'))</AndroidVersionSource>
+    <Version>$([System.Text.RegularExpressions.Regex]::Match('$(AndroidVersionSource)', 'versionName = &quot;([0-9.]+)&quot;').Groups[1].Value)</Version>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+</Project>

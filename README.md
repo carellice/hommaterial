@@ -10,6 +10,11 @@
 
 <p align="center"><a href="https://carellice.github.io/hommaterial/"><b>Apri la versione web</b></a> · <a href="pwa/README.md">Guida di configurazione</a></p>
 
+**Windows 11:** scarica lo ZIP Windows dalle [release GitHub](https://github.com/carellice/hommaterial/releases),
+estrailo interamente in una cartella personale e avvia `Hommaterial.Windows.exe`.
+Gli aggiornamenti si scaricano dall'app, in **Impostazioni → Controlla aggiornamenti**.
+Per pubblicare Android e Windows da questo PC usa `release.bat`: [guida al rilascio](RELEASING.md).
+
 <p align="center">
   <a href="docs/video/hommaterial-promo.mp4"><img src="docs/video/anteprima.gif" alt="Presentazione animata di Hommaterial" width="720"></a>
 </p>

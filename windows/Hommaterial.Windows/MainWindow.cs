@@ -85,7 +85,9 @@ public sealed partial class MainWindow : Window
         polling.Tick += async (_, _) => { if (!dialogOpen) { if (demo) await runtime.ReceiveAsync(home.States, DateTimeOffset.Now.ToUnixTimeMilliseconds()); else if (client.IsLoggedIn) await RefreshAsync(false); } };
         timerClock.Tick += async (_, _) => await TickTimersAsync();
         polling.Start(); timerClock.Start();
-        root.Loaded += async (_, _) => { if (!demo && client.IsLoggedIn) await RefreshAsync(); if (!demo && store.ReadSwitchBot() is not null) await RefreshRemotesAsync(); };
+        root.Loaded += async (_, _) => { if (!demo && client.IsLoggedIn) await RefreshAsync(); if (!demo && store.ReadSwitchBot() is not null) await RefreshRemotesAsync(); await CheckUpdatesAsync(); };
+        updateClock.Tick += async (_, _) => await CheckUpdatesAsync();
+        updateClock.Start();
         AppWindow.Closing += (sender, args) =>
         {
             if (closingAllowed) return;
@@ -94,7 +96,7 @@ public sealed partial class MainWindow : Window
             args.Cancel = true;
             _ = ConfirmCloseAsync();
         };
-        Closed += (_, _) => { polling.Stop(); timerClock.Stop(); lifetime.Cancel(); client.Dispose(); switchBotClient.Dispose(); notifications.Dispose(); tray?.Dispose(); };
+        Closed += (_, _) => { polling.Stop(); timerClock.Stop(); updateClock.Stop(); lifetime.Cancel(); updateHttp.Dispose(); client.Dispose(); switchBotClient.Dispose(); notifications.Dispose(); tray?.Dispose(); };
         if (Environment.GetCommandLineArgs().Contains("--demo")) StartDemo();
     }
 
@@ -162,7 +164,7 @@ public sealed partial class MainWindow : Window
             : navigation.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == selected)
               ?? navigation.MenuItems[0];
         navigation.PaneFooter = new StackPanel { Margin = new Thickness(16, 12, 16, 20), Spacing = 6,
-            Children = { Text(demo ? "MODALITÀ DEMO" : client.IsLoggedIn ? "ACCOUNT COLLEGATO" : "BENVENUTO", 11, true), Text("Hommaterial per Windows · 0.1", 11) } };
+            Children = { Text(demo ? "MODALITÀ DEMO" : client.IsLoggedIn ? "ACCOUNT COLLEGATO" : "BENVENUTO", 11, true), Text("Hommaterial per Windows · " + AppVersion, 11) } };
         rebuildingNavigation = false;
     }
 

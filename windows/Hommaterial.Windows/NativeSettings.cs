@@ -66,8 +66,10 @@ public sealed partial class MainWindow
         hidden.Children.Add(Button("Cancella cronologia dei sensori", () => { home.History.Clear(); Save(); Message("Cronologia cancellata."); }));
         hidden.Children.Add(AsyncButton("Riordina stanze e card", () => { selected = "rooms"; RebuildNavigation(); Render(); return Task.CompletedTask; }));
         page.Children.Add(Card(hidden));
-        page.Children.Add(Card(new StackPanel { Spacing = 8, Children = { Text("Hommaterial per Windows · 0.2", 20, true),
-            Text("C# · WinUI 3 · Open source · MIT"), Text("Progetto indipendente, non affiliato ad Amazon. Le API Alexa sono non ufficiali. Gli aggiornamenti della versione Store saranno gestiti dal Microsoft Store."),
+        page.Children.Add(Card(new StackPanel { Spacing = 8, Children = { Text("Hommaterial per Windows · " + AppVersion, 20, true),
+            Text("C# · WinUI 3 · Open source · MIT"), Text("Progetto indipendente, non affiliato ad Amazon. Le API Alexa sono non ufficiali."),
+            Text("Controllo aggiornamenti su GitHub all'avvio e ogni 6 ore. Download e installazione partono solo quando lo scegli. Usa una cartella personale scrivibile, conservando tutti i file dell'app."),
+            AsyncButton("Controlla aggiornamenti", () => CheckUpdatesAsync(true), true),
             AsyncButton("Progetto e versioni disponibili", () => { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/carellice/hommaterial") { UseShellExecute = true }); return Task.CompletedTask; }) } }));
     }
     async Task ExportBackupAsync(bool includeKeys)

@@ -102,6 +102,7 @@ if (OperatingSystem.IsWindows())
     }
 }
 await FeatureTests.Run(Check);
+await UpdateTests.Run(Check);
 Console.WriteLine($"\n{passed} verifiche superate.");
 
 sealed class FakeHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> handle) : HttpMessageHandler

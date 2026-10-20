@@ -5,6 +5,12 @@ comandi Alexa. Se colleghi SwitchBot, comunica con la sua API ufficiale per elen
 e comandare i telecomandi. Non usa server intermedi, pubblicità, statistiche o
 telemetria propria. La demo non invia comandi ad Amazon o SwitchBot.
 
+Per gli aggiornamenti l'app contatta l'API pubblica GitHub all'avvio, ogni sei ore e
+su richiesta, e scarica il pacchetto solo dopo conferma. GitHub riceve l'indirizzo IP
+e l'intestazione del client con la versione; non vengono inviati credenziali Amazon,
+nomi dei dispositivi o dati della casa. Download, log e copia dei file precedenti
+restano nella sottocartella locale `updates` finché non vengono eliminati.
+
 Password e verifica in due passaggi si inseriscono nel browser sul sito Amazon.
 L'app riceve un codice temporaneo dall'indirizzo finale, non lo salva, e lo scambia
 per un token. Il token Amazon e le credenziali SwitchBot sono cifrati su disco con

@@ -7,6 +7,13 @@ Le avvertenze del [progetto](../README.md) sulle API Alexa non ufficiali valgono
 
 ## Provarla
 
+Per la distribuzione GitHub scarica lo ZIP Windows dalla release, estrailo interamente
+in una cartella personale scrivibile e apri `Hommaterial.Windows.exe`.
+Da **Impostazioni → Controlla aggiornamenti** puoi scaricare e installare le nuove
+versioni; il controllo parte anche all'avvio e ogni sei ore. Account e dati locali
+vengono conservati. Versione Windows e versione Android derivano dallo stesso numero.
+Vedi [RELEASING.md](../RELEASING.md) per `release.bat`, requisiti e dettagli.
+
 Su Windows 11 x64, con [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0):
 
 ```powershell
