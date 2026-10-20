@@ -12,18 +12,29 @@ Android passa da `versionCode 34` a `35`.
 3. Per Android installa Android Studio, SDK Platform 36 e i relativi Build-Tools.
    Il percorso predefinito è `%LOCALAPPDATA%\Android\Sdk`; per altri percorsi usa
    `ANDROID_HOME`. Serve anche Java 17 o il JDK incluso in Android Studio.
-4. Recupera **la chiave del Mac** (`~/.android/debug.keystore`). L'APK attuale usa
-   questa chiave di sviluppo, non una nuova chiave generata sul PC Windows.
-   Conserva una copia sicura fuori dal repository. Imposta una variabile utente
-   `HOMMATERIAL_ANDROID_KEYSTORE` con il percorso assoluto del file originale.
-   Puoi farlo nelle variabili d'ambiente di Windows e riaprire il terminale/Explorer.
-   In alternativa lo script cerca `%USERPROFILE%\.android\debug.keystore`:
-   prima di sostituire un file già presente, fanne una copia.
+4. La nuova chiave dedicata è in `%USERPROFILE%\.android\hommaterial-signing\`:
+   `hommaterial.keystore` contiene la chiave privata e `signing.properties` le password
+   e la configurazione. Gradle e `release.bat` la leggono automaticamente.
+   Conserva un backup privato **di entrambi i file** e non rigenerarli per ogni release.
+   Su un altro PC ripristina la cartella oppure imposta `HOMMATERIAL_ANDROID_SIGNING_PROPERTIES`
+   sul percorso assoluto del file `signing.properties`, aggiornando il suo `storeFile`.
+   Per una prima configurazione su un progetto senza alcuna chiave esistente,
+   `tools/New-AndroidSigningKey.ps1` ne crea una e si rifiuta di sovrascrivere file esistenti.
 
 Non caricare mai chiavi o password su GitHub. Il rilascio congiunto confronta la firma
 del nuovo APK con l'APK della release precedente e si ferma se sono diverse.
-Una nuova chiave richiederebbe la disinstallazione di Android, con possibile perdita
-dei dati locali: non è un aggiornamento compatibile.
+È stata autorizzata una nuova firma dopo la v1.33, perché la chiave del Mac non è
+disponibile. `tools/android-signing-migration.json` contiene solo l'impronta pubblica
+del nuovo certificato e la release precedente: permette questa precisa transizione,
+senza disabilitare il controllo sulle release successive. Lo script aggiunge alle
+note della prima release Android con nuova firma le istruzioni di migrazione.
+Gli utenti devono esportare il backup, disinstallare il vecchio APK, installare il
+nuovo, collegare nuovamente Amazon e importare il backup. La vecchia app non può
+installare automaticamente un APK firmato con la nuova chiave.
+
+Il percorso legacy `HOMMATERIAL_ANDROID_KEYSTORE`/`~/.android/debug.keystore` resta
+disponibile per vecchi ambienti, ma dopo la migrazione anche sul Mac va usata la
+nuova chiave dedicata per pubblicare APK compatibili.
 
 ## Un doppio clic per pubblicare
 

@@ -8,6 +8,7 @@ local.properties
 .claude/
 *.jks
 *.keystore
+signing.properties
 
 # Windows / .NET
 **/bin/

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -16,10 +18,26 @@ android {
         versionName = "1.33"
     }
 
+    val signingPropertiesFile = file(
+        System.getenv("HOMMATERIAL_ANDROID_SIGNING_PROPERTIES")
+            ?: "${System.getProperty("user.home")}/.android/hommaterial-signing/signing.properties"
+    )
+    val dedicatedSigning = signingPropertiesFile.isFile
     signingConfigs {
         getByName("debug") {
             // Reuse the original Mac key on Windows; never commit the keystore.
             System.getenv("HOMMATERIAL_ANDROID_KEYSTORE")?.let { storeFile = file(it) }
+        }
+        if (dedicatedSigning) {
+            val credentials = Properties().apply {
+                signingPropertiesFile.reader(Charsets.UTF_8).use { load(it) }
+            }
+            create("hommaterial") {
+                storeFile = file(requireNotNull(credentials.getProperty("storeFile")))
+                storePassword = requireNotNull(credentials.getProperty("storePassword"))
+                keyAlias = requireNotNull(credentials.getProperty("keyAlias"))
+                keyPassword = requireNotNull(credentials.getProperty("keyPassword"))
+            }
         }
     }
 
@@ -28,8 +46,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Personal build: signed with the debug key so it installs without a keystore setup.
-            signingConfig = signingConfigs.getByName("debug")
+            // Dedicated local key when configured; retain legacy debug signing on the Mac.
+            signingConfig = signingConfigs.getByName(if (dedicatedSigning) "hommaterial" else "debug")
         }
     }
 

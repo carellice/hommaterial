@@ -71,10 +71,17 @@ try {
     if (-not $sdk) { $sdk = Join-Path $env:LOCALAPPDATA 'Android\Sdk' }
     if (-not $WindowsOnly) {
         if (-not (Test-Path -LiteralPath $sdk)) { throw 'SDK Android mancante. Installalo con Android Studio oppure usa -WindowsOnly.' }
-        $key = $env:HOMMATERIAL_ANDROID_KEYSTORE
-        if (-not $key) { $key = Join-Path $env:USERPROFILE '.android\debug.keystore' }
-        if (-not (Test-Path -LiteralPath $key)) { throw 'Manca la chiave Android originale. Imposta HOMMATERIAL_ANDROID_KEYSTORE sul file del Mac.' }
-        $env:HOMMATERIAL_ANDROID_KEYSTORE = $key
+        $signingProperties = $env:HOMMATERIAL_ANDROID_SIGNING_PROPERTIES
+        if (-not $signingProperties) { $signingProperties = Join-Path $env:USERPROFILE '.android\hommaterial-signing\signing.properties' }
+        if (Test-Path -LiteralPath $signingProperties) {
+            $env:HOMMATERIAL_ANDROID_SIGNING_PROPERTIES = $signingProperties
+        } else {
+            if ($env:HOMMATERIAL_ANDROID_SIGNING_PROPERTIES) { throw 'Il file HOMMATERIAL_ANDROID_SIGNING_PROPERTIES configurato non esiste.' }
+            $key = $env:HOMMATERIAL_ANDROID_KEYSTORE
+            if (-not $key) { $key = Join-Path $env:USERPROFILE '.android\debug.keystore' }
+            if (-not (Test-Path -LiteralPath $key)) { throw 'Chiave Android mancante. Ripristina la chiave dedicata e signing.properties dal backup.' }
+            $env:HOMMATERIAL_ANDROID_KEYSTORE = $key
+        }
         $env:ANDROID_HOME = $sdk
         $signer = Get-ChildItem -LiteralPath (Join-Path $sdk 'build-tools') -Filter apksigner.bat -Recurse | Sort-Object FullName -Descending | Select-Object -First 1
         if (-not $signer) { throw 'Installa Android SDK Build-Tools (apksigner).' }
@@ -98,6 +105,7 @@ try {
         }
         Write-Host "Preparazione Hommaterial $next..."
         $assets = New-Object 'System.Collections.Generic.List[string]'
+        $androidMigration = $false
         if (-not $WindowsOnly) {
             Invoke-Checked (Join-Path $root 'gradlew.bat') @('testReleaseUnitTest', 'assembleRelease', '--no-daemon')
             $apk = Join-Path $out "Hommaterial-$tag.apk"
@@ -115,7 +123,15 @@ try {
                 if ($LASTEXITCODE -ne 0) { throw 'Verifica firma nuovo APK fallita.' }
                 $oldHash = [regex]::Match(($oldInfo -join "`n"), 'Signer #1 certificate SHA-256 digest: ([a-fA-F0-9]+)').Groups[1].Value
                 $newHash = [regex]::Match(($newInfo -join "`n"), 'Signer #1 certificate SHA-256 digest: ([a-fA-F0-9]+)').Groups[1].Value
-                if (-not $oldHash -or $oldHash -ne $newHash) { throw 'Firma Android diversa dalla release precedente. Usa la chiave originale del Mac: nessun APK verra  pubblicato.' }
+                if (-not $oldHash -or -not $newHash) { throw 'Impossibile leggere le impronte dei certificati Android.' }
+                if ($oldHash -ne $newHash) {
+                    $migrationPath = Join-Path $PSScriptRoot 'android-signing-migration.json'
+                    $migration = if (Test-Path -LiteralPath $migrationPath) { Get-Content -LiteralPath $migrationPath -Raw | ConvertFrom-Json } else { $null }
+                    if ($migration -and $prior.tag_name -eq $migration.previousRelease -and $newHash -eq $migration.newCertificateSha256) {
+                        $androidMigration = $true
+                        Write-Warning 'Nuova firma Android autorizzata: gli utenti devono esportare il backup e disinstallare il vecchio APK prima di installare questo.'
+                    } else { throw 'Firma Android diversa da quella attesa. Ripristina la chiave dedicata dal backup: nessun APK verra pubblicato.' }
+                }
             }
             $assets.Add($apk)
         }
@@ -150,6 +166,12 @@ try {
             Invoke-Checked 'gh' @('release', 'edit', $tag, '--repo', $repo, '--notes-file', $notes)
         } else {
             Invoke-Checked 'gh' (@('release', 'create', $tag, '--repo', $repo, '--target', $commit, '--title', "Hommaterial $next", '--generate-notes', '--draft') + $assets.ToArray())
+            if ($androidMigration) {
+                $draft = Read-GhJson @('release', 'view', $tag, '--repo', $repo, '--json', 'body')
+                $notes = Join-Path $out 'notes.md'
+                Write-Utf8 $notes ("## Android: nuova chiave di firma`nQuesta versione non si installa come aggiornamento degli APK fino alla v1.33. Esporta prima un backup dall'app, disinstalla la vecchia versione, installa il nuovo APK, collega nuovamente Amazon e importa il backup. Gli aggiornamenti successivi useranno la stessa nuova firma.`n`n" + $draft.body)
+                Invoke-Checked 'gh' @('release', 'edit', $tag, '--repo', $repo, '--notes-file', $notes)
+            }
             # Keep Android's /releases/latest pointing to a release with an APK.
             $latestFlag = if ($WindowsOnly) { '--latest=false' } else { '--latest' }
             Invoke-Checked 'gh' @('release', 'edit', $tag, '--repo', $repo, '--draft=false', $latestFlag)
