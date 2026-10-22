@@ -257,6 +257,29 @@ internal fun LgButtonDialog(remote: Remote, state: UiState, vm: HomeViewModel, o
     )
 }
 
+/** Renames an LG TV in the app, which is the name the home, the custom devices and the voice use. */
+@Composable
+internal fun LgRenameDialog(name: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
+    var typed by rememberSaveable { mutableStateOf(name) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.room_rename_title, name)) },
+        text = {
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it },
+                label = { Text(str(R.string.room_name)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onRename(typed) }, enabled = typed.isNotBlank()) { Text(str(R.string.room_rename)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
+    )
+}
+
 @Composable
 private fun Heading(text: String) {
     Text(

@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
@@ -239,6 +240,10 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     }
     var confirmSwitchBot by remember { mutableStateOf(false) }
     var removingTv by remember { mutableStateOf<LgTv?>(null) }
+    var renamingTv by remember { mutableStateOf<LgTv?>(null) }
+    renamingTv?.let { tv ->
+        LgRenameDialog(tv.name, onRename = { vm.renameLgTv(tv.id, it); renamingTv = null }, onDismiss = { renamingTv = null })
+    }
     state.tvSearch?.let { LgTvDialog(it, vm) }
     removingTv?.let { tv ->
         ConfirmDialog(
@@ -417,12 +422,21 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                         text = str(R.string.lgtv_test, tv.host),
                         onClick = { vm.testLgTv(tv) },
                         trailing = {
-                            IconButton(onClick = { removingTv = tv }) {
-                                Icon(
-                                    Icons.Outlined.Close,
-                                    contentDescription = str(R.string.lgtv_remove),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                            Row {
+                                IconButton(onClick = { renamingTv = tv }) {
+                                    Icon(
+                                        Icons.Outlined.Edit,
+                                        contentDescription = str(R.string.room_rename),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                IconButton(onClick = { removingTv = tv }) {
+                                    Icon(
+                                        Icons.Outlined.Close,
+                                        contentDescription = str(R.string.lgtv_remove),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         },
                     )

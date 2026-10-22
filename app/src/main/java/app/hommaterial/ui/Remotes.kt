@@ -301,6 +301,18 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
                         onDismiss = { moving = false },
                     )
                 }
+                // An LG TV goes by the name given here; those of SwitchBot are named in its app.
+                if (remote.lg) {
+                    var renaming by remember { mutableStateOf(false) }
+                    TextButton(onClick = { renaming = true }) { Text(str(R.string.room_rename)) }
+                    if (renaming) {
+                        LgRenameDialog(
+                            remote.name,
+                            onRename = { vm.renameLgTv(remote.id, it); renaming = false },
+                            onDismiss = { renaming = false },
+                        )
+                    }
+                }
                 val hidden = remote.id in state.hiddenRemotes
                 TextButton(onClick = { vm.setRemoteHidden(remote, !hidden); onDismiss() }) {
                     Text(str(if (hidden) R.string.unhide else R.string.hide))

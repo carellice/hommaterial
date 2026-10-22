@@ -906,6 +906,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(tvSearch = null) }
     }
 
+    /** Gives the LG TV [id] the [name] it goes by in the app; the TV itself keeps its own. */
+    fun renameLgTv(id: String, name: String) {
+        val tv = _state.value.lgTvs.find { it.id == id } ?: return
+        val trimmed = name.trim().takeIf { it.isNotEmpty() } ?: return
+        _state.update { it.copy(lgTvs = pairedTvs.put(tv.copy(name = trimmed))) }
+    }
+
     fun forgetLgTv(tv: LgTv) {
         _state.update { it.copy(lgTvs = pairedTvs.remove(tv.id)) }
     }

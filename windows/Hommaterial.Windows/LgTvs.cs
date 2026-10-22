@@ -41,11 +41,26 @@ public sealed partial class MainWindow
         {
             var row = Row(); row.Children.Add(new TextBlock { Text = tv.Name + " · " + tv.Host, VerticalAlignment = VerticalAlignment.Center });
             row.Children.Add(AsyncButton("Prova", async () => { await lgTv.SendAsync(tv, "toast", "Hommaterial è collegato", lifetime.Token); Message("Messaggio mostrato su " + tv.Name + ".", InfoBarSeverity.Success); }));
+            row.Children.Add(AsyncButton("Rinomina", () => RenameLgTvAsync(tv)));
             row.Children.Add(Button("Rimuovi", () => { SaveLgTvs(lgTvs.Where(t => t.Id != tv.Id).ToList()); RebuildNavigation(); Render(); }));
             panel.Children.Add(row);
         }
         if (!demo) panel.Children.Add(AsyncButton("Aggiungi un TV LG", AddLgTvAsync));
         page.Children.Add(Card(panel));
+    }
+
+    // The name the TV goes by in the app, for the home, custom devices and voice; the TV itself keeps its own.
+    void RenameLgTv(string id, string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) throw new InvalidOperationException("Scrivi un nome per il TV.");
+        SaveLgTvs(lgTvs.Select(t => t.Id == id ? t with { Name = name.Trim() } : t).ToList());
+    }
+    async Task RenameLgTvAsync(LgTv tv)
+    {
+        var body = new StackPanel { Spacing = 12, MinWidth = 320 };
+        var name = new TextBox { Header = "Nome", Text = tv.Name };
+        body.Children.Add(name);
+        await ShowFormAsync("Rinomina " + tv.Name, body, () => { RenameLgTv(tv.Id, name.Text); RebuildNavigation(); return Task.CompletedTask; }, "Rinomina");
     }
 
     // Looks for TVs on the network, or takes one by its address, then waits while the TV asks the user on screen.
@@ -138,5 +153,13 @@ public sealed partial class MainWindow
             Save(); refreshButtons();
         }));
         body.Children.Add(apps); body.Children.Add(appActions);
+
+        // Renamed in place: the panel is a dialog already, and another cannot open over it.
+        var rename = Row(8);
+        var name = new TextBox { Header = "Nome del TV", Text = tv.Name, MinWidth = 220 };
+        var save = Button("Rinomina", () => { RenameLgTv(tv.Id, name.Text); Message("Nome del TV aggiornato.", InfoBarSeverity.Success); });
+        save.VerticalAlignment = VerticalAlignment.Bottom;
+        rename.Children.Add(name); rename.Children.Add(save);
+        body.Children.Add(rename);
     }
 }
