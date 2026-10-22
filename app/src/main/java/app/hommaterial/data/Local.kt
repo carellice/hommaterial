@@ -16,6 +16,8 @@ class Alexa private constructor(context: Context) {
         .build()
     val auth = AlexaAuth(context, http)
     val api = AlexaApi(auth, http)
+    // Shared as well: a connection kept open for the keys serves the app and the shortcuts alike.
+    val lgTv = LgTvClient(http)
 
     companion object {
         @Volatile

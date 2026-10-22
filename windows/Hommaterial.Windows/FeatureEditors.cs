@@ -81,7 +81,7 @@ public sealed partial class MainWindow
             var remote = owner.home.Remotes.FirstOrDefault(r => r.Id == id);
             if (remote is null) return;
             foreach (var (code, label) in StandardCommands(remote)) command.Items.Add(new ComboBoxItem { Content = label, Tag = new HomeAction("remote", id, code) });
-            foreach (var name in owner.home.RemoteButtons.GetValueOrDefault(id) ?? []) command.Items.Add(new ComboBoxItem { Content = name + " (personalizzato)", Tag = new HomeAction("remote", id, name, true) });
+            foreach (var name in owner.home.RemoteButtons.GetValueOrDefault(id) ?? []) command.Items.Add(new ComboBoxItem { Content = owner.ButtonLabel(id, name) + " (personalizzato)", Tag = new HomeAction("remote", id, name, true) });
             if (command.Items.Count > 0) command.SelectedIndex = 0;
         }
         public HomeAction Build()
@@ -99,13 +99,14 @@ public sealed partial class MainWindow
     static IEnumerable<(string Code, string Label)> StandardCommands(RemoteDevice remote)
     {
         if (remote.Kind == "CUSTOM") return [];
+        if (remote.Kind == "TV" && remote.Id.StartsWith(LgTv.Prefix)) return [("turnOn", "Accendi"), ("turnOff", "Spegni"), ("volumeAdd", "Volume ＋"), ("volumeSub", "Volume −"), ("channelAdd", "Canale ＋"), ("channelSub", "Canale −"), ("setMute", "Muto"), .. LgMedia];
         if (remote.Kind == "TV") return [("turnOn", "Accendi"), ("turnOff", "Spegni"), ("volumeAdd", "Volume ＋"), ("volumeSub", "Volume −"), ("channelAdd", "Canale ＋"), ("channelSub", "Canale −")];
         return [("turnOn", "Accendi"), ("turnOff", "Spegni")];
     }
     string Describe(HomeAction action) => action.Type switch {
         "power" => (action.Value == "on" ? "Accendi " : "Spegni ") + (home.Devices.FirstOrDefault(d => d.ApplianceId == action.Target)?.Name ?? "dispositivo mancante"),
         "macro" => "Esegui " + (home.Macros.FirstOrDefault(m => m.Id == action.Target)?.Name ?? "personalizzato mancante"),
-        "wait" => "Aspetta " + action.Value + " secondi", _ => (home.Remotes.FirstOrDefault(r => r.Id == action.Target)?.Name ?? "telecomando mancante") + " · " + action.Value };
+        "wait" => "Aspetta " + action.Value + " secondi", _ => (home.Remotes.FirstOrDefault(r => r.Id == action.Target)?.Name ?? "telecomando mancante") + " · " + ButtonLabel(action.Target, action.Value) };
     void RenderAutomations()
     {
         page.Children.Add(Text("Automazioni", 32, true));

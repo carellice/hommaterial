@@ -112,25 +112,46 @@ internal fun describe(action: MacroAction, state: UiState): String = when (actio
     }
     else -> {
         val remote = state.remotes.find { it.id == action.target }?.name ?: str(R.string.macro_gone)
-        str(R.string.macro_press, if (action.custom) action.value else commandLabel(action.value), remote)
+        str(R.string.macro_press, commandName(action.target, action.value, action.custom, state), remote)
     }
 }
 
 /** The keys every remote of a kind has, besides those the user added. */
-private fun standardCommands(remote: Remote): List<String> = when (remote.kind) {
-    RemoteKind.CUSTOM -> emptyList()
-    RemoteKind.TV -> listOf("turnOn", "turnOff", "volumeAdd", "volumeSub", "channelAdd", "channelSub")
+private fun standardCommands(remote: Remote): List<String> = when {
+    remote.kind == RemoteKind.CUSTOM -> emptyList()
+    // An LG TV also has the sound and the player, which it tells apart from the other keys.
+    remote.lg -> listOf("turnOn", "turnOff", "volumeAdd", "volumeSub", "channelAdd", "channelSub", "setMute") + LG_MEDIA
+    remote.kind == RemoteKind.TV -> listOf("turnOn", "turnOff", "volumeAdd", "volumeSub", "channelAdd", "channelSub")
     else -> listOf("turnOn", "turnOff")
 }
 
-private fun commandLabel(command: String): String = when (command) {
+internal fun commandLabel(command: String): String = when (command) {
     "turnOn" -> str(R.string.turn_on)
     "turnOff" -> str(R.string.turn_off)
     "volumeAdd" -> str(R.string.remote_up, str(R.string.remote_volume))
     "volumeSub" -> str(R.string.remote_down, str(R.string.remote_volume))
     "channelAdd" -> str(R.string.remote_up, str(R.string.remote_channel))
     "channelSub" -> str(R.string.remote_down, str(R.string.remote_channel))
+    "setMute" -> str(R.string.lg_key_mute)
+    "play" -> str(R.string.lg_play)
+    "pause" -> str(R.string.lg_pause)
+    "stop" -> str(R.string.lg_stop)
+    "rewind" -> str(R.string.lg_rewind)
+    "fastForward" -> str(R.string.lg_forward)
     else -> command
+}
+
+/**
+ * What a key of the remote [remoteId] is called: for SwitchBot the name the user typed when
+ * [custom], for an LG TV the name of the app or of the key it stands for.
+ */
+internal fun commandName(remoteId: String, command: String, custom: Boolean, state: UiState): String {
+    val tv = state.lgTvs.find { it.id == remoteId }
+    return when {
+        tv != null -> lgLabel(command, tv.apps)
+        custom -> command
+        else -> commandLabel(command)
+    }
 }
 
 /** Creates a custom device, when [macro] is null, or edits one: its name, what it depends on, its actions. */
@@ -411,7 +432,7 @@ internal fun ActionPicker(
         ) { onPick(MacroAction(ACTION_POWER, target.orEmpty(), if (it == 0) "on" else "off")) }
         remote == null -> ListDialog(
             title = str(R.string.macro_pick_remote),
-            items = state.remotes.map { it.name to it.type },
+            items = state.remotes.map { it.name to if (it.lg) str(R.string.remote_lg) else it.type },
             onDismiss = onDismiss,
         ) { target = state.remotes[it].id }
         else -> {
@@ -419,7 +440,8 @@ internal fun ActionPicker(
             val keys = state.remoteButtons[remote.id].orEmpty()
             ListDialog(
                 title = remote.name,
-                items = standard.map { commandLabel(it) to null } + keys.map { it to null },
+                items = (standard.map { commandName(remote.id, it, false, state) } +
+                    keys.map { commandName(remote.id, it, true, state) }).map { it to null },
                 empty = str(R.string.macro_no_keys),
                 onDismiss = onDismiss,
             ) { index ->

@@ -15,6 +15,8 @@ export function createBackup(s, switchBot = null) {
   delete portable.monitor.pin;
   delete portable.monitor.monitorPin;
   if (switchBot?.token) portable.switchBot = { token: switchBot.token, secret: switchBot.secret || '' };
+  // LG TVs are paired by the apps on the home network; the web only carries them along.
+  if (Array.isArray(s.lgTvs) && s.lgTvs.length) portable.lgTvs = JSON.parse(JSON.stringify(s.lgTvs));
   return portable;
 }
 
@@ -39,5 +41,11 @@ export function parseBackup(text) {
     action(a.action);
   }
   for (const m of backup.macros || []) for (const step of [...(m.steps || []), ...(m.otherwise || [])]) action(step, false);
+  if (backup.lgTvs !== undefined) {
+    if (!Array.isArray(backup.lgTvs)) throw new Error('Invalid LG TVs');
+    for (const tv of backup.lgTvs) {
+      if (!tv || typeof tv.id !== 'string' || !tv.id.startsWith('lg:') || typeof tv.host !== 'string') throw new Error('Invalid LG TV');
+    }
+  }
   return backup;
 }

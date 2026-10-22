@@ -82,6 +82,7 @@ import app.hommaterial.R
 import app.hommaterial.UiState
 import app.hommaterial.data.Device
 import app.hommaterial.data.Group
+import app.hommaterial.data.LgTv
 import app.hommaterial.data.Macro
 import app.hommaterial.plural
 import app.hommaterial.quick.Alerts
@@ -237,6 +238,17 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
         MacroEditor(editingMacro, state, vm, onDismiss = { creatingMacro = false; editingMacro = null })
     }
     var confirmSwitchBot by remember { mutableStateOf(false) }
+    var removingTv by remember { mutableStateOf<LgTv?>(null) }
+    state.tvSearch?.let { LgTvDialog(it, vm) }
+    removingTv?.let { tv ->
+        ConfirmDialog(
+            title = str(R.string.lgtv_remove_title, tv.name),
+            text = str(R.string.lgtv_remove_text),
+            confirm = str(R.string.lgtv_remove),
+            onConfirm = { vm.forgetLgTv(tv) },
+            onDismiss = { removingTv = null },
+        )
+    }
     if (linkingSwitchBot) {
         SwitchBotDialog(
             onConnect = { token, secret -> vm.connectSwitchBot(token, secret); linkingSwitchBot = false },
@@ -370,9 +382,9 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 if (state.switchBot) {
                     Setting(
                         title = str(R.string.switchbot_linked),
-                        text = plural(R.plurals.remotes_found, state.remotes.size),
+                        text = plural(R.plurals.remotes_found, state.switchBotRemotes.size),
                     )
-                    for (remote in state.remotes) {
+                    for (remote in state.switchBotRemotes) {
                         val hidden = remote.id in state.hiddenRemotes
                         Setting(
                             title = remote.name,
@@ -396,6 +408,26 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                         onClick = { linkingSwitchBot = true },
                     )
                 }
+            }
+
+            Section(R.string.s_lgtv, R.string.lgtv_text) {
+                for (tv in state.lgTvs) {
+                    Setting(
+                        title = tv.name,
+                        text = str(R.string.lgtv_test, tv.host),
+                        onClick = { vm.testLgTv(tv) },
+                        trailing = {
+                            IconButton(onClick = { removingTv = tv }) {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = str(R.string.lgtv_remove),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                    )
+                }
+                Setting(title = str(R.string.lgtv_add), text = str(R.string.lgtv_add_text), onClick = vm::searchLgTvs)
             }
 
             Section(R.string.s_updates) {

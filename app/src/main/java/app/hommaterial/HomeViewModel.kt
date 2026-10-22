@@ -16,8 +16,12 @@ import app.hommaterial.data.Cache
 import app.hommaterial.data.ColorChoice
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
+import app.hommaterial.data.FoundTv
 import app.hommaterial.data.Group
 import app.hommaterial.data.History
+import app.hommaterial.data.LG_PREFIX
+import app.hommaterial.data.LgTv
+import app.hommaterial.data.LgTvs
 import app.hommaterial.data.LoginAttempt
 import app.hommaterial.data.Macro
 import app.hommaterial.data.MacroAction
@@ -119,13 +123,17 @@ data class UiState(
     val theme: Int = 0,
     /** How this tablet behaves as the panel of the home. */
     val monitor: MonitorConfig = MonitorConfig(),
-    /** Whether the SwitchBot account is linked, for the infrared [remotes] of its hubs. */
+    /** Whether the SwitchBot account is linked, for the infrared remotes of its hubs. */
     val switchBot: Boolean = false,
-    val remotes: List<Remote> = emptyList(),
+    val switchBotRemotes: List<Remote> = emptyList(),
     /** The buttons added by hand to each remote, by remote. See [SwitchBot.buttons]. */
     val remoteButtons: Map<String, List<String>> = emptyMap(),
     val acSettings: Map<String, AcSetting> = emptyMap(),
     val hiddenRemotes: Set<String> = emptySet(),
+    /** The LG TVs paired on this phone, driven on the home network. */
+    val lgTvs: List<LgTv> = emptyList(),
+    /** The search for an LG TV to pair, while its dialog is open. */
+    val tvSearch: TvSearch? = null,
     /** Whether a PIN was chosen for the monitor mode. */
     val pin: Boolean = false,
     /** Whether a backup being imported is waiting to know if its monitor mode comes along. */
@@ -156,12 +164,26 @@ data class UiState(
         get() = (placed.mapNotNull { it.room } + roomList + rooms.filterKeys { ':' in it }.values)
             .filter { it.isNotEmpty() }.distinct().sortedBy { it.lowercase() }
 
+    /** Every remote: the infrared ones of SwitchBot, then the paired LG TVs. */
+    val remotes: List<Remote> get() = switchBotRemotes + lgTvs.map { it.asRemote() }
+
     /** The remotes in the list: all but the hidden ones. */
     val shownRemotes: List<Remote> get() = remotes.filter { it.id !in hiddenRemotes }
 
     /** Whether the settings and the choices about the devices are behind the PIN of the monitor. */
     val locked: Boolean get() = monitor.enabled && pin
 }
+
+/**
+ * Where the pairing of an LG TV stands: the search on the network, then [pairing] the TV at that
+ * address, which is [asking] the user on its screen.
+ */
+data class TvSearch(
+    val searching: Boolean = true,
+    val found: List<FoundTv> = emptyList(),
+    val pairing: String? = null,
+    val asking: Boolean = false,
+)
 
 private const val BACKUP_APP = "hommaterial"
 const val LAYOUT_GRID = 0
@@ -175,6 +197,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val api = alexa.api
     private val updater = Updater(app, alexa.http)
     private val switchBot = SwitchBot(app, alexa.http)
+    private val pairedTvs = LgTvs(app)
+    private val tvRemote = alexa.lgTv
     private val local = Cache(app)
     private val cache = local.prefs
     private val history = History(app)
@@ -194,6 +218,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private var refreshJob: Job? = null
     private var updateJob: Job? = null
     private var pendingBackup: JSONObject? = null
+    private var tvSearchJob: Job? = null
 
     init {
         // Shortcuts and widget may be stale after an update of the app or a change made elsewhere.
@@ -248,10 +273,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }.getOrDefault(MonitorConfig()),
             pin = settings.contains(PIN_KEY),
             switchBot = switchBot.connected,
-            remotes = switchBot.remotes(),
+            switchBotRemotes = switchBot.remotes(),
             remoteButtons = switchBot.buttons(),
             acSettings = switchBot.acSettings(),
             hiddenRemotes = switchBot.hidden(),
+            lgTvs = pairedTvs.all(),
         )
     }
 
@@ -311,10 +337,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 pin = it.pin,
                 // SwitchBot is another account: signing out of Amazon leaves it linked.
                 switchBot = it.switchBot,
-                remotes = it.remotes,
+                switchBotRemotes = it.switchBotRemotes,
                 remoteButtons = it.remoteButtons,
                 acSettings = it.acSettings,
                 hiddenRemotes = it.hiddenRemotes,
+                lgTvs = it.lgTvs,
                 update = it.update,
                 updatePrompt = it.updatePrompt,
                 updateProgress = it.updateProgress,
@@ -327,7 +354,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         // The remotes change rarely and have no state: they are fetched on the side, without a word.
         if (switchBot.connected) {
             viewModelScope.launch {
-                guarded(quiet = true) { _state.update { it.copy(remotes = switchBot.fetchRemotes()) } }
+                guarded(quiet = true) { _state.update { it.copy(switchBotRemotes = switchBot.fetchRemotes()) } }
             }
         }
         refreshJob = viewModelScope.launch {
@@ -813,7 +840,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val linked = guarded {
                 val remotes = switchBot.fetchRemotes()
-                _state.update { it.copy(switchBot = true, remotes = remotes) }
+                _state.update { it.copy(switchBot = true, switchBotRemotes = remotes) }
                 _messages.tryEmit(plural(R.plurals.remotes_found, remotes.size))
             }
             if (!linked) switchBot.disconnect()
@@ -821,15 +848,89 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun disconnectSwitchBot() {
+        // The buttons and the hiding of the LG TVs are kept with those of SwitchBot, and stay.
+        val s = _state.value
+        val tvButtons = s.remoteButtons.filterKeys { it.startsWith(LG_PREFIX) }
+        val tvHidden = s.hiddenRemotes.filter { it.startsWith(LG_PREFIX) }.toSet()
         switchBot.disconnect()
+        switchBot.putButtons(tvButtons)
+        switchBot.putHidden(tvHidden)
         _state.update {
             it.copy(
                 switchBot = false,
-                remotes = emptyList(),
-                remoteButtons = emptyMap(),
+                switchBotRemotes = emptyList(),
+                remoteButtons = tvButtons,
                 acSettings = emptyMap(),
-                hiddenRemotes = emptySet(),
+                hiddenRemotes = tvHidden,
             )
+        }
+    }
+
+    /** Opens the search for an LG TV to pair, looking on the network at once. */
+    fun searchLgTvs() {
+        tvSearchJob?.cancel()
+        _state.update { it.copy(tvSearch = TvSearch()) }
+        tvSearchJob = viewModelScope.launch {
+            var found = emptyList<FoundTv>()
+            guarded(quiet = true) { found = tvRemote.discover() }
+            val paired = _state.value.lgTvs.map { it.host }.toSet()
+            _state.update { s -> s.copy(tvSearch = s.tvSearch?.copy(searching = false, found = found.filter { it.host !in paired })) }
+        }
+    }
+
+    /** Pairs the TV at [host], which asks the user on its screen; the search stays open if it fails. */
+    fun pairLgTv(host: String) {
+        val address = host.trim()
+        if (address.isEmpty()) return
+        tvSearchJob?.cancel()
+        _state.update { it.copy(tvSearch = (it.tvSearch ?: TvSearch()).copy(searching = false, pairing = address, asking = false)) }
+        tvSearchJob = viewModelScope.launch {
+            val paired = guarded {
+                val tv = tvRemote.pair(address, str(R.string.lgtv_hello)) {
+                    _state.update { s -> s.copy(tvSearch = s.tvSearch?.copy(asking = true)) }
+                }
+                // The name the user gave the TV says more than its model.
+                val name = _state.value.tvSearch?.found?.find { it.host == address }?.name ?: tv.name
+                // Paired again, it stays the same remote, with its buttons, rooms and custom devices.
+                val before = _state.value.lgTvs.find { it.host == address }
+                val again = tv.copy(name = before?.name ?: name, id = before?.id ?: tv.id, apps = before?.apps.orEmpty())
+                _state.update { it.copy(lgTvs = pairedTvs.put(again), tvSearch = null) }
+                _messages.tryEmit(str(R.string.lgtv_paired, again.name))
+            }
+            if (!paired) _state.update { s -> s.copy(tvSearch = s.tvSearch?.copy(pairing = null, asking = false)) }
+        }
+    }
+
+    fun closeTvSearch() {
+        tvSearchJob?.cancel()
+        _state.update { it.copy(tvSearch = null) }
+    }
+
+    fun forgetLgTv(tv: LgTv) {
+        _state.update { it.copy(lgTvs = pairedTvs.remove(tv.id)) }
+    }
+
+    /** Asks [remote], an LG TV, for its apps and inputs, to offer them as buttons. */
+    fun refreshLgApps(remote: Remote) {
+        val tv = _state.value.lgTvs.find { it.id == remote.id } ?: return
+        _state.update { it.copy(busy = it.busy + tv.id) }
+        viewModelScope.launch {
+            guarded(quiet = true) {
+                val apps = tvRemote.apps(tv)
+                val current = _state.value.lgTvs.find { it.id == tv.id } ?: return@guarded
+                _state.update { it.copy(lgTvs = pairedTvs.put(current.copy(apps = apps))) }
+            }
+            _state.update { it.copy(busy = it.busy - tv.id) }
+        }
+    }
+
+    /** Shows a message on [tv], to see that it answers. */
+    fun testLgTv(tv: LgTv) {
+        _state.update { it.copy(busy = it.busy + tv.id) }
+        _haptics.tryEmit(Haptic.Key)
+        viewModelScope.launch {
+            if (!guarded { tvRemote.send(tv, "toast", str(R.string.lgtv_hello)) }) _haptics.tryEmit(Haptic.Reject)
+            _state.update { it.copy(busy = it.busy - tv.id) }
         }
     }
 
@@ -847,7 +948,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(busy = it.busy + remote.id) }
         _haptics.tryEmit(haptic)
         viewModelScope.launch {
-            if (!guarded { switchBot.send(remote, command, parameter, custom) }) _haptics.tryEmit(Haptic.Reject)
+            val sent = guarded {
+                val tv = _state.value.lgTvs.find { it.id == remote.id }
+                if (tv != null) tvRemote.send(tv, command, parameter) else switchBot.send(remote, command, parameter, custom)
+            }
+            if (!sent) _haptics.tryEmit(Haptic.Reject)
             _state.update { it.copy(busy = it.busy - remote.id) }
         }
     }
@@ -920,6 +1025,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         switchBot.keys()?.let { (token, secret) ->
             backup.put("switchBot", JSONObject().put("token", token).put("secret", secret))
         }
+        // So do the LG TVs with their keys, which serve only on the home network: no new pairing.
+        if (s.lgTvs.isNotEmpty()) backup.put("lgTvs", JSONArray(s.lgTvs.map { it.toJson() }))
         viewModelScope.launch {
             val saved = runCatching {
                 withContext(Dispatchers.IO) {
@@ -1043,6 +1150,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             switchBot.putHidden(strings("hiddenRemotes"))
             _state.update { it.copy(hiddenRemotes = switchBot.hidden()) }
         }
+        backup.optJSONArray("lgTvs")?.let { saved ->
+            val tvs = runCatching { saved.mapObjects(LgTv::fromJson) }.getOrNull()?.filter { it.id.startsWith(LG_PREFIX) }
+            if (tvs != null) _state.update { it.copy(lgTvs = pairedTvs.replaceAll(tvs)) }
+        }
         if (monitor) backup.optJSONObject("monitor")?.let { setMonitor(MonitorConfig.fromJson(it)) }
         backup.optJSONObject("switchBot")?.let { keys ->
             val token = keys.optString("token")
@@ -1050,7 +1161,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 switchBot.connect(token, keys.optString("secret"))
                 _state.update { it.copy(switchBot = true) }
                 viewModelScope.launch {
-                    guarded(quiet = true) { _state.update { it.copy(remotes = switchBot.fetchRemotes()) } }
+                    guarded(quiet = true) { _state.update { it.copy(switchBotRemotes = switchBot.fetchRemotes()) } }
                 }
             }
         }

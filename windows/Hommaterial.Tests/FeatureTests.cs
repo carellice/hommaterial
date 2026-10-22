@@ -14,13 +14,16 @@ static class FeatureTests
         "monitor":{"enabled":true,"pages":["room:Studio","favorites"],"only":{"room:Studio":["a","macro:m"]},"restMinutes":4,"restItems":["clock","sensors"],"night":true,"nightFrom":22,"nightTo":6},
         "schedules":[{"id":"s","action":{"type":"macro","target":"m","value":"","custom":false},"label":"Postazione","at":1792567800000,"hour":20,"minute":10,"days":[2,4,6],"enabled":true}],
         "automations":[{"id":"auto","device":"a","trigger":"temperatureAbove","threshold":25,"action":{"type":"power","target":"b","value":"off"},"title":"Caldo","label":"Spegni b","enabled":true}],
+        "lgTvs":[{"id":"lg:1","name":"Sala","host":"192.168.1.20","key":"k","pin":"p","macs":["a8:23:fe:01:02:03"],"apps":{"netflix":"Netflix"}}],
         "futureField":{"keep":[1,2,3]},"monitorPin":"never-export","refreshToken":"never-export"}
         """);
         var original = imported.Choices;
         check(original.Macros[0].Otherwise![0].Custom && original.Schedules[0].Days.SetEquals([2, 4, 6]) && imported.SwitchBot?.Secret == "secret", "backup Android/web: macro condizionali, programmi, credenziali SwitchBot");
-        var exported = JsonNode.Parse(BackupCodec.Export(original, imported.SwitchBot))!;
+        check(imported.LgTvs is [{ Key: "k", Macs: ["a8:23:fe:01:02:03"] }] && !original.BackupExtras.ContainsKey("lgTvs"), "TV LG del backup letti come dati, non come campi sconosciuti");
+        var exported = JsonNode.Parse(BackupCodec.Export(original, imported.SwitchBot, imported.LgTvs))!;
         check(exported["widget"]?["columns"]?.GetValue<int>() == 3 && exported["tiles"]?[1] is null && exported["hapticLevel"]?.GetValue<int>() == 63 && exported["futureField"]?["keep"]?.AsArray().Count == 3, "round trip conserva widget, tile Android, vibrazione e campi futuri");
         check(exported["theme"]?.GetValue<int>() == 2 && exported["app"]?.ToString() == "hommaterial" && exported["monitorPin"] is null && exported["refreshToken"] is null, "formato v1 comune e nessun PIN o token Amazon nel backup");
+        check(exported["lgTvs"]?[0]?["key"]?.ToString() == "k" && exported["lgTvs"]?[0]?["apps"]?["netflix"]?.ToString() == "Netflix", "i TV LG abbinati su Android tornano intatti dal backup di Windows");
         check(BackupCodec.Parse(exported.ToJsonString()).Choices.Automations[0].Action.Value == "off", "esportazione Windows riletta senza perdere le automazioni");
         var account = DemoHome.Create(); account.MonitorPin = "local-pin"; account.Marketplace = "amazon.de";
         BackupCodec.Apply(account, original, false);

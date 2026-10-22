@@ -345,7 +345,7 @@ public sealed partial class MainWindow
         else if (action.Type == "remote")
         {
             if (!home.Remotes.Any(r => r.Id == action.Target)) throw new InvalidOperationException("Telecomando non trovato.");
-            if (!demo) await switchBotClient.SendAsync(action.Target, action.Value, custom: action.Custom, cancellation: cancellation);
+            if (!demo) await SendRemoteAsync(action.Target, action.Value, custom: action.Custom, cancellation: cancellation);
         }
         else throw new InvalidOperationException("Azione non supportata.");
     }

@@ -28,12 +28,20 @@ internal fun switchBotSign(token: String, secret: String, time: String, nonce: S
 /** What a remote can do, which decides the buttons the app gives it. */
 enum class RemoteKind { TV, AIR_CONDITIONER, CUSTOM, OTHER }
 
-/** An infrared remote set up on a SwitchBot hub; [type] is the name SwitchBot gives its kind. */
+/** The type of the paired LG TVs among the remotes. */
+const val LG_TYPE = "LG webOS"
+
+/**
+ * An infrared remote set up on a SwitchBot hub, [type] being the name SwitchBot gives its kind;
+ * or an LG TV, driven on the network instead, as [lg] tells.
+ */
 data class Remote(val id: String, val name: String, val type: String) {
+    val lg: Boolean get() = id.startsWith(LG_PREFIX)
+
     val kind: RemoteKind
         // The remotes learnt button by button are named as the ready-made ones, after "DIY".
         get() = when (type.removePrefix("DIY ").lowercase()) {
-            "tv", "iptv", "streamer", "set top box" -> RemoteKind.TV
+            "tv", "iptv", "streamer", "set top box", "lg webos" -> RemoteKind.TV
             "air conditioner" -> RemoteKind.AIR_CONDITIONER
             "others" -> RemoteKind.CUSTOM
             else -> RemoteKind.OTHER

@@ -108,7 +108,12 @@ private fun iconFor(remote: Remote): ImageVector = when (remote.kind) {
     else -> Icons.Outlined.SettingsRemote
 }
 
-private fun kindLabel(remote: Remote): String = when (remote.kind) {
+private fun kindLabel(remote: Remote): String = when {
+    remote.lg -> str(R.string.remote_lg)
+    else -> kindName(remote)
+}
+
+private fun kindName(remote: Remote): String = when (remote.kind) {
     RemoteKind.TV -> str(R.string.remote_tv)
     RemoteKind.AIR_CONDITIONER -> str(R.string.remote_ac)
     else -> str(R.string.remote_generic)
@@ -157,13 +162,23 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
     // The minutes of a timer, while the key it presses is being chosen.
     var timing by remember { mutableStateOf<Int?>(null) }
     val askNotifications = rememberNotificationRequest()
-    if (adding) {
+    if (adding && remote.lg) {
+        LgButtonDialog(
+            remote,
+            state,
+            vm,
+            onAdd = { vm.setRemoteButtons(remote, (buttons + it).distinct()); adding = false },
+            onDismiss = { adding = false },
+        )
+    } else if (adding) {
         ButtonDialog(
             onAdd = { vm.setRemoteButtons(remote, (buttons + it).distinct()); adding = false },
             onDismiss = { adding = false },
         )
     }
-    DetailsContainer(onDismiss) {
+    fun label(name: String) = commandName(remote.id, name, true, state)
+    // A TV has many keys and is held as its remote would be: it takes the whole screen.
+    DetailsContainer(onDismiss, fullScreen = remote.kind == RemoteKind.TV) {
         Column(
             Modifier.verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
         ) {
@@ -193,6 +208,7 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
                         }
                     }
                     if (remote.kind == RemoteKind.TV) TvControls(remote, vm)
+                    if (remote.lg) LgControls(remote, vm)
                 }
             }
 
@@ -218,7 +234,7 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
                 }
             }
             timing?.let { minutes ->
-                ListDialog(str(R.string.timer_key_in), buttons.map { it to null }, onDismiss = { timing = null }) {
+                ListDialog(str(R.string.timer_key_in), buttons.map { label(it) to null }, onDismiss = { timing = null }) {
                     val action = MacroAction(ACTION_REMOTE, remote.id, buttons[it], custom = true)
                     vm.addTimer(action, describe(action, state), minutes)
                     timing = null
@@ -246,7 +262,7 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
                             if (name == null) {
                                 AddKey(Modifier.weight(1f)) { adding = true }
                             } else {
-                                RemoteKey(name, editing, Modifier.weight(1f)) {
+                                RemoteKey(label(name), editing, Modifier.weight(1f)) {
                                     if (editing) {
                                         vm.setRemoteButtons(remote, buttons - name)
                                     } else {
@@ -260,7 +276,7 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
                 }
             }
             Text(
-                str(R.string.remote_buttons_hint),
+                str(if (remote.lg) R.string.lgtv_buttons_hint else R.string.remote_buttons_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp),

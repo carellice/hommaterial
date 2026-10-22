@@ -176,6 +176,14 @@ await test('old v1 backups remain readable and malformed schedules fail before r
   assert.throws(() => parseBackup('{"app":"hommaterial","version":1,"schedules":[null]}'));
   assert.throws(() => parseBackup('{"app":"hommaterial","version":1,"macros":[{"steps":[{"type":"macro","target":"self","value":""}]}]}'));
 });
+await test('the LG TVs of an Android backup come back out of the web unchanged', () => {
+  const tv = { id: 'lg:1', name: 'Sala', host: '192.168.1.20', key: 'k', pin: 'p', macs: ['a8:23:fe:01:02:03'], apps: { netflix: 'Netflix' } };
+  const backup = parseBackup(JSON.stringify(createBackup({ lgTvs: [tv] })));
+  assert.deepEqual(backup.lgTvs, [tv]);
+  assert.equal(createBackup({}).lgTvs, undefined);
+  assert.throws(() => parseBackup('{"app":"hommaterial","version":1,"lgTvs":{}}'));
+  assert.throws(() => parseBackup('{"app":"hommaterial","version":1,"lgTvs":[{"id":"abc","host":"x"}]}'));
+});
 
 if (failures) {
   console.log(`${failures} failed`);

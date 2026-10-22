@@ -121,6 +121,9 @@ Quello che un browser non permette:
   tablet in modalità monitor sempre acceso.
 - **Niente widget, riquadri rapidi né scorciatoie dell'icona.** Le scelte
   fatte per questi nell'app Android restano nel backup.
+- **Niente TV LG.** Si comandano sulla rete di casa, che un sito non può
+  raggiungere: si usano dall'app Android o Windows. I TV di un backup restano
+  nel file quando lo riesporti dalla PWA.
 - **Luminosità dello schermo.** La schermata di riposo attenua il testo, non
   lo schermo. Lo schermo sempre acceso usa il Wake Lock, dove il browser lo
   supporta.

@@ -20,9 +20,9 @@ public sealed partial class MainWindow
 
         var backup = new StackPanel { Spacing = 12 }; backup.Children.Add(Text("Backup e trasferimento", 20, true));
         backup.Children.Add(Text("Lo stesso file JSON si importa su Android, web e Windows. Include stanze, gruppi, preferiti, personalizzati, automazioni, programmi e impostazioni. L'account Amazon e il PIN restano su questo dispositivo."));
-        var keys = new CheckBox { Content = "Includi token e chiave SwitchBot nel file", IsChecked = false };
+        var keys = new CheckBox { Content = "Includi le credenziali di SwitchBot e dei TV LG nel file", IsChecked = false };
         backup.Children.Add(keys);
-        backup.Children.Add(Text("Se incluse, le chiavi SwitchBot sono leggibili nel backup, come nelle altre versioni. Conserva il file in un posto di cui ti fidi.", 12));
+        backup.Children.Add(Text("Se incluse, le chiavi SwitchBot e dei TV LG sono leggibili nel backup, come nelle altre versioni. Conserva il file in un posto di cui ti fidi.", 12));
         var backupActions = Row(); backupActions.Children.Add(AsyncButton("Esporta backup…", () => ExportBackupAsync(keys.IsChecked == true)));
         backupActions.Children.Add(AsyncButton("Importa backup…", ImportBackupAsync)); backup.Children.Add(backupActions); page.Children.Add(Card(backup));
 
@@ -47,11 +47,12 @@ public sealed partial class MainWindow
         page.Children.Add(Card(notificationsPanel));
 
         var bot = new StackPanel { Spacing = 12 }; bot.Children.Add(Text("Telecomandi SwitchBot", 20, true));
-        bot.Children.Add(Text((demo ? demoKeys : store.ReadSwitchBot()) is null ? "Collega l'hub con token e chiave segreta dell'app SwitchBot." : "Account collegato · " + home.Remotes.Count + " telecomandi"));
+        bot.Children.Add(Text((demo ? demoKeys : store.ReadSwitchBot()) is null ? "Collega l'hub con token e chiave segreta dell'app SwitchBot." : "Account collegato · " + home.Remotes.Count(r => !r.Id.StartsWith(LgTv.Prefix)) + " telecomandi"));
         bot.Children.Add(AsyncButton("Collega o modifica credenziali", ConnectSwitchBotAsync));
         bot.Children.Add(AsyncButton("Aggiorna telecomandi", RefreshRemotesAsync));
-        bot.Children.Add(Button("Scollega SwitchBot", () => { if (demo) demoKeys = null; else store.SaveSwitchBot(null); home.Remotes.Clear(); Save(); Render(); }));
+        bot.Children.Add(Button("Scollega SwitchBot", () => { if (demo) demoKeys = null; else store.SaveSwitchBot(null); home.Remotes.Clear(); SyncLgRemotes(); Save(); Render(); }));
         page.Children.Add(Card(bot));
+        RenderLgTvSettings();
 
         var monitor = new StackPanel { Spacing = 12 }; monitor.Children.Add(Text("Modalità monitor", 20, true));
         monitor.Children.Add(Text("Un pannello dedicato alla casa, con pagine, schermo acceso, riposo e PIN facoltativo."));
@@ -81,7 +82,7 @@ public sealed partial class MainWindow
             picker.FileTypeChoices.Add("Backup Hommaterial", new List<string> { ".json" });
             WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
             var file = await picker.PickSaveFileAsync(); if (file is null) return;
-            await FileIO.WriteTextAsync(file, BackupCodec.Export(home, includeKeys ? demo ? demoKeys : store.ReadSwitchBot() : null));
+            await FileIO.WriteTextAsync(file, BackupCodec.Export(home, includeKeys ? demo ? demoKeys : store.ReadSwitchBot() : null, includeKeys && !demo ? lgTvs : null));
             Message("Backup esportato. Compatibile con Android e web.", InfoBarSeverity.Success);
         }
         catch (Exception e) { ShowError(e); }
@@ -104,13 +105,15 @@ public sealed partial class MainWindow
             var monitor = new CheckBox { Content = "Ripristina anche la modalità monitor", IsChecked = false };
             var active = new CheckBox { Content = "Attiva automazioni e programmi importati", IsChecked = false };
             var keys = new CheckBox { Content = "Importa anche le credenziali SwitchBot", IsChecked = imported.SwitchBot is not null, Visibility = imported.SwitchBot is null ? Visibility.Collapsed : Visibility.Visible };
-            body.Children.Add(monitor); body.Children.Add(active); body.Children.Add(keys);
+            var tvs = new CheckBox { Content = $"Importa anche i TV LG abbinati ({imported.LgTvs?.Count ?? 0})", IsChecked = imported.LgTvs is { Count: > 0 } && !demo, Visibility = imported.LgTvs is { Count: > 0 } && !demo ? Visibility.Visible : Visibility.Collapsed };
+            body.Children.Add(monitor); body.Children.Add(active); body.Children.Add(keys); body.Children.Add(tvs);
             await ShowFormAsync("Ripristina backup", body, () =>
             {
                 if (active.IsChecked != true) { foreach (var a in choices.Automations) a.Enabled = false; foreach (var s in choices.Schedules) s.Enabled = false; }
                 BackupCodec.Apply(home, choices, monitor.IsChecked == true);
                 foreach (var rule in home.Automations) runtime.Prime(rule);
                 if (keys.IsChecked == true && imported.SwitchBot is not null) { if (demo) demoKeys = imported.SwitchBot; else store.SaveSwitchBot(imported.SwitchBot); }
+                if (tvs.IsChecked == true && imported.LgTvs is { } importedTvs) SaveLgTvs(importedTvs.DistinctBy(t => t.Id).ToList());
                 Save(); ApplyTheme(); ApplyMonitor(); Message("Backup importato.", InfoBarSeverity.Success); return Task.CompletedTask;
             }, "Ripristina");
             if (imported.SwitchBot is not null && (demo ? demoKeys : store.ReadSwitchBot()) is not null) await RefreshRemotesAsync();
@@ -130,21 +133,22 @@ public sealed partial class MainWindow
             if (demo) { demoKeys = keys; return; }
             using var verify = new SwitchBotClient(() => keys);
             var remotes = await verify.RemotesAsync();
-            store.SaveSwitchBot(keys); home.Remotes = remotes; Save();
+            store.SaveSwitchBot(keys); home.Remotes = remotes; SyncLgRemotes(); Save();
         }, "Collega");
     }
     async Task RefreshRemotesAsync()
     {
         if (demo) { Message("In demo i telecomandi sono simulati."); return; }
         if (store.ReadSwitchBot() is null) return;
-        home.Remotes = await switchBotClient.RemotesAsync(); Save(); RebuildNavigation(); Render();
+        home.Remotes = await switchBotClient.RemotesAsync(); SyncLgRemotes(); Save(); RebuildNavigation(); Render();
     }
     async Task RemoteDetailsAsync(RemoteDevice remote)
     {
-        var body = new StackPanel { Spacing = 12 }; var feedback = Text("I comandi a infrarossi non restituiscono lo stato dell'apparecchio.", 12); body.Children.Add(feedback);
+        var tv = LgTvOf(remote.Id);
+        var body = new StackPanel { Spacing = 12 }; var feedback = Text(tv is null ? "I comandi a infrarossi non restituiscono lo stato dell'apparecchio." : "Comandato sulla rete di casa: il PC deve essere sulla stessa rete del TV.", 12); body.Children.Add(feedback);
         async Task Press(string command, string parameter = "default", bool custom = false)
         {
-            try { if (!demo) await switchBotClient.SendAsync(remote.Id, command, parameter, custom, lifetime.Token); feedback.Text = "Comando inviato: " + command; }
+            try { if (!demo) await SendRemoteAsync(remote.Id, command, parameter, custom, lifetime.Token); feedback.Text = "Comando inviato: " + ButtonLabel(remote.Id, command); }
             catch (Exception e) { feedback.Text = e.Message; ShowError(e); }
         }
         foreach (var (code, label) in StandardCommands(remote)) body.Children.Add(AsyncButton(label, () => Press(code)));
@@ -167,20 +171,31 @@ public sealed partial class MainWindow
         void FillCustom()
         {
             customPanel.Children.Clear();
-            foreach (var name in home.RemoteButtons.GetValueOrDefault(remote.Id) ?? []) customPanel.Children.Add(AsyncButton(name, () => Press(name, custom: true)));
+            foreach (var name in home.RemoteButtons.GetValueOrDefault(remote.Id) ?? [])
+            {
+                if (tv is null) { customPanel.Children.Add(AsyncButton(name, () => Press(name, custom: true))); continue; }
+                // The buttons of an LG TV are chosen from its apps and keys, and taken away one by one.
+                var row = Row(8); row.Children.Add(AsyncButton(ButtonLabel(remote.Id, name), () => Press(name, custom: true)));
+                row.Children.Add(Button("Rimuovi", () => { home.RemoteButtons[remote.Id] = (home.RemoteButtons.GetValueOrDefault(remote.Id) ?? []).Where(n => n != name).ToList(); Save(); FillCustom(); }));
+                customPanel.Children.Add(row);
+            }
         }
         FillCustom();
-        var names = new TextBox { Header = "Tasti personalizzati (uno per riga)", AcceptsReturn = true, Text = string.Join("\n", home.RemoteButtons.GetValueOrDefault(remote.Id) ?? []) };
-        body.Children.Add(names); body.Children.Add(Button("Salva i tasti", () =>
-        { home.RemoteButtons[remote.Id] = names.Text.Split('\n').Select(n => n.Trim()).Where(n => n.Length > 0).Distinct().ToList(); Save(); FillCustom(); }));
+        if (tv is not null) AddLgControls(body, tv, command => Press(command), FillCustom);
+        else
+        {
+            var names = new TextBox { Header = "Tasti personalizzati (uno per riga)", AcceptsReturn = true, Text = string.Join("\n", home.RemoteButtons.GetValueOrDefault(remote.Id) ?? []) };
+            body.Children.Add(names); body.Children.Add(Button("Salva i tasti", () =>
+            { home.RemoteButtons[remote.Id] = names.Text.Split('\n').Select(n => n.Trim()).Where(n => n.Length > 0).Distinct().ToList(); Save(); FillCustom(); }));
+        }
         AddFavoriteControl(body, "remote:" + remote.Id); AddPlaceControl(body, "remote:" + remote.Id);
         AddActionTimer(body, "Timer del telecomando", selection => { AddNativeTimer(new("remote", remote.Id, selection.On ? "turnOn" : "turnOff"), remote.Name, selection.Minutes); return Task.CompletedTask; });
         var customTimer = new ComboBox { Header = "Oppure esegui un tasto dopo il timer" };
-        foreach (var name in home.RemoteButtons.GetValueOrDefault(remote.Id) ?? []) customTimer.Items.Add(name);
+        foreach (var name in home.RemoteButtons.GetValueOrDefault(remote.Id) ?? []) customTimer.Items.Add(new ComboBoxItem { Content = ButtonLabel(remote.Id, name), Tag = name });
         if (customTimer.Items.Count > 0)
         {
             customTimer.SelectedIndex = 0; body.Children.Add(customTimer);
-            AddActionTimer(body, "Timer tasto personalizzato", selection => { AddNativeTimer(new("remote", remote.Id, customTimer.SelectedItem.ToString()!, true), remote.Name, selection.Minutes); return Task.CompletedTask; }, false);
+            AddActionTimer(body, "Timer tasto personalizzato", selection => { AddNativeTimer(new("remote", remote.Id, (string)((ComboBoxItem)customTimer.SelectedItem).Tag, true), remote.Name, selection.Minutes); return Task.CompletedTask; }, false);
         }
         body.Children.Add(Button("Nascondi questo telecomando", () => { home.HiddenRemotes.Add(remote.Id); Save(); Message("Telecomando nascosto."); }));
         await ShowPanelAsync(remote.Name, body);

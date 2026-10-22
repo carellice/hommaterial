@@ -9,7 +9,7 @@ public sealed record HomeMacro(string Id, string Name, string? Condition = null,
 public sealed record RemoteDevice(string Id, string Name, string Type)
 {
     public string Kind => Type.Replace("DIY ", "").ToLowerInvariant() switch
-    { "tv" or "iptv" or "streamer" or "set top box" => "TV", "air conditioner" => "AC", "others" => "CUSTOM", _ => "OTHER" };
+    { "tv" or "iptv" or "streamer" or "set top box" or "lg webos" => "TV", "air conditioner" => "AC", "others" => "CUSTOM", _ => "OTHER" };
 }
 public sealed record AcSetting(int Temperature = 24, int Mode = 2, int Fan = 1);
 public sealed record SwitchBotKeys(string Token, string Secret);
@@ -99,12 +99,12 @@ public static class ScheduleClock
     }
 }
 
-public sealed record ImportedBackup(HomeData Choices, SwitchBotKeys? SwitchBot);
+public sealed record ImportedBackup(HomeData Choices, SwitchBotKeys? SwitchBot, List<LgTv>? LgTvs = null);
 public static class BackupCodec
 {
     public static readonly JsonSerializerOptions PortableJson = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, PropertyNameCaseInsensitive = true, WriteIndented = true };
     static JsonNode? Node<T>(T data) => JsonSerializer.SerializeToNode(data, PortableJson);
-    public static string Export(HomeData home, SwitchBotKeys? keys = null)
+    public static string Export(HomeData home, SwitchBotKeys? keys = null, List<LgTv>? lgTvs = null)
     {
         var root = (JsonObject)home.BackupExtras.DeepClone();
         root["app"] = "hommaterial"; root["version"] = 1;
@@ -123,6 +123,8 @@ public static class BackupCodec
         foreach (var name in new[] { "refreshToken", "cookie", "csrf", "monitorPin", "pin", "password", "session", "switchBot" }) root.Remove(name);
         if (root["monitor"] is JsonObject monitor) { monitor.Remove("pin"); monitor.Remove("monitorPin"); }
         if (keys is not null) root["switchBot"] = Node(keys);
+        // The LG TVs with their keys, which serve only on the home network, as Android does.
+        if (lgTvs is { Count: > 0 }) root["lgTvs"] = Node(lgTvs);
         return root.ToJsonString(PortableJson);
     }
     public static ImportedBackup Parse(string json)
@@ -159,8 +161,10 @@ public static class BackupCodec
             foreach (var list in new[] { home.Schedules.Select(s => s.Id), home.Automations.Select(a => a.Id), home.Macros.Select(m => m.Id), home.Groups.Select(g => g.Id) })
                 if (list.Count() != list.Distinct().Count()) throw new JsonException();
             var keys = root["switchBot"]?.Deserialize<SwitchBotKeys>(PortableJson);
-            foreach (var name in new[] { "refreshToken", "cookie", "csrf", "monitorPin", "pin", "password", "session", "switchBot" }) home.BackupExtras.Remove(name);
-            return new(home, keys is { Token.Length: > 0 } ? keys : null);
+            var tvs = root["lgTvs"]?.Deserialize<List<LgTv>>(PortableJson);
+            if (tvs is not null && tvs.Any(t => t is null || t.Id?.StartsWith(LgTv.Prefix) != true || string.IsNullOrWhiteSpace(t.Host) || t.Key is null || t.Pin is null)) throw new JsonException();
+            foreach (var name in new[] { "refreshToken", "cookie", "csrf", "monitorPin", "pin", "password", "session", "switchBot", "lgTvs" }) home.BackupExtras.Remove(name);
+            return new(home, keys is { Token.Length: > 0 } ? keys : null, tvs);
         }
         catch (Exception e) when (e is JsonException or InvalidOperationException or ArgumentException or NullReferenceException)
         { throw new InvalidOperationException("Backup non valido o danneggiato. Nessun dato è stato modificato.", e); }

@@ -101,6 +101,8 @@ function loadCached() {
     shortcuts: cache.get('shortcuts', null),
     widget: cache.get('widget', null),
     tiles: cache.get('tiles', Array(TILE_SLOTS).fill(null)),
+    // The LG TVs of a backup, kept for the next one: the web cannot reach them.
+    lgTvs: cache.get('lgTvs', []),
     showHidden: false,
     favorites: cache.get('favorites', []),
     timers: cache.get('timers', {}),
@@ -909,8 +911,13 @@ export async function connectSwitchBot(token, secret) {
 }
 
 export function disconnectSwitchBot() {
+  // The buttons and the hiding of the LG TVs are kept with those of SwitchBot, and stay.
+  const tvButtons = Object.fromEntries(Object.entries(state.remoteButtons).filter(([id]) => id.startsWith('lg:')));
+  const tvHidden = state.hiddenRemotes.filter((id) => id.startsWith('lg:'));
   switchBot.disconnect();
-  update({ switchBot: false, remotes: [], remoteButtons: {}, acSettings: {}, hiddenRemotes: [] });
+  switchBot.putButtons(tvButtons);
+  switchBot.putHidden(tvHidden);
+  update({ switchBot: false, remotes: [], remoteButtons: tvButtons, acSettings: {}, hiddenRemotes: tvHidden });
 }
 
 /** Presses a button of [remote]. Nothing comes back from an appliance: only a failure is told. */
@@ -1061,6 +1068,7 @@ function restore(backup, monitor) {
     widget: backup.widget ?? null,
     tiles,
     alerts,
+    ...(Array.isArray(backup.lgTvs) ? { lgTvs: backup.lgTvs } : {}),
   };
   // Restored automations wait for a new crossing when their condition already holds.
   const automationsTripped = values.automations.filter((a) => holds(a, state.states[a.device] ?? emptyState()) === true).map((a) => a.id);

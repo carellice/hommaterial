@@ -49,6 +49,20 @@ internal sealed class LocalStore
         if (keys is null) File.Delete(path);
         else File.WriteAllBytes(path, Protect(JsonSerializer.SerializeToUtf8Bytes(keys), true));
     }
+    // The paired LG TVs, with their keys: encrypted as the SwitchBot ones.
+    public List<LgTv> ReadLgTvs()
+    {
+        var path = Path.Combine(dataFolder, "lgtv.bin");
+        if (!File.Exists(path)) return [];
+        try { return JsonSerializer.Deserialize<List<LgTv>>(Protect(File.ReadAllBytes(path), false), BackupCodec.PortableJson) ?? []; }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or JsonException) { Log(e); return []; }
+    }
+    public void SaveLgTvs(List<LgTv> tvs)
+    {
+        var path = Path.Combine(dataFolder, "lgtv.bin");
+        if (tvs.Count == 0) File.Delete(path);
+        else File.WriteAllBytes(path, Protect(JsonSerializer.SerializeToUtf8Bytes(tvs, BackupCodec.PortableJson), true));
+    }
     public void Clear()
     {
         File.Delete(TokenPath);

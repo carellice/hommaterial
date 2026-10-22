@@ -100,6 +100,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -121,6 +122,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -128,6 +130,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.window.DialogProperties
 import app.hommaterial.HomeViewModel
 import app.hommaterial.LAYOUT_LIST
@@ -1444,10 +1447,29 @@ private fun DeviceSheet(
     }
 }
 
-/** A sheet from the bottom on a phone, a panel on the side where the screen is wide. */
+/**
+ * A sheet from the bottom on a phone, a panel on the side where the screen is wide; the whole
+ * screen when [fullScreen], for what is held like a remote with many keys.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DetailsContainer(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun DetailsContainer(onDismiss: () -> Unit, fullScreen: Boolean = false, content: @Composable () -> Unit) {
+    if (fullScreen) {
+        Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            // Not dimmed: it covers the home, and the bars of the system would show grey around it.
+            val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+            SideEffect { window?.setDimAmount(0f) }
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxSize()) {
+                Column {
+                    IconButton(onClick = onDismiss, modifier = Modifier.padding(start = 8.dp, top = 8.dp)) {
+                        Icon(Icons.Outlined.Close, contentDescription = str(R.string.close))
+                    }
+                    Box(Modifier.weight(1f)) { content() }
+                }
+            }
+        }
+        return
+    }
     if (!LocalHomeLook.current.wide) {
         ModalBottomSheet(onDismissRequest = onDismiss) { content() }
         return

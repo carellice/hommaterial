@@ -14,6 +14,8 @@ import app.hommaterial.data.Cache
 import app.hommaterial.data.Device
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.History
+import app.hommaterial.data.LG_PREFIX
+import app.hommaterial.data.LgTvs
 import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.SwitchBot
 import app.hommaterial.str
@@ -59,13 +61,24 @@ object Quick {
 
     /** Presses a key of a remote, one of those the user added by name when [custom]. */
     suspend fun pressRemote(context: Context, remoteId: String, command: String, custom: Boolean): Outcome {
-        val switchBot = SwitchBot(context, Alexa.get(context).http)
-        val remote = switchBot.remotes().find { it.id == remoteId }
-            ?: return Outcome(false, str(R.string.quick_not_found))
-        return attempt {
-            switchBot.send(remote, command, custom = custom)
-            Outcome(true, remote.name)
+        val known = remoteId.startsWith(LG_PREFIX) && LgTvs(context).all().any { it.id == remoteId } ||
+            SwitchBot(context, Alexa.get(context).http).remotes().any { it.id == remoteId }
+        if (!known) return Outcome(false, str(R.string.quick_not_found))
+        return attempt { Outcome(true, press(context, remoteId, command, custom)) }
+    }
+
+    /** Presses a key of the remote [remoteId], of SwitchBot or an LG TV, and returns its name. */
+    private suspend fun press(context: Context, remoteId: String, command: String, custom: Boolean): String {
+        val alexa = Alexa.get(context)
+        if (remoteId.startsWith(LG_PREFIX)) {
+            val tv = LgTvs(context).all().find { it.id == remoteId } ?: throw Exception(str(R.string.macro_gone))
+            alexa.lgTv.send(tv, command)
+            return tv.name
         }
+        val switchBot = SwitchBot(context, alexa.http)
+        val remote = switchBot.remotes().find { it.id == remoteId } ?: throw Exception(str(R.string.macro_gone))
+        switchBot.send(remote, command, custom = custom)
+        return remote.name
     }
 
     /** Inverts the power of a device, asking Alexa for its real state first. */
@@ -148,7 +161,6 @@ object Quick {
         fun device(id: String) = devices.find { it.applianceId == id } ?: throw Exception(str(R.string.macro_gone))
         val outcome = attempt {
             val alexa = Alexa.get(context)
-            val switchBot = SwitchBot(context, alexa.http)
             val actions = if (macro.condition == null) macro.steps else {
                 val watched = device(macro.condition)
                 val on = alexa.api.states(listOf(watched))[watched.applianceId]?.takeIf { it.reachable }?.power
@@ -168,11 +180,7 @@ object Quick {
                         val state = (known[target.applianceId] ?: DeviceState()).copy(power = on, reachable = true)
                         cache.putStates(known + (target.applianceId to state))
                     }
-                    ACTION_REMOTE -> {
-                        val remote = switchBot.remotes().find { it.id == action.target }
-                            ?: throw Exception(str(R.string.macro_gone))
-                        switchBot.send(remote, action.value, custom = action.custom)
-                    }
+                    ACTION_REMOTE -> press(context, action.target, action.value, action.custom)
                 }
             }
             Outcome(true, str(R.string.macro_done, macro.name))

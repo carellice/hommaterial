@@ -92,16 +92,20 @@ if (OperatingSystem.IsWindows())
         Check(store.ReadToken() == "local-test-token" && !Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(folder, "session.bin"))).Contains("local-test-token"), "DPAPI: token decifrabile per l'utente corrente e mai in chiaro sul disco");
         store.Save(demo);
         Check(store.Load().Favorites.SetEquals(demo.Favorites) && store.Load().Devices.Count == demo.Devices.Count, "cache e preferiti sopravvivono al caricamento");
+        store.SaveLgTvs([new("lg:1", "Sala", "192.168.1.20", "lg-test-key", "pin", ["a8:23:fe:01:02:03"], new() { ["netflix"] = "Netflix" })]);
+        Check(store.ReadLgTvs() is [{ Key: "lg-test-key", Apps.Count: 1 }] && !Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(folder, "lgtv.bin"))).Contains("lg-test-key"), "DPAPI: TV LG abbinati cifrati sul disco");
+        store.SaveLgTvs([]);
         store.Clear();
         Check(store.ReadToken() is null && store.Load().Devices.Count == 0, "disconnessione cancella token e dati dell'account");
     }
     finally
     {
-        foreach (var name in new[] { "session.bin", "home.json", "home.json.tmp" }) File.Delete(Path.Combine(folder, name));
+        foreach (var name in new[] { "session.bin", "home.json", "home.json.tmp", "lgtv.bin" }) File.Delete(Path.Combine(folder, name));
         Directory.Delete(folder);
     }
 }
 await FeatureTests.Run(Check);
+await LgTvTests.Run(Check);
 await UpdateTests.Run(Check);
 Console.WriteLine($"\n{passed} verifiche superate.");
 

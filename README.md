@@ -168,6 +168,14 @@ collegati al proprio account Alexa.
   telecomando, con il simbolo o il colore quando il nome lo dice. Un
   telecomando che non serve si nasconde dalla lista, come gli altri
   dispositivi.
+- I TV LG con webOS si comandano direttamente sulla rete di casa, senza
+  account né cloud: dalle Impostazioni → TV LG l'app li cerca sulla rete (o
+  prende l'indirizzo scritto a mano) e il TV chiede di accettare la richiesta
+  sul suo schermo. Il telecomando si apre a tutto schermo, con accensione
+  (Wake-on-LAN), volume, canali, frecce e OK, Indietro, Home, muto, i tasti
+  del lettore e, come tasti propri, le app e gli ingressi del TV. Funzionano
+  solo con il telefono sulla stessa rete del TV; per accenderlo da spento va
+  attivata sul TV l'accensione dalla rete.
 
 - I dispositivi personalizzati sono riquadri che con un tocco eseguono una
   serie di azioni, una dopo l'altra: accendere o spegnere dispositivi,
@@ -249,6 +257,10 @@ istruzioni, con la guida di configurazione passo per passo, sono in
   sono server intermedi, statistiche né pubblicità.
 - Solo se colleghi SwitchBot, l'app parla anche con i server di SwitchBot, per
   elencare i telecomandi e inviare i loro comandi.
+- I TV LG si comandano solo sulla rete di casa, senza passare da internet. La
+  chiave data dal TV quando accetti la richiesta resta sul telefono, insieme
+  all'impronta del suo certificato, e va nel backup per non rifare
+  l'abbinamento: custodisci il file.
 - La password viene inserita nella pagina di Amazon e non viene letta né
   salvata dall'app.
 - Sul telefono, nell'area privata dell'app, restano il token di accesso,

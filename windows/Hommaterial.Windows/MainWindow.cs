@@ -33,6 +33,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         home = store.Load();
+        lgTvs = store.ReadLgTvs(); SyncLgRemotes();
         client = NewClient();
         Title = "Hommaterial";
         SystemBackdrop = new MicaBackdrop();
@@ -96,7 +97,7 @@ public sealed partial class MainWindow : Window
             args.Cancel = true;
             _ = ConfirmCloseAsync();
         };
-        Closed += (_, _) => { polling.Stop(); timerClock.Stop(); updateClock.Stop(); lifetime.Cancel(); updateHttp.Dispose(); client.Dispose(); switchBotClient.Dispose(); notifications.Dispose(); tray?.Dispose(); };
+        Closed += (_, _) => { polling.Stop(); timerClock.Stop(); updateClock.Stop(); lifetime.Cancel(); updateHttp.Dispose(); client.Dispose(); switchBotClient.Dispose(); lgTv.Dispose(); notifications.Dispose(); tray?.Dispose(); };
         if (Environment.GetCommandLineArgs().Contains("--demo")) StartDemo();
     }
 
@@ -312,7 +313,7 @@ public sealed partial class MainWindow : Window
     async Task LeaveDemoAndLoginAsync()
     {
         if (busy || dialogOpen || pending.Count > 0) return;
-        demo = false; home = store.Load(); selected = "all";
+        demo = false; home = store.Load(); SyncLgRemotes(); selected = "all";
         client.Dispose(); client = NewClient(); ApplyTheme(); RebuildNavigation(); Render();
         if (client.IsLoggedIn) await RefreshAsync(); else await LoginAsync();
     }
@@ -364,7 +365,7 @@ public sealed partial class MainWindow : Window
             {
                 await loginClient.CompleteLoginAsync(attempt, redirect.Text.Trim());
                 store.SaveToken(pendingToken ?? throw new InvalidOperationException("Token Amazon mancante."));
-                home = new HomeData { Theme = home.Theme, Marketplace = loginClient.Market.Domain };
+                home = new HomeData { Theme = home.Theme, Marketplace = loginClient.Market.Domain }; SyncLgRemotes();
                  Save(); connected = true;
                 client.Dispose(); client = NewClient(); dialog.Hide();
             }
@@ -386,7 +387,7 @@ public sealed partial class MainWindow : Window
         try
         {
             if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-             store.Clear(); home = new(); client.Dispose(); client = NewClient(); selected = "all";
+             store.Clear(); home = new(); SyncLgRemotes(); client.Dispose(); client = NewClient(); selected = "all";
             notice.IsOpen = false; ApplyTheme(); RebuildNavigation(); Render();
         }
         finally { dialogOpen = false; }
