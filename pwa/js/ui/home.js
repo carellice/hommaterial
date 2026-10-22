@@ -8,7 +8,7 @@ import * as store from '../store.js';
 import { str, plural, clock, dateText, degrees } from '../i18n.js';
 import {
   PAGE_ALL, LAYOUT_LIST, ACTION_POWER, WHITE_CHOICES, COLOR_CHOICES,
-  homeSections, shownPages, pageLabel, pageIcon, search, statusText, countdown, ageText, whenText, isLocked,
+  homeSections, shownPages, pageLabel, pageIcon, search, statusText, countdown, ageText, whenText, isLocked, placed, placeOf,
 } from '../model.js';
 import { MacroTile } from './macros.js';
 import { RemoteTile } from './remotes.js';
@@ -301,7 +301,8 @@ function PageGrid({ page, s, look }) {
           <span class="title-small">${section.title}</span>
           ${section.switchable.length > 0 && html`<${RoomPower} name=${section.title} devices=${section.switchable} />`}
         </div>
-        ${section.entries.map((entry) => html`<${Tile} key=${`${section.key}|${entry.id}`} entry=${entry} s=${s} look=${look} />`)}`)}
+        ${section.entries.map((entry) => html`<${Tile} key=${`${section.key}|${entry.id}`} entry=${entry} s=${s}
+          look=${section.key === 'favorites' ? { ...look, room: entryRoom(s, entry) } : look} />`)}`)}
       ${sections.length > 0 && html`<div class="span"><${Legend} /></div>`}
     </div>`;
 }
@@ -375,8 +376,19 @@ export function TileRow({ icon, busy, name, status, hints, size }) {
     <span class="corner">${busy ? html`<${Spinner} />` : hints.map((hint) => html`<${Icon} name=${hint.icon} title=${str(hint.text)} />`)}</span>`;
 }
 
-export function TileFace({ look, ...props }) {
-  return look.list ? html`<${TileRow} size=${look.size} ...${props} />` : html`<${TileBody} size=${look.size} ...${props} />`;
+export function TileFace({ look, status, ...props }) {
+  // Out of their rooms, the favorites say which room they are in.
+  const told = look.room ? `${look.room} · ${status}` : status;
+  return look.list
+    ? html`<${TileRow} size=${look.size} status=${told} ...${props} />`
+    : html`<${TileBody} size=${look.size} status=${told} ...${props} />`;
+}
+
+/** The room the user sees a tile in, null for a group or for what is in none. */
+function entryRoom(s, entry) {
+  if (entry.kind === 'dev') return placed(s).find((d) => d.applianceId === entry.id)?.room || null;
+  if (entry.kind === 'mac' || entry.kind === 'rem') return placeOf(s, entry.id);
+  return null;
 }
 
 function DeviceTile({ device, s, look }) {

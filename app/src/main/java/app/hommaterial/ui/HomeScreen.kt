@@ -631,7 +631,11 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
                     SectionHeader(section.title)
                 }
             }
-            items(section.entries, key = { "${section.key}|${it.id}" }) { it.Tile(state, vm) }
+            items(section.entries, key = { "${section.key}|${it.id}" }) { entry ->
+                // Out of their rooms, the favorites say which room they are in.
+                val room = if (section.key == "favorites") entry.room(state) else null
+                CompositionLocalProvider(LocalTileRoom provides room) { entry.Tile(state, vm) }
+            }
         }
         if (sections.isNotEmpty()) item(key = "legend", span = { GridItemSpan(maxLineSpan) }) { Legend() }
     }
@@ -663,6 +667,16 @@ private sealed interface Entry {
         override val name get() = group.name
     }
 }
+
+/** The room the user sees it in, null for a group or for what is in none. */
+private fun Entry.room(state: UiState): String? = when (this) {
+    is Entry.Dev -> state.placed.find { it.applianceId == device.applianceId }?.room
+    is Entry.Mac, is Entry.Rem -> state.placeOf(id)
+    is Entry.Grp -> null
+}
+
+/** The room a tile shows before its state, where the section around it does not tell. */
+internal val LocalTileRoom = compositionLocalOf<String?> { null }
 
 @Composable
 private fun Entry.Tile(state: UiState, vm: HomeViewModel) = when (this) {
@@ -977,6 +991,7 @@ private val SWITCH_HINTS = listOf(TileHint.TOGGLE, TileHint.HOLD)
 @Composable
 internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: String, hints: List<TileHint>) {
     val size = LocalHomeLook.current.tileSize
+    val told = LocalTileRoom.current?.let { "$it · $status" } ?: status
     val type = MaterialTheme.typography
     @Composable
     fun Corner() {
@@ -1006,7 +1021,7 @@ internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: St
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    status,
+                    told,
                     style = if (size == 2) type.bodyMedium else type.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1033,7 +1048,7 @@ internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: St
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            status,
+            told,
             style = if (size == 2) type.bodyLarge else type.bodySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
