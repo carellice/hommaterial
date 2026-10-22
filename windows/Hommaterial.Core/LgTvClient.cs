@@ -9,8 +9,10 @@ using System.Threading.Channels;
 namespace Hommaterial.Core;
 
 // An LG TV paired on the home network, in the same JSON as Android: Key is what the TV gave when the request was
-// accepted, Pin the SHA-256 of its certificate as first seen, Macs wake it from standby, Apps its apps and inputs by id.
-public sealed record LgTv(string Id, string Name, string Host, string Key, string Pin, List<string>? Macs = null, Dictionary<string, string>? Apps = null)
+// accepted, Pin the SHA-256 of its certificate as first seen, Macs wake it from standby, Apps its apps and Inputs its
+// sources, such as the HDMI ports, by id.
+public sealed record LgTv(string Id, string Name, string Host, string Key, string Pin, List<string>? Macs = null, Dictionary<string, string>? Apps = null,
+    Dictionary<string, string>? Inputs = null)
 {
     public const string Prefix = "lg:";
     public const string Type = "LG webOS";
@@ -93,6 +95,15 @@ public sealed class LgTvClient(int port = 3001) : IDisposable
         foreach (var point in payload["launchPoints"]?.AsArray() ?? [])
             if (point?["id"]?.ToString() is { Length: > 0 } id && point["title"]?.ToString() is { } title && !string.IsNullOrWhiteSpace(title)) apps.TryAdd(id, title);
         return apps;
+    }
+    // The sources of the TV, by id, with the names it shows for them.
+    public static Dictionary<string, string> Inputs(JsonObject payload)
+    {
+        var inputs = new Dictionary<string, string>();
+        foreach (var device in payload["devices"]?.AsArray() ?? [])
+            if (device?["id"]?.ToString() is { Length: > 0 } id)
+                inputs.TryAdd(id, device["label"]?.ToString() is { } label && !string.IsNullOrWhiteSpace(label) ? label : id);
+        return inputs;
     }
     static bool IsMac(string text) => System.Text.RegularExpressions.Regex.IsMatch(text, "^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$");
     // The magic packet: six bytes 0xFF, then the address sixteen times.
@@ -183,6 +194,9 @@ public sealed class LgTvClient(int port = 3001) : IDisposable
 
     public Task<Dictionary<string, string>> AppsAsync(LgTv tv, CancellationToken cancellation = default) =>
         WithSessionAsync(tv, async k => Apps(await k.Main.CallAsync(new WebOsCall("ssap://com.webos.applicationManager/listLaunchPoints"), cancellation)), cancellation);
+
+    public Task<Dictionary<string, string>> InputsAsync(LgTv tv, CancellationToken cancellation = default) =>
+        WithSessionAsync(tv, async k => Inputs(await k.Main.CallAsync(new WebOsCall("ssap://tv/getExternalInputList"), cancellation)), cancellation);
 
     // Wakes the TV from standby, which works only while its network stays on.
     public static async Task WakeAsync(LgTv tv, CancellationToken cancellation = default)

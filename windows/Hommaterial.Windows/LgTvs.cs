@@ -28,6 +28,7 @@ public sealed partial class MainWindow
     {
         if (LgTvOf(remoteId) is not { } tv) return command;
         if (command.StartsWith("app:")) return tv.Apps?.GetValueOrDefault(command[4..]) ?? command[4..];
+        if (command.StartsWith("input:")) return tv.Inputs?.GetValueOrDefault(command[6..]) ?? command[6..];
         if (command.StartsWith("key:")) return LgKeys.FirstOrDefault(k => k.Key == command[4..]).Label ?? command[4..];
         return LgMedia.FirstOrDefault(m => m.Code == command).Label ?? command switch { "setMute" => "Muto", _ => command };
     }
@@ -92,7 +93,7 @@ public sealed partial class MainWindow
             // Paired again, it stays the same remote, with its buttons, rooms and custom devices.
             var before = lgTvs.FirstOrDefault(t => t.Host == host);
             var name = before?.Name ?? results.FirstOrDefault(r => r.Host == host)?.Name ?? tv.Name;
-            tv = tv with { Id = before?.Id ?? tv.Id, Name = name, Apps = before?.Apps ?? [] };
+            tv = tv with { Id = before?.Id ?? tv.Id, Name = name, Apps = before?.Apps ?? [], Inputs = before?.Inputs ?? [] };
             SaveLgTvs(lgTvs.Where(t => t.Id != tv.Id && t.Host != host).Append(tv).ToList());
             Message(tv.Name + " abbinato.", InfoBarSeverity.Success);
         }, "Abbina");
@@ -121,27 +122,50 @@ public sealed partial class MainWindow
         }
         body.Children.Add(media);
 
+        // The sources, such as the HDMI ports, asked to the TV as the panel opens like its apps.
+        var sources = new ComboBox { Header = "Sorgente", HorizontalAlignment = HorizontalAlignment.Stretch, PlaceholderText = "Chiedo al TV le sue sorgenti…" };
+        void FillSources(Dictionary<string, string>? known)
+        {
+            sources.Items.Clear();
+            foreach (var (id, label) in known ?? []) sources.Items.Add(new ComboBoxItem { Content = label, Tag = "input:" + id });
+            if (sources.Items.Count > 0) sources.SelectedIndex = 0;
+        }
+        FillSources(tv.Inputs);
+        var sourceActions = Row(8);
+        sourceActions.Children.Add(AsyncButton("Cambia sorgente", () => sources.SelectedItem is ComboBoxItem { Tag: string command } ? press(command) : Task.CompletedTask, true));
+        body.Children.Add(sources); body.Children.Add(sourceActions);
+
         // The apps are asked to the TV as the panel opens; the last list known shows meanwhile.
         var apps = new ComboBox { Header = "App e ingressi", HorizontalAlignment = HorizontalAlignment.Stretch, PlaceholderText = "Chiedo al TV le sue app…" };
-        void FillApps(Dictionary<string, string>? known)
+        void FillApps(Dictionary<string, string>? known, Dictionary<string, string>? inputs)
         {
             apps.Items.Clear();
+            foreach (var (id, label) in inputs ?? []) apps.Items.Add(new ComboBoxItem { Content = "Sorgente " + label, Tag = "input:" + id });
             foreach (var (id, title) in known ?? []) apps.Items.Add(new ComboBoxItem { Content = title, Tag = "app:" + id });
             foreach (var (key, label) in LgKeys) apps.Items.Add(new ComboBoxItem { Content = "Tasto " + label, Tag = "key:" + key });
             foreach (var (code, label) in LgMedia) apps.Items.Add(new ComboBoxItem { Content = label, Tag = code });
             if (apps.Items.Count > 0) apps.SelectedIndex = 0;
         }
-        FillApps(tv.Apps);
+        FillApps(tv.Apps, tv.Inputs);
         _ = RefreshAppsAsync();
         async Task RefreshAppsAsync()
         {
             try
             {
                 var fresh = await lgTv.AppsAsync(tv, lifetime.Token);
-                SaveLgTvs(lgTvs.Select(t => t.Id == tv.Id ? t with { Apps = fresh } : t).ToList());
-                FillApps(fresh);
+                // Older webOS may not list its sources: the apps are kept all the same.
+                Dictionary<string, string>? inputs = null;
+                try { inputs = await lgTv.InputsAsync(tv, lifetime.Token); } catch (LgTvException) { }
+                var current = lgTvs.FirstOrDefault(t => t.Id == tv.Id) ?? tv;
+                inputs ??= current.Inputs;
+                SaveLgTvs(lgTvs.Select(t => t.Id == tv.Id ? t with { Apps = fresh, Inputs = inputs } : t).ToList());
+                FillApps(fresh, inputs); FillSources(inputs);
             }
-            catch (LgTvException) { if (tv.Apps is not { Count: > 0 }) apps.PlaceholderText = "Il TV non risponde: accendilo per vedere le sue app."; }
+            catch (LgTvException)
+            {
+                if (tv.Apps is not { Count: > 0 }) apps.PlaceholderText = "Il TV non risponde: accendilo per vedere le sue app.";
+                if (tv.Inputs is not { Count: > 0 }) sources.PlaceholderText = "Il TV non risponde: accendilo per vedere le sue sorgenti.";
+            }
         }
         var appActions = Row(8);
         appActions.Children.Add(AsyncButton("Apri", () => apps.SelectedItem is ComboBoxItem { Tag: string command } ? press(command) : Task.CompletedTask, true));

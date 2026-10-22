@@ -59,7 +59,7 @@ const val LG_PREFIX = "lg:"
  * An LG TV with webOS, paired on the home network. [key] is what the TV gave when the request was
  * accepted on its screen; [pin] the fingerprint of its certificate as first seen, so that another
  * machine answering at the same address is not taken for it; [macs] wake it up from standby.
- * [apps] are the apps and the inputs it has, by id, as last asked.
+ * [apps] are the apps it has and [inputs] its sources, such as the HDMI ports, by id, as last asked.
  */
 data class LgTv(
     val id: String,
@@ -69,6 +69,7 @@ data class LgTv(
     val pin: String,
     val macs: List<String> = emptyList(),
     val apps: Map<String, String> = emptyMap(),
+    val inputs: Map<String, String> = emptyMap(),
 ) {
     /** The TV among the remotes, next to those of SwitchBot. */
     fun asRemote() = Remote(id, name, LG_TYPE)
@@ -77,6 +78,7 @@ data class LgTv(
         .put("id", id).put("name", name).put("host", host).put("key", key).put("pin", pin)
         .put("macs", JSONArray(macs))
         .put("apps", JSONObject(apps))
+        .put("inputs", JSONObject(inputs))
 
     companion object {
         fun fromJson(o: JSONObject) = LgTv(
@@ -87,6 +89,7 @@ data class LgTv(
             o.getString("pin"),
             o.optJSONArray("macs")?.let { a -> (0 until a.length()).map(a::getString) }.orEmpty(),
             o.optJSONObject("apps")?.let { a -> a.keys().asSequence().associateWith(a::getString) }.orEmpty(),
+            o.optJSONObject("inputs")?.let { a -> a.keys().asSequence().associateWith(a::getString) }.orEmpty(),
         )
     }
 }
@@ -207,6 +210,13 @@ internal fun webOsApps(payload: JSONObject): Map<String, String> =
         .filter { (id, title) -> id.isNotEmpty() && title.isNotBlank() }
         .toMap()
 
+/** The sources of the TV in its answer, by id, with the names it shows for them. */
+internal fun webOsInputs(payload: JSONObject): Map<String, String> =
+    (payload.optJSONArray("devices") ?: JSONArray())
+        .mapObjects { it.optString("id") to it.optString("label") }
+        .filter { (id, _) -> id.isNotEmpty() }
+        .associate { (id, label) -> id to label.ifBlank { id } }
+
 internal fun ssdpSearch(): String =
     "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 2\r\nST: $SSDP_TARGET\r\n\r\n"
 
@@ -313,6 +323,11 @@ class LgTvClient(private val http: OkHttpClient, private val port: Int = WEBOS_P
     /** The apps and the inputs of [tv], by id. */
     suspend fun apps(tv: LgTv): Map<String, String> = session(tv) {
         webOsApps(it.main.call(WebOsAction.Call("ssap://com.webos.applicationManager/listLaunchPoints")))
+    }
+
+    /** The sources of [tv], by id, such as the HDMI ports and the antenna. */
+    suspend fun inputs(tv: LgTv): Map<String, String> = session(tv) {
+        webOsInputs(it.main.call(WebOsAction.Call("ssap://tv/getExternalInputList")))
     }
 
     /** Closes the connections kept open. */

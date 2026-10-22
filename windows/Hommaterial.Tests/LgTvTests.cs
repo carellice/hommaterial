@@ -30,6 +30,9 @@ static class LgTvTests
             "TV LG: la ricerca trova solo i TV LG, con il loro nome");
         check(LgTvClient.Macs(JsonNode.Parse("""{"wiredInfo":{"macAddress":"A8:23:FE:01:02:03"},"wifiInfo":{"macAddress":"none"}}""")!.AsObject()).SequenceEqual(["a8:23:fe:01:02:03"])
             && LgTvClient.Apps(JsonNode.Parse("""{"launchPoints":[{"id":"netflix","title":"Netflix"},{"id":"","title":"x"}]}""")!.AsObject()).Count == 1, "TV LG: MAC e app dalle risposte del TV");
+        var inputs = LgTvClient.Inputs(JsonNode.Parse("""{"devices":[{"id":"HDMI_1","label":"PlayStation"},{"id":"HDMI_2","label":""},{"id":"","label":"x"}]}""")!.AsObject());
+        check(inputs.Count == 2 && inputs["HDMI_1"] == "PlayStation" && inputs["HDMI_2"] == "HDMI_2"
+            && LgTvClient.Action("input:HDMI_1") is WebOsCall { Uri: "ssap://tv/switchInput" } source && source.Payload?["inputId"]?.ToString() == "HDMI_1", "TV LG: sorgenti con i nomi del TV e cambio sorgente");
 
         await using (var fake = new FakeTv())
         {
@@ -46,6 +49,10 @@ static class LgTvTests
             check(fake.Connections == 3 && fake.Received.Count(m => m["type"]?.ToString() == "register" && m["payload"]?["client-key"]?.ToString() == "abc") == 1,
                 "TV LG: tasti di fila su una sola connessione");
             check(await Fails(() => lg.SendAsync(tv, "channelAdd")) == LgTvError.Refused, "TV LG: comando rifiutato dal TV segnalato");
+            var sources = await lg.InputsAsync(tv);
+            await lg.SendAsync(tv, "input:HDMI_1");
+            check(sources.GetValueOrDefault("HDMI_1") == "PlayStation" && fake.Received.Any(m => m["uri"]?.ToString() == "ssap://tv/switchInput" && m["payload"]?["inputId"]?.ToString() == "HDMI_1"),
+                "TV LG: elenco delle sorgenti chiesto al TV e cambio sorgente inviato");
             using var other = new LgTvClient(fake.Port);
             check(await Fails(() => other.SendAsync(tv with { Pin = new string('0', 64) }, "volumeAdd")) == LgTvError.Changed, "TV LG: certificato diverso allo stesso indirizzo rifiutato");
             check(await Fails(() => other.SendAsync(tv, "selfDestruct")) == LgTvError.UnknownCommand, "TV LG: comando sconosciuto rifiutato prima di collegarsi");
@@ -154,6 +161,7 @@ static class LgTvTests
                         "ssap://com.webos.service.connectionmanager/getinfo" => Reply("response", new() { ["returnValue"] = true, ["wiredInfo"] = new JsonObject { ["macAddress"] = "A8:23:FE:01:02:03" } }),
                         "ssap://com.webos.service.networkinput/getPointerInputSocket" => Reply("response", new() { ["returnValue"] = true, ["socketPath"] = $"wss://127.0.0.1:{Port}/pointer" }),
                         "ssap://tv/channelUp" => new() { ["type"] = "error", ["id"] = id, ["error"] = "500 Application error" },
+                        "ssap://tv/getExternalInputList" => Reply("response", new() { ["returnValue"] = true, ["devices"] = new JsonArray(new JsonObject { ["id"] = "HDMI_1", ["label"] = "PlayStation" }) }),
                         _ => Reply("response", new() { ["returnValue"] = true }),
                     };
                     break;

@@ -208,7 +208,7 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
                         }
                     }
                     if (remote.kind == RemoteKind.TV) TvControls(remote, vm)
-                    if (remote.lg) LgControls(remote, vm)
+                    if (remote.lg) LgControls(remote, state, vm)
                 }
             }
 

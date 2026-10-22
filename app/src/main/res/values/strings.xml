@@ -372,6 +372,9 @@
     <string name="lgtv_no_mac">The TV did not tell how to wake it up: turn it on with its remote</string>
     <string name="lgtv_pair_again">%1$s asks to be paired again: remove it and add it again</string>
     <string name="remote_lg">LG TV</string>
+    <string name="lgtv_source">Source</string>
+    <string name="lgtv_sources_loading">Asking the TV for its sources…</string>
+    <string name="lgtv_sources_none">The TV does not answer: turn it on to see its sources.</string>
     <string name="close">Close</string>
     <string name="lgtv_apps">Apps and inputs</string>
     <string name="lgtv_keys">Keys</string>

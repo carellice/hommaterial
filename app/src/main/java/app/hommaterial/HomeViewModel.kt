@@ -21,6 +21,7 @@ import app.hommaterial.data.Group
 import app.hommaterial.data.History
 import app.hommaterial.data.LG_PREFIX
 import app.hommaterial.data.LgTv
+import app.hommaterial.data.LgTvException
 import app.hommaterial.data.LgTvs
 import app.hommaterial.data.LoginAttempt
 import app.hommaterial.data.Macro
@@ -893,7 +894,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 val name = _state.value.tvSearch?.found?.find { it.host == address }?.name ?: tv.name
                 // Paired again, it stays the same remote, with its buttons, rooms and custom devices.
                 val before = _state.value.lgTvs.find { it.host == address }
-                val again = tv.copy(name = before?.name ?: name, id = before?.id ?: tv.id, apps = before?.apps.orEmpty())
+                val again = tv.copy(
+                    name = before?.name ?: name,
+                    id = before?.id ?: tv.id,
+                    apps = before?.apps.orEmpty(),
+                    inputs = before?.inputs.orEmpty(),
+                )
                 _state.update { it.copy(lgTvs = pairedTvs.put(again), tvSearch = null) }
                 _messages.tryEmit(str(R.string.lgtv_paired, again.name))
             }
@@ -917,15 +923,21 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(lgTvs = pairedTvs.remove(tv.id)) }
     }
 
-    /** Asks [remote], an LG TV, for its apps and inputs, to offer them as buttons. */
+    /** Asks [remote], an LG TV, for its apps and its sources, to offer them as buttons and to switch. */
     fun refreshLgApps(remote: Remote) {
         val tv = _state.value.lgTvs.find { it.id == remote.id } ?: return
         _state.update { it.copy(busy = it.busy + tv.id) }
         viewModelScope.launch {
             guarded(quiet = true) {
                 val apps = tvRemote.apps(tv)
+                // Older webOS may not list its sources: the apps are kept all the same.
+                val inputs = try {
+                    tvRemote.inputs(tv)
+                } catch (_: LgTvException) {
+                    null
+                }
                 val current = _state.value.lgTvs.find { it.id == tv.id } ?: return@guarded
-                _state.update { it.copy(lgTvs = pairedTvs.put(current.copy(apps = apps))) }
+                _state.update { it.copy(lgTvs = pairedTvs.put(current.copy(apps = apps, inputs = inputs ?: current.inputs))) }
             }
             _state.update { it.copy(busy = it.busy - tv.id) }
         }

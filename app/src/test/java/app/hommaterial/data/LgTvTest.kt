@@ -243,10 +243,27 @@ class LgTvTest {
     }
 
     @Test
+    fun theSourcesComeWithTheNamesTheTvShows() {
+        val payload = JSONObject().put(
+            "devices",
+            org.json.JSONArray()
+                .put(JSONObject().put("id", "HDMI_1").put("label", "PlayStation"))
+                .put(JSONObject().put("id", "HDMI_2").put("label", ""))
+                .put(JSONObject().put("id", "").put("label", "Nothing")),
+        )
+        assertEquals(mapOf("HDMI_1" to "PlayStation", "HDMI_2" to "HDMI_2"), webOsInputs(payload))
+        val switch = webOsAction("input:HDMI_1") as WebOsAction.Call
+        assertEquals("ssap://tv/switchInput", switch.uri)
+        assertEquals("HDMI_1", switch.payload.getString("inputId"))
+    }
+
+    @Test
     fun aTvIsKeptWithItsAppsAndIsATvAmongTheRemotes() {
-        val tv = paired().copy(apps = mapOf("netflix" to "Netflix"))
+        val tv = paired().copy(apps = mapOf("netflix" to "Netflix"), inputs = mapOf("HDMI_1" to "HDMI 1"))
         assertEquals(tv, LgTv.fromJson(JSONObject(tv.toJson().toString())))
-        assertEquals(tv, LgTv.fromJson(JSONObject(tv.toJson().toString()).apply { remove("apps") }).copy(apps = tv.apps))
+        // Saved before the apps and the sources were kept, a TV is read without them.
+        val older = JSONObject(tv.toJson().toString()).apply { remove("apps"); remove("inputs") }
+        assertEquals(tv, LgTv.fromJson(older).copy(apps = tv.apps, inputs = tv.inputs))
         val remote = tv.asRemote()
         assertTrue(remote.lg)
         assertEquals(RemoteKind.TV, remote.kind)

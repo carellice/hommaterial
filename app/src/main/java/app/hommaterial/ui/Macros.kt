@@ -148,7 +148,7 @@ internal fun commandLabel(command: String): String = when (command) {
 internal fun commandName(remoteId: String, command: String, custom: Boolean, state: UiState): String {
     val tv = state.lgTvs.find { it.id == remoteId }
     return when {
-        tv != null -> lgLabel(command, tv.apps)
+        tv != null -> lgLabel(command, tv.apps, tv.inputs)
         custom -> command
         else -> commandLabel(command)
     }

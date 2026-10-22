@@ -360,6 +360,9 @@
     <string name="lgtv_no_mac">Il TV non ha detto come risvegliarlo: accendilo con il suo telecomando</string>
     <string name="lgtv_pair_again">%1$s chiede di essere abbinato di nuovo: rimuovilo e aggiungilo ancora</string>
     <string name="remote_lg">TV LG</string>
+    <string name="lgtv_source">Sorgente</string>
+    <string name="lgtv_sources_loading">Chiedo al TV le sue sorgenti…</string>
+    <string name="lgtv_sources_none">Il TV non risponde: accendilo per vedere le sue sorgenti.</string>
     <string name="close">Chiudi</string>
     <string name="lgtv_apps">App e ingressi</string>
     <string name="lgtv_keys">Tasti</string>

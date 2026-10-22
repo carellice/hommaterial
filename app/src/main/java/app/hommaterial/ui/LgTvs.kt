@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Input
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
@@ -43,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -145,9 +147,10 @@ private val LG_KEYS = listOf(
 /** The commands of the player, which webOS takes as requests rather than as keys. */
 internal val LG_MEDIA = listOf("play", "pause", "stop", "rewind", "fastForward")
 
-/** What a command of an LG TV is called: an app by its name on the TV, a key by its own. */
-internal fun lgLabel(command: String, apps: Map<String, String>): String = when {
+/** What a command of an LG TV is called: an app or a source by its name on the TV, a key by its own. */
+internal fun lgLabel(command: String, apps: Map<String, String>, inputs: Map<String, String> = emptyMap()): String = when {
     command.startsWith("app:") -> command.substring(4).let { apps[it] ?: it }
+    command.startsWith("input:") -> command.substring(6).let { inputs[it] ?: it }
     command.startsWith("key:") -> command.substring(4).let { key ->
         LG_KEYS.find { it.first == key }?.second?.let(::str) ?: key
     }
@@ -156,11 +159,13 @@ internal fun lgLabel(command: String, apps: Map<String, String>): String = when 
 
 /**
  * The keys of the LG remote that matter most, on top of those every TV has: the arrows with OK,
- * then Back, Home and the sound, then the player.
+ * then Back, Home and the sound, then the player and the source.
  */
 @Composable
-internal fun LgControls(remote: Remote, vm: HomeViewModel) {
+internal fun LgControls(remote: Remote, state: UiState, vm: HomeViewModel) {
     fun press(key: String) = vm.sendRemote(remote, "key:$key")
+    var choosingSource by remember { mutableStateOf(false) }
+    if (choosingSource) LgSourceDialog(remote, state, vm, onDismiss = { choosingSource = false })
     Column(
         Modifier.fillMaxWidth().padding(top = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -206,6 +211,34 @@ internal fun LgControls(remote: Remote, vm: HomeViewModel) {
             }
         }
     }
+    FilledTonalButton(onClick = { choosingSource = true }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Icon(Icons.AutoMirrored.Outlined.Input, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(str(R.string.lgtv_source))
+    }
+}
+
+/** The sources of the TV, such as its HDMI ports, asked to it as the dialog opens: a tap switches to one. */
+@Composable
+private fun LgSourceDialog(remote: Remote, state: UiState, vm: HomeViewModel, onDismiss: () -> Unit) {
+    val tv = state.lgTvs.find { it.id == remote.id } ?: return
+    LaunchedEffect(remote.id) { vm.refreshLgApps(remote) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.lgtv_source)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                when {
+                    tv.inputs.isNotEmpty() -> for ((id, label) in tv.inputs) {
+                        Choice(label) { vm.sendRemote(remote, "input:$id"); onDismiss() }
+                    }
+                    remote.id in state.busy -> Waiting(str(R.string.lgtv_sources_loading))
+                    else -> Text(str(R.string.lgtv_sources_none), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
+    )
 }
 
 /** A key of the arrows: round, with OK in the middle set apart. */
@@ -242,6 +275,10 @@ internal fun LgButtonDialog(remote: Remote, state: UiState, vm: HomeViewModel, o
         title = { Text(str(R.string.remote_button_add)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (tv.inputs.isNotEmpty()) {
+                    Heading(str(R.string.lgtv_source))
+                    for ((id, label) in tv.inputs) Choice(label) { onAdd("input:$id") }
+                }
                 Heading(str(R.string.lgtv_apps))
                 when {
                     tv.apps.isNotEmpty() -> for ((id, title) in tv.apps) Choice(title) { onAdd("app:$id") }
