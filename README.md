@@ -89,7 +89,9 @@ collegati al proprio account Alexa.
   minuti scelti con **Personalizzato…**.
 - I timer in corso stanno in una sezione in cima alla lista, con il conto
   alla rovescia, ordinati dal più vicino allo spegnimento.
-- I preferiti stanno in cima alla lista.
+- I preferiti, anche i gruppi, stanno in cima alla lista.
+- Da **Riordina** si sceglie anche la larghezza di ogni riquadro: una o due
+  colonne. Su uno schermo stretto si adatta allo spazio disponibile.
 - Ogni azione si sente sotto il dito: una vibrazione breve e diversa per
   accensione e spegnimento, per un dispositivo personalizzato eseguito, un
   tasto del telecomando, un timer avviato o un tag NFC scritto, piccoli scatti
@@ -127,6 +129,10 @@ collegati al proprio account Alexa.
 - Dal menu si aprono le Impostazioni: tema chiaro, scuro o automatico,
   vibrazione, lingua, notifiche, aggiornamenti, stanze, preferiti e dispositivi nascosti,
   riquadri, timer e avvisi attivi, e il backup su file delle proprie scelte.
+  Prima di importare un backup si scelgono le categorie da ripristinare:
+  per esempio gruppi e dispositivi personalizzati senza cambiare i preferiti.
+  Le categorie escluse conservano i dati locali; i dispositivi Alexa arrivano
+  dall’account Amazon, non dal backup.
 - Le stanze si possono riorganizzare dentro l'app, creandone quante se ne
   vuole e scegliendo i dispositivi di ognuna, senza cambiare niente in Alexa.
 - I gruppi accendono o spengono insieme più dispositivi di stanze diverse.

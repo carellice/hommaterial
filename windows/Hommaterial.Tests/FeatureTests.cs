@@ -28,6 +28,16 @@ static class FeatureTests
         var account = DemoHome.Create(); account.MonitorPin = "local-pin"; account.Marketplace = "amazon.de";
         BackupCodec.Apply(account, original, false);
         check(account.Devices.Count == 7 && account.Marketplace == "amazon.de" && account.MonitorPin == "local-pin" && !account.Monitor.Enabled, "ripristino mantiene cache account, marketplace e PIN; monitor solo su scelta");
+        var selective = DemoHome.Create(); selective.Favorites = ["local"]; selective.Tripped = ["already-tripped"];
+        selective.TileSpans["local"] = 2;
+        var schedulesBefore = selective.Schedules;
+        BackupCodec.Apply(selective, original, false, new HashSet<string> { "groups", "macros" });
+        check(selective.Groups[0].Id == "g" && selective.Macros[0].Id == "m" && selective.Favorites.SetEquals(["local"]), "importa gruppi e dispositivi personalizzati senza cambiare i preferiti");
+        check(ReferenceEquals(selective.Schedules, schedulesBefore) && selective.Tripped.Contains("already-tripped") && selective.TileSpans["local"] == 2, "categorie escluse conservano programmi, automazioni e larghezze locali");
+        var widths = BackupCodec.Parse(BackupCodec.Export(new HomeData { TileSpans = new() { ["group:g"] = 2, ["a"] = 1 } })).Choices;
+        check(widths.TileSpans["group:g"] == 2 && TileLayout.Span(widths.TileSpans, "group:g", 1) == 1 && TileLayout.Span(widths.TileSpans, "missing", 3) == 1, "larghezze compatibili nel backup e limitate alle colonne disponibili");
+        check(TileLayout.Arrange([1, 2, 2, 1], 3).SequenceEqual(new[] { (0, 0, 1), (0, 1, 2), (1, 0, 2), (1, 2, 1) }), "griglia mista mantiene ordine e righe senza sovrapposizioni");
+        check(TileLayout.Arrange([2, 1], 1).SequenceEqual(new[] { (0, 0, 1), (1, 0, 1) }), "riquadri larghi si adattano a una sola colonna");
         foreach (var bad in new[] { "{}", "{broken", "{\"app\":\"other\",\"version\":1}", "{\"app\":\"hommaterial\",\"version\":2}", "{\"app\":\"hommaterial\",\"version\":1,\"schedules\":[null]}", "{\"app\":\"hommaterial\",\"version\":1,\"macros\":[{\"id\":\"m\",\"name\":\"Bad\",\"steps\":[{\"type\":\"macro\",\"target\":\"m\"}]}]}" })
         {
             var refused = false; try { BackupCodec.Parse(bad); } catch (InvalidOperationException) { refused = true; }

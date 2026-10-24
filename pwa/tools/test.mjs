@@ -185,6 +185,59 @@ await test('the LG TVs of an Android backup come back out of the web unchanged',
   assert.throws(() => parseBackup('{"app":"hommaterial","version":1,"lgTvs":[{"id":"abc","host":"x"}]}'));
 });
 
+const { selectBackup, BACKUP_SECTIONS, tileSpan } = await import('../js/backup.js');
+await test('import custom devices and groups without changing favorites, credentials or runtime choices', () => {
+  const local = createBackup({ favorites: ['local'], groups: [], macros: [], tileSpans: { local: 2 }, schedules: [], monitor: { enabled: false } }, { token: 'local' });
+  const incoming = createBackup({ favorites: ['group:g'], groups: [{ id: 'g', name: 'Luci', devices: ['1'] }], macros: [{ id: 'm', steps: [] }], monitor: { enabled: true } }, { token: 'incoming' });
+  const merged = selectBackup(local, incoming, ['macros', 'groups']);
+  assert.equal(merged.groups[0].id, 'g'); assert.equal(merged.macros[0].id, 'm');
+  for (const key of ['favorites', 'tileSpans', 'schedules', 'monitor', 'switchBot']) assert.deepEqual(merged[key], local[key]);
+  merged.groups[0].name = 'Changed'; assert.equal(incoming.groups[0].name, 'Luci');
+  assert.deepEqual(selectBackup(local, incoming, []), local);
+  assert.deepEqual(selectBackup(local, { app: 'hommaterial', version: 1 }, BACKUP_SECTIONS.map(([id]) => id)), local);
+});
+await test('favorite groups appear at the top and on their own favorites page', () => {
+  const s = { devices: [{ applianceId: '1', name: 'Lampada', hasPower: true, room: 'Sala' }], rooms: {}, roomList: [], hidden: [], hiddenRemotes: [],
+    groups: [{ id: 'g', name: 'Luci', devices: ['1'] }], macros: [], remotes: [], favorites: ['group:g'], monitor: { enabled: false }, order: {} };
+  assert(model.availablePages(s).includes(model.PAGE_FAVORITES));
+  assert.equal(model.homeSections(model.PAGE_ALL, s)[0].entries[0].id, 'group:g');
+  const favorites = model.homeSections(model.PAGE_FAVORITES, s);
+  assert.equal(favorites.length, 1); assert.equal(favorites[0].entries[0].id, 'group:g');
+  assert(model.homeSections(model.PAGE_ALL, s).some((section) => section.key === 'groups'));
+  assert.deepEqual(model.pagePicks(s, model.PAGE_FAVORITES).map((p) => p.key), ['g']);
+  s.monitor = { enabled: true, only: { favorites: [] } };
+  assert.equal(model.homeSections(model.PAGE_FAVORITES, s).length, 0);
+});
+await test('portable tile widths default to one and shrink to fit a single column', () => {
+  const backup = parseBackup(JSON.stringify(createBackup({ tileSpans: { 'group:g': 2, '1': 1 } })));
+  assert.equal(tileSpan(backup.tileSpans, 'group:g', 4), 2);
+  assert.equal(tileSpan(backup.tileSpans, 'group:g', 1), 1);
+  assert.equal(tileSpan({}, 'missing', 4), 1);
+  assert.equal(tileSpan({ bad: 999 }, 'bad', 4), 1);
+});
+
+await test('the import flow waits for confirmation and persists only selected data', async () => {
+  const memory = new Map();
+  globalThis.localStorage = { getItem: (key) => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value) };
+  memory.set('hommaterial.cache', JSON.stringify({ favorites: ['local'], groups: [], schedules: [], automations: [], alertsTripped: ['local|above'], automationsTripped: ['local-auto'] }));
+  const store = await import('../js/store.js');
+  const file = { text: async () => JSON.stringify(createBackup({ favorites: ['incoming'], groups: [{ id: 'g', name: 'Luci', devices: ['1'] }] })) };
+  await store.importBackup(file);
+  assert.equal(store.getState().askBackupRestore, true);
+  assert.deepEqual(store.getState().groups, []);
+  store.finishImport(null);
+  assert.deepEqual(store.getState().favorites, ['local']);
+  await store.importBackup(file); store.finishImport(['groups']);
+  assert.equal(store.getState().groups[0].id, 'g');
+  assert.deepEqual(store.getState().favorites, ['local']);
+  const saved = JSON.parse(memory.get('hommaterial.cache'));
+  assert.deepEqual(saved.favorites, ['local']);
+  assert.deepEqual(saved.alertsTripped, ['local|above']);
+  assert.deepEqual(saved.automationsTripped, ['local-auto']);
+  store.setTileSpan('group:g', 2);
+  assert.equal(JSON.parse(memory.get('hommaterial.cache')).tileSpans['group:g'], 2);
+});
+
 if (failures) {
   console.log(`${failures} failed`);
   process.exit(1);

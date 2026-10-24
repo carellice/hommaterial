@@ -184,10 +184,8 @@ public sealed partial class MainWindow
                 if (favorites.Count > 0)
                 {
                     page.Children.Add(Text("Preferiti", 20, true));
-                    var favoriteGrid = DeviceGrid();
-                    ScrollViewer.SetVerticalScrollMode(favoriteGrid, ScrollMode.Disabled);
                     var favoriteOrder = home.Order.GetValueOrDefault("favorites") ?? [];
-                    foreach (var entry in favorites.OrderBy(e => favoriteOrder.IndexOf(e.Key) is int i && i >= 0 ? i : int.MaxValue)) favoriteGrid.Items.Add(NativeDeviceCard(entry, false));
+                    var favoriteGrid = DeviceGrid(favorites.OrderBy(e => favoriteOrder.IndexOf(e.Key) is int i && i >= 0 ? i : int.MaxValue));
                     page.Children.Add(favoriteGrid);
                 }
             }
@@ -220,9 +218,7 @@ public sealed partial class MainWindow
                 }
                 else
                 {
-                    var grid = DeviceGrid();
-                    ScrollViewer.SetVerticalScrollMode(grid, ScrollMode.Disabled);
-                    foreach (var entry in OrderSection(group.Key, group)) grid.Items.Add(NativeDeviceCard(entry, query.Length > 0 && entry == entries[0]));
+                    var grid = DeviceGrid(OrderSection(group.Key, group), query.Length > 0 ? entries[0] : null);
                     section.Children.Add(grid);
                 }
                 page.Children.Add(section);
@@ -242,7 +238,7 @@ public sealed partial class MainWindow
     {
         var state = entry.Device is not null ? home.States.GetValueOrDefault(entry.Key) : null;
         var on = state?.Power == true;
-        var content = new StackPanel { Spacing = 10, Width = list ? double.NaN : home.Monitor.Enabled ? 190 + home.Monitor.TileSize * 35 : 236 };
+        var content = new StackPanel { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Stretch };
         var icon = new FontIcon { Glyph = entry.Device?.IsSensor == true ? "\uE9CA" : entry.Group is not null ? "\uE902" : entry.Macro is not null ? "\uE768" : entry.Remote is not null ? "\uE7F4" : entry.Device?.Category == "LIGHT" ? "\uE793" : "\uE7E8",
             FontSize = 28, HorizontalAlignment = HorizontalAlignment.Left, Foreground = on ? Accent : Muted };
         content.Children.Add(icon); content.Children.Add(Text(entry.Name, 17, true));
@@ -254,7 +250,7 @@ public sealed partial class MainWindow
         var button = new Button { Content = content, Padding = new Thickness(22), CornerRadius = new CornerRadius(14),
             HorizontalContentAlignment = HorizontalAlignment.Stretch, HorizontalAlignment = HorizontalAlignment.Stretch,
             BorderThickness = new Thickness(highlighted ? 2 : 1),
-            Margin = new Thickness(0, 0, 12, 12), MinHeight = list ? 80 : 190, IsEnabled = !pending.Contains(entry.Key) };
+            Margin = new Thickness(0, 0, 0, 12), MinHeight = list ? 80 : 190, IsEnabled = !pending.Contains(entry.Key) };
         AutomationProperties.SetName(button, entry.Name + ", " + status);
         AutomationProperties.SetHelpText(button, "Invio: azione principale. Maiusc+F10 o tasto destro: dettagli.");
         ToolTipService.SetToolTip(button, "Clic per interagire · tasto destro per i dettagli");
@@ -288,10 +284,30 @@ public sealed partial class MainWindow
         button.PointerCanceled += (_, _) => { hovered = false; AnimateIconScale(icon, 1f); };
         return button;
     }
-    // Re-created result containers must not replay WinUI's default entrance/reorder animations.
-    // Page navigation still has its own transition; state updates retain the existing controls.
-    static GridView DeviceGrid() => new() { SelectionMode = ListViewSelectionMode.None, IsTabStop = false,
-        HorizontalAlignment = HorizontalAlignment.Stretch, ItemContainerTransitions = new TransitionCollection() };
+    Grid DeviceGrid(IEnumerable<Entry> source, Entry? highlighted = null)
+    {
+        var entries = source.ToList();
+        var grid = new Grid { ColumnSpacing = 12, HorizontalAlignment = HorizontalAlignment.Stretch };
+        foreach (var entry in entries) grid.Children.Add(NativeDeviceCard(entry, entry == highlighted, home.Layout == 1));
+        void Reflow()
+        {
+            var minimum = home.Monitor.Enabled ? 234 + home.Monitor.TileSize * 35 : 280;
+            var columns = home.Layout == 1 ? 1 : Math.Max(1, (int)((grid.ActualWidth + 12) / (minimum + 12)));
+            grid.ColumnDefinitions.Clear(); grid.RowDefinitions.Clear();
+            for (var i = 0; i < columns; i++) grid.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
+            var positions = TileLayout.Arrange(entries.Select(e => TileLayout.Span(home.TileSpans, e.Key, columns)), columns);
+            var rows = positions.Count == 0 ? 0 : positions[^1].Row + 1;
+            for (var i = 0; i < rows; i++) grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
+            for (var i = 0; i < positions.Count; i++)
+            {
+                var position = positions[i]; var card = (FrameworkElement)grid.Children[i];
+                Grid.SetRow(card, position.Row); Grid.SetColumn(card, position.Column); Grid.SetColumnSpan(card, position.Span);
+            }
+        }
+        grid.SizeChanged += (_, args) => { if (args.NewSize.Width != args.PreviousSize.Width) Reflow(); };
+        grid.Loaded += (_, _) => Reflow();
+        return grid;
+    }
     string DashboardSubtitle() => demo ? "Casa dimostrativa · nessun comando reale" : home.UpdatedAt is DateTimeOffset at ? $"Tutto a portata di clic · aggiornato alle {at:HH:mm}" : "Tutto a portata di clic";
     string SearchActionHint(Entry first)
     {

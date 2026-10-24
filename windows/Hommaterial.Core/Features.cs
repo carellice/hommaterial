@@ -110,6 +110,7 @@ public static class BackupCodec
         root["app"] = "hommaterial"; root["version"] = 1;
         root["favorites"] = Node(home.Favorites); root["hidden"] = Node(home.Hidden);
         root["rooms"] = Node(home.Rooms); root["roomList"] = Node(home.RoomList);
+        root["tileSpans"] = Node(home.TileSpans);
         root["groups"] = Node(home.Groups); root["macros"] = Node(home.Macros); root["order"] = Node(home.Order);
         root["alerts"] = Node(home.Alerts); root["remoteButtons"] = Node(home.RemoteButtons); root["hiddenRemotes"] = Node(home.HiddenRemotes);
         root["theme"] = home.Theme == "Light" ? 1 : home.Theme == "Dark" ? 2 : 0;
@@ -137,6 +138,7 @@ public static class BackupCodec
                 throw new InvalidOperationException("Il file non è un backup Hommaterial versione 1.");
             T Read<T>(string name, T fallback) => root[name] is JsonNode node ? node.Deserialize<T>(PortableJson) ?? fallback : fallback;
             var home = new HomeData {
+                TileSpans = Read<Dictionary<string, int>>("tileSpans", []).ToDictionary(p => p.Key, p => Math.Clamp(p.Value, 1, 2)),
                 Favorites = Read<HashSet<string>>("favorites", []), Hidden = Read<HashSet<string>>("hidden", []),
                 Rooms = Read<Dictionary<string, string>>("rooms", []), RoomList = Read<List<string>>("roomList", []),
                 Groups = Read<List<HomeGroup>>("groups", []), Macros = Read<List<HomeMacro>>("macros", []), Order = Read<Dictionary<string, List<string>>>("order", []),
@@ -177,14 +179,24 @@ public static class BackupCodec
             "macro" => allowMacro && action.Target.Length > 0,
             "wait" => int.TryParse(action.Value, out var seconds) && seconds is >= 0 and <= 300, _ => false })) throw new JsonException("Azione non valida.");
     }
-    public static void Apply(HomeData target, HomeData imported, bool restoreMonitor)
+    public static void Apply(HomeData target, HomeData imported, bool restoreMonitor, IReadOnlySet<string>? selected = null)
     {
-        target.Favorites = imported.Favorites; target.Hidden = imported.Hidden; target.Rooms = imported.Rooms;
-        target.RoomList = imported.RoomList; target.Groups = imported.Groups; target.Macros = imported.Macros; target.Order = imported.Order;
-        target.Alerts = imported.Alerts; target.RemoteButtons = imported.RemoteButtons; target.HiddenRemotes = imported.HiddenRemotes;
-        target.Theme = imported.Theme; target.Layout = imported.Layout; target.Language = imported.Language;
-        target.Schedules = imported.Schedules; target.Automations = imported.Automations; target.BackupExtras = imported.BackupExtras;
-        target.Tripped.Clear();
+        bool Has(string id) => selected is null || selected.Contains(id);
+        if (Has("favorites")) target.Favorites = imported.Favorites;
+        if (Has("hidden")) { target.Hidden = imported.Hidden; target.HiddenRemotes = imported.HiddenRemotes; }
+        if (Has("rooms")) { target.Rooms = imported.Rooms; target.RoomList = imported.RoomList; }
+        if (Has("groups")) target.Groups = imported.Groups;
+        if (Has("macros")) target.Macros = imported.Macros;
+        if (Has("tiles")) { target.Order = imported.Order; target.TileSpans = imported.TileSpans; }
+        if (Has("alerts")) target.Alerts = imported.Alerts;
+        if (Has("remotes")) target.RemoteButtons = imported.RemoteButtons;
+        if (Has("settings")) { target.Theme = imported.Theme; target.Layout = imported.Layout; target.Language = imported.Language; }
+        if (Has("schedules")) target.Schedules = target.Schedules.Where(s => s.IsTimer).Concat(imported.Schedules).ToList();
+        if (Has("automations")) { target.Automations = imported.Automations; target.Tripped.Clear(); }
+        if (selected is null) target.BackupExtras = (JsonObject)imported.BackupExtras.DeepClone();
+        else foreach (var section in BackupSections.All.Where(s => Has(s.Id)))
+            foreach (var field in section.Fields)
+                if (imported.BackupExtras.TryGetPropertyValue(field, out var value)) target.BackupExtras[field] = value?.DeepClone();
         if (restoreMonitor) target.Monitor = imported.Monitor;
     }
 }

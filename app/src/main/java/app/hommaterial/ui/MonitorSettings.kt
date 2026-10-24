@@ -275,7 +275,8 @@ private fun pagePicks(state: UiState, page: String): List<Pick> {
         PAGE_FAVORITES -> visible.filter { it.applianceId in state.favorites }
         else -> visible.filter { it.room == room }
     }
-    val picks = devices.map { Pick(it.applianceId, it.name, it.room ?: str(R.string.room_none)) }
+    val picks = devices.map { Pick(it.applianceId, it.name, it.room ?: str(R.string.room_none)) } +
+        (if (page == PAGE_FAVORITES) state.groups.filter { "group:${it.id}" in state.favorites }.map { Pick(it.id, it.name) } else emptyList())
     if (room == null || !page.startsWith(PAGE_ROOM)) return picks
     // What else was put in the room, to keep or to leave out as its devices.
     return picks +

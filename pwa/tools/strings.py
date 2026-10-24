@@ -34,10 +34,10 @@ def main():
     it = read("values-it")
     body = "// Written by tools/strings.py from the strings of the Android app: do not edit.\n"
     body += "export const STRINGS = " + json.dumps({"en": en, "it": it}, ensure_ascii=False, indent=0) + ";\n"
-    OUT.write_text(body)
+    OUT.write_text(body, encoding="utf-8")
     # The web app takes the version of the Android app it is the twin of.
-    version = re.search(r'versionName = "([^"]+)"', GRADLE.read_text()).group(1)
-    VERSION.write_text(f"// Written by tools/strings.py from the version of the Android app.\nexport const APP_VERSION = '{version}';\n")
+    version = re.search(r'versionName = "([^"]+)"', GRADLE.read_text(encoding="utf-8")).group(1)
+    VERSION.write_text(f"// Written by tools/strings.py from the version of the Android app.\nexport const APP_VERSION = '{version}';\n", encoding="utf-8")
     print(f"{len(en)} strings, {len(it)} in Italian", file=sys.stderr)
 
 

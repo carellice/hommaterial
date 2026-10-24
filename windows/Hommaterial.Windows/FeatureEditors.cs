@@ -291,6 +291,11 @@ public sealed partial class MainWindow
         var favorite = new ToggleSwitch { Header = "Nei preferiti", IsOn = home.Favorites.Contains(key) };
         favorite.Toggled += (_, _) => { if (favorite.IsOn) home.Favorites.Add(key); else home.Favorites.Remove(key); Save(); };
         body.Children.Add(favorite);
+        var width = new ComboBox { Header = "Larghezza riquadro", HorizontalAlignment = HorizontalAlignment.Stretch };
+        width.Items.Add("1 colonna"); width.Items.Add("2 colonne");
+        width.SelectedIndex = TileLayout.Span(home.TileSpans, key, 2) - 1;
+        width.SelectionChanged += (_, _) => { home.TileSpans[key] = width.SelectedIndex + 1; Save(); };
+        body.Children.Add(width);
     }
     void AddPlaceControl(StackPanel body, string key)
     {

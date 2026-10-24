@@ -30,6 +30,7 @@ public sealed class HomeData
     public List<HomeGroup> Groups { get; set; } = [];
     public List<HomeMacro> Macros { get; set; } = [];
     public Dictionary<string, List<string>> Order { get; set; } = [];
+    public Dictionary<string, int> TileSpans { get; set; } = [];
     public List<HomeSchedule> Schedules { get; set; } = [];
     public List<AutomationRule> Automations { get; set; } = [];
     public Dictionary<string, SensorAlert> Alerts { get; set; } = [];

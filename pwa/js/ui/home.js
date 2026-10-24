@@ -2,9 +2,10 @@
 import { html, useState, useEffect, useRef } from '../lib.js';
 import {
   Icon, IconButton, Spinner, Switch, Details, Dialog, FullDialog, Menu, ConfirmDialog, PinDialog,
-  Card, OrderRow, useStore, useNow, useWidth, usePress, useBack,
+  Card, Chips, OrderRow, useStore, useNow, useWidth, usePress, useBack,
 } from './common.js';
 import * as store from '../store.js';
+import { tileSpan } from '../backup.js';
 import { str, plural, clock, dateText, degrees } from '../i18n.js';
 import {
   PAGE_ALL, LAYOUT_LIST, ACTION_POWER, WHITE_CHOICES, COLOR_CHOICES,
@@ -194,15 +195,32 @@ function enterText(entry, s) {
   return str('search_open');
 }
 
+function useGridColumns(look, active = true) {
+  const grid = useRef(null);
+  const [columns, setColumns] = useState(1);
+  useEffect(() => {
+    const measure = () => {
+      const node = grid.current;
+      if (node) setColumns(getComputedStyle(node).gridTemplateColumns.split(' ').length);
+    };
+    const observer = new ResizeObserver(measure);
+    if (grid.current) observer.observe(grid.current);
+    measure();
+    return () => observer.disconnect();
+  }, [look.list, look.size, active]);
+  return [grid, columns];
+}
+
 /** What the search found, the first one marked: it is the one the Enter key acts on. */
 function SearchResults({ query, found, s, look }) {
+  const [grid, columns] = useGridColumns(look, found.length > 0);
   if (!query.trim()) return null;
   if (!found.length) return html`<div class="empty">${str('search_nothing', query)}</div>`;
   return html`
-    <div class="grid">
+    <div class="grid" ref=${grid}>
       <div class="span section-header"><span class="title-small">${str('search_enter', enterText(found[0], s), found[0].name)}</span></div>
       ${found.map((entry, i) => html`
-        <div key=${`found|${entry.id}`} class=${i === 0 ? 'marked' : ''}><${Tile} entry=${entry} s=${s} look=${look} /></div>`)}
+        <div key=${`found|${entry.id}`} class=${i === 0 ? 'marked' : ''} style=${`grid-column:span ${look.list ? 1 : tileSpan(s.tileSpans, entry.id, columns)};min-width:0`}><${Tile} entry=${entry} s=${s} look=${look} /></div>`)}
     </div>`;
 }
 
@@ -259,6 +277,7 @@ function PullToRefresh({ refreshing, onRefresh, children }) {
 
 /** The tiles of a page: the whole home in sections, or only the favorites, the groups or a room. */
 function PageGrid({ page, s, look }) {
+  const [grid, columns] = useGridColumns(look);
   const sections = homeSections(page, s);
   const shown = sections.flatMap((sec) => sec.entries).filter((e) => e.kind === 'dev').map((e) => e.device);
   const now = Date.now();
@@ -273,7 +292,7 @@ function PageGrid({ page, s, look }) {
   const running = timers.length || due.length || repeating.length || automations.length;
   if (!sections.length && !running && !s.refreshing) return html`<div class="empty">${str('no_devices')}</div>`;
   return html`
-    <div class="grid">
+    <div class="grid" ref=${grid}>
       ${(timers.length > 0 || due.length > 0) && html`
         <div class="span section-header"><span class="title-small">${str('s_timers')}</span></div>
         ${timers.map(([device, at]) => html`
@@ -301,8 +320,8 @@ function PageGrid({ page, s, look }) {
           <span class="title-small">${section.title}</span>
           ${section.switchable.length > 0 && html`<${RoomPower} name=${section.title} devices=${section.switchable} />`}
         </div>
-        ${section.entries.map((entry) => html`<${Tile} key=${`${section.key}|${entry.id}`} entry=${entry} s=${s}
-          look=${section.key === 'favorites' ? { ...look, room: entryRoom(s, entry) } : look} />`)}`)}
+        ${section.entries.map((entry) => html`<div class="tile-slot" key=${`${section.key}|${entry.id}`} style=${`grid-column:span ${look.list ? 1 : tileSpan(s.tileSpans, entry.id, columns)};min-width:0`}>
+          <${Tile} entry=${entry} s=${s} look=${section.key === 'favorites' ? { ...look, room: entryRoom(s, entry) } : look} /></div>`)}`)}
       ${sections.length > 0 && html`<div class="span"><${Legend} /></div>`}
     </div>`;
 }
@@ -548,6 +567,7 @@ function GroupSheet({ group, devices, s, onDismiss }) {
         <div class="grow"><div class="title-large">${group.name}</div>
           <div class="body-medium faint">${groupStatus(lit, devices.length)}</div></div>
       </div>
+      ${!isLocked(s) && html`<button class="text-btn" onClick=${() => store.setFavorite(`group:${group.id}`, !s.favorites.includes(`group:${group.id}`))}>${str(s.favorites.includes(`group:${group.id}`) ? 'favorite_remove' : 'favorite_add')}</button>`}
       <div class="two">
         <button class="tonal-btn" onClick=${() => store.setRoomPower(devices, true)}>${str('all_on')}</button>
         <button class="tonal-btn" onClick=${() => store.setRoomPower(devices, false)}>${str('all_off')}</button>
@@ -593,7 +613,7 @@ function GroupSheet({ group, devices, s, onDismiss }) {
 
 /** The tiles of the home as lists, one per section, to put in order with the arrows. */
 function ArrangeDialog({ s, onDismiss }) {
-  const sections = homeSections(PAGE_ALL, s).filter((sec) => sec.entries.length > 1);
+  const sections = homeSections(PAGE_ALL, s);
   return html`
     <${FullDialog} title=${str('arrange')} onDismiss=${onDismiss}
       actions=${html`<button class="text-btn" onClick=${onDismiss}>${str('arrange_done')}</button>`}>
@@ -605,12 +625,14 @@ function ArrangeDialog({ s, onDismiss }) {
             <div class="card-title title-medium">${section.title}</div>
             <div style="padding-bottom:8px">
               ${section.entries.map((entry, index) => html`
-                <${OrderRow} key=${entry.id} name=${entry.name} first=${index === 0} last=${index === ids.length - 1}
+                <div key=${entry.id}><${OrderRow} name=${entry.name} first=${index === 0} last=${index === ids.length - 1}
                   onMove=${(by) => {
                     const moved = [...ids];
                     moved.splice(index + by, 0, moved.splice(index, 1)[0]);
                     store.setOrder({ ...s.order, [section.key]: moved });
-                  }} />`)}
+                  }} />
+                <${Chips} title=${str('tile_width')} choices=${[[1, str('tile_one_column')], [2, str('tile_two_columns')]]}
+                  selected=${tileSpan(s.tileSpans, entry.id)} onSelect=${(value) => store.setTileSpan(entry.id, value)} /></div>`)}
             </div>
           <//>`;
       })}

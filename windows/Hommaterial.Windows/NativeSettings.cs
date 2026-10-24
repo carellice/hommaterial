@@ -101,17 +101,31 @@ public sealed partial class MainWindow
             var choices = imported.Choices;
             var body = new StackPanel { Spacing = 14 };
             body.Children.Add(Text($"{choices.Favorites.Count} preferiti · {choices.RoomList.Count} stanze personalizzate · {choices.Groups.Count} gruppi · {choices.Macros.Count} personalizzati · {choices.Automations.Count} automazioni · {choices.Schedules.Count} programmi"));
-            body.Children.Add(Text("L'importazione sostituisce le tue scelte locali. Il collegamento Amazon e la cronologia rimangono su questo PC."));
+            body.Children.Add(Text("Scegli le categorie da importare: solo quelle selezionate sostituiscono le scelte locali. I dispositivi Alexa vengono caricati dal tuo account Amazon."));
+            var sections = BackupSections.All.ToDictionary(s => s.Id, s => new CheckBox { Content = s.Title, IsChecked = true });
+            foreach (var choice in sections.Values) body.Children.Add(choice);
             var monitor = new CheckBox { Content = "Ripristina anche la modalità monitor", IsChecked = false };
             var active = new CheckBox { Content = "Attiva automazioni e programmi importati", IsChecked = false };
             var keys = new CheckBox { Content = "Importa anche le credenziali SwitchBot", IsChecked = imported.SwitchBot is not null, Visibility = imported.SwitchBot is null ? Visibility.Collapsed : Visibility.Visible };
             var tvs = new CheckBox { Content = $"Importa anche i TV LG abbinati ({imported.LgTvs?.Count ?? 0})", IsChecked = imported.LgTvs is { Count: > 0 } && !demo, Visibility = imported.LgTvs is { Count: > 0 } && !demo ? Visibility.Visible : Visibility.Collapsed };
+            var selection = Row();
+            void SelectAll(bool value) {
+                foreach (var choice in sections.Values) choice.IsChecked = value;
+                monitor.IsChecked = value; keys.IsChecked = value && imported.SwitchBot is not null;
+                tvs.IsChecked = value && imported.LgTvs is { Count: > 0 } && !demo;
+            }
+            selection.Children.Add(Button("Seleziona tutto", () => SelectAll(true)));
+            selection.Children.Add(Button("Deseleziona tutto", () => SelectAll(false)));
+            body.Children.Insert(2, selection);
             body.Children.Add(monitor); body.Children.Add(active); body.Children.Add(keys); body.Children.Add(tvs);
             await ShowFormAsync("Ripristina backup", body, () =>
             {
                 if (active.IsChecked != true) { foreach (var a in choices.Automations) a.Enabled = false; foreach (var s in choices.Schedules) s.Enabled = false; }
-                BackupCodec.Apply(home, choices, monitor.IsChecked == true);
-                foreach (var rule in home.Automations) runtime.Prime(rule);
+                var selectedSections = sections.Where(p => p.Value.IsChecked == true).Select(p => p.Key).ToHashSet();
+                if (selectedSections.Count == 0 && monitor.IsChecked != true && keys.IsChecked != true && tvs.IsChecked != true)
+                    throw new InvalidOperationException("Seleziona almeno una categoria.");
+                BackupCodec.Apply(home, choices, monitor.IsChecked == true, selectedSections);
+                if (selectedSections.Contains("automations")) foreach (var rule in home.Automations) runtime.Prime(rule);
                 if (keys.IsChecked == true && imported.SwitchBot is not null) { if (demo) demoKeys = imported.SwitchBot; else store.SaveSwitchBot(imported.SwitchBot); }
                 if (tvs.IsChecked == true && imported.LgTvs is { } importedTvs) SaveLgTvs(importedTvs.DistinctBy(t => t.Id).ToList());
                 Save(); ApplyTheme(); ApplyMonitor(); Message("Backup importato.", InfoBarSeverity.Success); return Task.CompletedTask;

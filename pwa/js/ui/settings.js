@@ -4,6 +4,7 @@ import {
   Icon, IconButton, Setting, Toggle, Chips, OrderRow, Dialog, ConfirmDialog, Field, PinDialog, useStore, useBack,
 } from './common.js';
 import * as store from '../store.js';
+import { BACKUP_SECTIONS } from '../backup.js';
 import { DEFAULT_MONITOR } from '../store.js';
 import { str, plural, clock, degrees } from '../i18n.js';
 import { proxy, probe } from '../net.js';
@@ -225,12 +226,7 @@ export function SettingsScreen({ onBack }) {
           <${Setting} title=${str('about_source')} text=${str('installed_version', store.installedVersion)}
             onClick=${() => window.open(SOURCE_URL, '_blank', 'noopener')} />`)}
       </div></div>
-      ${s.askMonitorRestore && html`
-        <${Dialog} title=${str('backup_monitor_title')} onDismiss=${() => store.finishImport(null)} actions=${html`
-          <button class="text-btn" onClick=${() => store.finishImport(false)}>${str('backup_monitor_no')}</button>
-          <button class="text-btn" onClick=${() => store.finishImport(true)}>${str('backup_monitor_yes')}</button>`}>
-          <div class="body-medium faint">${str('backup_monitor_text')}</div>
-        <//>`}
+      ${s.askBackupRestore && html`<${BackupImportDialog} />`}
       ${shownDialog}
     </div>`;
 }
@@ -409,3 +405,20 @@ const PresetDialog = ({ rooms, onPick, onDismiss }) => html`
     ${rooms.map((room) => html`<${Setting} key=${room} title=${pageLabel(room)} text=${str('monitor_preset_room_text')} onClick=${() => onPick([room])} />`)}
     <div class="body-small" style="padding:8px 16px 0">${str('monitor_preset_note')}</div>
   <//>`;
+
+function BackupImportDialog() {
+  const [selected, setSelected] = useState(BACKUP_SECTIONS.filter(([id]) => id !== 'monitor').map(([id]) => id));
+  return html`<${Dialog} title=${str('backup_choose')} onDismiss=${() => store.finishImport(null)} actions=${html`
+    <button class="text-btn" onClick=${() => store.finishImport(null)}>${str('cancel')}</button>
+    <button class="text-btn" disabled=${!selected.length} onClick=${() => store.finishImport(selected)}>${str('backup_import')}</button>`}>
+    <p class="body-medium faint">${str('backup_choose_text')}</p>
+    <div class="row">
+      <button class="text-btn" onClick=${() => setSelected(BACKUP_SECTIONS.map(([id]) => id))}>${str('backup_all')}</button>
+      <button class="text-btn" onClick=${() => setSelected([])}>${str('backup_none')}</button>
+    </div>
+    ${BACKUP_SECTIONS.map(([id, label]) => html`<label class="row" style="padding:8px 0" key=${id}>
+      <input type="checkbox" checked=${selected.includes(id)} onChange=${(event) => setSelected(event.target.checked ? [...selected, id] : selected.filter((x) => x !== id))} />
+      <span style="padding-left:12px">${str(label)}</span>
+    </label>`)}
+  <//>`;
+}

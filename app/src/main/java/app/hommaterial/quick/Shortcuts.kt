@@ -33,7 +33,8 @@ internal fun publishShortcuts(context: Context) {
     val macros = cache.macros()
     val chosen = cache.shortcuts() ?: run {
         val favorites = cache.favorites()
-        devices.filter { it.applianceId in favorites }.map { SHORTCUT_DEVICE + it.applianceId }
+        devices.filter { it.applianceId in favorites }.map { SHORTCUT_DEVICE + it.applianceId } +
+            groups.filter { "group:${it.id}" in favorites }.map { SHORTCUT_GROUP + it.id }
     }
     val shortcuts = chosen
         .mapNotNull { key ->

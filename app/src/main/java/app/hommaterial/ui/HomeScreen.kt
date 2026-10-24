@@ -346,6 +346,7 @@ private fun SearchResults(query: String, found: List<Entry>, state: UiState, vm:
         return
     }
     val first = found.first()
+    val list = LocalHomeLook.current.list
     LazyVerticalGrid(
         columns = GridCells.Adaptive(LocalHomeLook.current.tileMinWidth),
         modifier = Modifier.fillMaxSize(),
@@ -356,7 +357,8 @@ private fun SearchResults(query: String, found: List<Entry>, state: UiState, vm:
         item(key = "enter", span = { GridItemSpan(maxLineSpan) }) {
             SectionHeader(str(R.string.search_enter, enterText(first, state), first.name))
         }
-        items(found, key = { "found|${it.id}" }) { entry ->
+        items(found, key = { "found|${it.id}" },
+            span = { GridItemSpan((if (list) 1 else state.tileSpans[it.id] ?: 1).coerceIn(1, maxLineSpan)) }) { entry ->
             val marked = entry === first
             Box(
                 if (marked) {
@@ -492,7 +494,7 @@ private fun homeSections(page: String, state: UiState): List<Section> {
     val rooms = (if (page == PAGE_FAVORITES) emptyList() else shown).groupBy { it.room ?: noRoom }
     // Hidden devices do not count for a group, as they do not for a room.
     val groups = when (page) {
-        PAGE_ALL -> state.groups
+        PAGE_ALL, PAGE_FAVORITES -> state.groups
         PAGE_GROUPS -> state.groups.filter { only == null || it.id in only }
         else -> emptyList()
     }.map { group ->
@@ -525,7 +527,8 @@ private fun homeSections(page: String, state: UiState): List<Section> {
     val favorites = if (!starred) emptyList() else {
         shown.filter { it.applianceId in state.favorites }.sortedBy { it.name.lowercase() }.map(Entry::Dev) +
             state.macros.filter { Quick.macroKey(it.id) in state.favorites }.map(Entry::Mac) +
-            inList.filter { Quick.remoteKey(it.id) in state.favorites }.map(Entry::Rem)
+            inList.filter { Quick.remoteKey(it.id) in state.favorites }.map(Entry::Rem) +
+            groups.filter { it.id in state.favorites && (only == null || it.group.id in only) }
     }
 
     fun section(key: String, title: String, entries: List<Entry>, switchable: List<Device> = emptyList()): Section {
@@ -534,7 +537,7 @@ private fun homeSections(page: String, state: UiState): List<Section> {
     }
     return buildList {
         add(section("favorites", str(R.string.favorites), favorites))
-        add(section("groups", str(R.string.s_groups), groups))
+        if (page != PAGE_FAVORITES) add(section("groups", str(R.string.s_groups), groups))
         add(section("macros", str(R.string.s_macros), macros.map(Entry::Mac)))
         add(section("remotes", str(R.string.s_remotes), remotes.map(Entry::Rem)))
         for (name in names) {
@@ -556,6 +559,7 @@ private fun homeSections(page: String, state: UiState): List<Section> {
 @Composable
 private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
     val sections = homeSections(page, state)
+    val list = LocalHomeLook.current.list
     val shown = sections.flatMap { it.entries }.filterIsInstance<Entry.Dev>().map { it.device }
     // Running timers come first, the one closest to switching off at the top.
     val timers = state.timers.entries.sortedBy { it.value }
@@ -631,7 +635,8 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
                     SectionHeader(section.title)
                 }
             }
-            items(section.entries, key = { "${section.key}|${it.id}" }) { entry ->
+            items(section.entries, key = { "${section.key}|${it.id}" },
+                span = { GridItemSpan((if (list) 1 else state.tileSpans[it.id] ?: 1).coerceIn(1, maxLineSpan)) }) { entry ->
                 // Out of their rooms, the favorites say which room they are in.
                 val room = if (section.key == "favorites") entry.room(state) else null
                 CompositionLocalProvider(LocalTileRoom provides room) { entry.Tile(state, vm) }
@@ -717,7 +722,7 @@ private fun ArrangeDialog(state: UiState, vm: HomeViewModel, onDismiss: () -> Un
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    for (section in sections.filter { it.entries.size > 1 }) {
+                    for (section in sections) {
                         SectionCard {
                             Column(Modifier.padding(bottom = 8.dp)) {
                                 Text(
@@ -735,6 +740,9 @@ private fun ArrangeDialog(state: UiState, vm: HomeViewModel, onDismiss: () -> Un
                                         val moved = ids.toMutableList()
                                         moved.add(index + by, moved.removeAt(index))
                                         vm.setOrder(state.order + (section.key to moved))
+                                    }
+                                    Chips(R.string.tile_width, listOf(1 to str(R.string.tile_one_column), 2 to str(R.string.tile_two_columns)), state.tileSpans[entry.id] ?: 1) {
+                                        vm.setTileSpan(entry.id, it)
                                     }
                                 }
                             }
@@ -934,7 +942,14 @@ private fun GroupSheet(group: Group, devices: List<Device>, state: UiState, vm: 
                     )
                 }
             }
-            if (!LocalHomeLook.current.locked) NfcTagButton(NFC_GROUP, group.id, group.name)
+            if (!LocalHomeLook.current.locked) {
+                val key = "group:${group.id}"
+                val favorite = key in state.favorites
+                TextButton(onClick = { vm.setFavorite(key, !favorite) }) {
+                    Text(str(if (favorite) R.string.favorite_remove else R.string.favorite_add))
+                }
+                NfcTagButton(NFC_GROUP, group.id, group.name)
+            }
         }
     }
 }

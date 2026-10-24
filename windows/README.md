@@ -44,7 +44,9 @@ e Windows App SDK. La prima compilazione richiede Internet per NuGet.
 
 ## Funzioni presenti
 
-- Stanze Alexa e personalizzate, preferiti, dispositivi nascosti, gruppi e ordinamento.
+- Stanze Alexa e personalizzate, preferiti (anche gruppi), dispositivi nascosti, gruppi e ordinamento.
+- Nei dettagli di ogni riquadro si sceglie la larghezza: una o due colonne,
+  adattate alla larghezza della finestra. La vista a elenco resta a una colonna.
 - Ctrl+K cerca nella casa; Invio interagisce con il primo risultato. Clic sulla card per
   l'azione principale, tasto destro o pressione prolungata per i dettagli.
 - Accensione/spegnimento, luminosità, colori e bianchi delle luci compatibili.
@@ -79,7 +81,10 @@ dell'account non vengono eseguiti mentre la demo è attiva.
 Il backup non contiene sessione Amazon né PIN. Le credenziali SwitchBot e dei TV LG sono
 incluse solo scegliendo l'opzione di esportazione: in quel caso sono leggibili nel JSON.
 I TV LG abbinati su Android si importano con il backup, senza rifare l'abbinamento.
-Windows mostra un riepilogo prima del ripristino e chiede se importare il monitor
+Windows mostra un riepilogo e permette di scegliere quali categorie importare:
+preferiti, gruppi, personalizzati, stanze, riquadri, programmi e altre impostazioni.
+Le categorie escluse conservano i dati locali. I dispositivi Alexa vengono caricati
+dall’account Amazon. Chiede inoltre se importare il monitor
 e attivare automazioni/programmi. Le vecchie versioni Android/web leggono i campi che
 conoscono e possono perdere quelli aggiunti quando riesportano il file.
 

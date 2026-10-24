@@ -42,6 +42,8 @@ import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import app.hommaterial.data.BackupSection
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -203,18 +205,32 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
         )
     }
     if (confirmSignOut) SignOutDialog(onConfirm = vm::logout, onDismiss = { confirmSignOut = false })
-    if (state.askMonitorRestore) {
+    if (state.askBackupRestore) {
+        var selected by remember { mutableStateOf(BackupSection.entries.filter { it != BackupSection.MONITOR }.toSet()) }
         AlertDialog(
-            // Leaving without an answer gives the whole import up.
             onDismissRequest = { vm.finishImport(null) },
-            title = { Text(str(R.string.backup_monitor_title)) },
-            text = { Text(str(R.string.backup_monitor_text)) },
+            title = { Text(str(R.string.backup_choose)) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(str(R.string.backup_choose_text))
+                    Row {
+                        TextButton(onClick = { selected = BackupSection.entries.toSet() }) { Text(str(R.string.backup_all)) }
+                        TextButton(onClick = { selected = emptySet() }) { Text(str(R.string.backup_none)) }
+                    }
+                    for (section in BackupSection.entries) {
+                        Row(Modifier.fillMaxWidth().clickable {
+                            selected = if (section in selected) selected - section else selected + section
+                        }, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Checkbox(checked = section in selected, onCheckedChange = null)
+                            Text(str(section.title), Modifier.padding(start = 8.dp))
+                        }
+                    }
+                }
+            },
             confirmButton = {
-                TextButton(onClick = { vm.finishImport(true) }) { Text(str(R.string.backup_monitor_yes)) }
+                TextButton(enabled = selected.isNotEmpty(), onClick = { vm.finishImport(selected) }) { Text(str(R.string.backup_import)) }
             },
-            dismissButton = {
-                TextButton(onClick = { vm.finishImport(false) }) { Text(str(R.string.backup_monitor_no)) }
-            },
+            dismissButton = { TextButton(onClick = { vm.finishImport(null) }) { Text(str(R.string.cancel)) } },
         )
     }
     if (confirmClear) {
@@ -287,7 +303,8 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     }
     val favoriteKeys = state.devices
         .filter { it.applianceId in state.favorites && it.applianceId !in state.hidden }
-        .map { SHORTCUT_DEVICE + it.applianceId }
+        .map { SHORTCUT_DEVICE + it.applianceId } +
+        state.groups.filter { "group:${it.id}" in state.favorites }.map { SHORTCUT_GROUP + it.id }
     val now = System.currentTimeMillis()
     val timers = state.timers.filter { it.value > now && it.key in names }
     val alerts = state.alerts.filterKeys { it in names }

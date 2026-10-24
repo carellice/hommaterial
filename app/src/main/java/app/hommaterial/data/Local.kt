@@ -77,6 +77,12 @@ class Cache(context: Context) {
         }
     }.getOrDefault(emptyMap())
 
+    fun tileSpans(): Map<String, Int> = runCatching {
+        app.hommaterial.data.tileSpans(JSONObject(prefs.getString("tileSpans", "{}")!!))
+    }.getOrDefault(emptyMap())
+
+    fun putTileSpans(spans: Map<String, Int>) = prefs.edit().putString("tileSpans", JSONObject(spans).toString()).apply()
+
     fun putOrder(order: Map<String, List<String>>) {
         val json = JSONObject()
         for ((section, ids) in order) json.put(section, JSONArray(ids))

@@ -564,4 +564,16 @@
     <string name="nfc_disabled">L\'NFC è disattivato: attivalo per scrivere il tag.</string>
     <string name="nfc_settings">Apri le impostazioni NFC</string>
     <string name="nfc_done">Fatto</string>
+    <string name="tile_width">Larghezza riquadro</string>
+    <string name="tile_one_column">1 colonna</string>
+    <string name="tile_two_columns">2 colonne</string>
+    <string name="backup_choose">Scegli cosa importare</string>
+    <string name="backup_choose_text">Le categorie selezionate sostituiscono le scelte locali. Il resto rimane com’è. I dispositivi Alexa vengono caricati dal tuo account Amazon.</string>
+    <string name="backup_hidden">Dispositivi nascosti</string>
+    <string name="backup_tiles">Ordine e larghezza riquadri</string>
+    <string name="backup_shortcuts">Widget e collegamenti</string>
+    <string name="backup_settings">Aspetto e impostazioni</string>
+    <string name="backup_keys">Credenziali SwitchBot</string>
+    <string name="backup_all">Seleziona tutto</string>
+    <string name="backup_none">Deseleziona tutto</string>
 </resources>

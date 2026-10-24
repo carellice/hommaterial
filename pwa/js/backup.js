@@ -4,7 +4,7 @@ export function createBackup(s, switchBot = null) {
   const backup = {
     app: 'hommaterial', version: 1,
     favorites: s.favorites ?? [], hidden: s.hidden ?? [], rooms: s.rooms ?? {}, roomList: s.roomList ?? [],
-    groups: s.groups ?? [], macros: s.macros ?? [], order: s.order ?? {},
+    groups: s.groups ?? [], macros: s.macros ?? [], order: s.order ?? {}, tileSpans: s.tileSpans ?? {},
     schedules: s.schedules ?? [], automations: s.automations ?? [], layout: s.layout ?? 0, language: s.language ?? 'auto',
     shortcuts: s.shortcuts ?? null, widget: s.widget ?? {}, tiles: s.tiles ?? Array(10).fill(null),
     alerts: s.alerts ?? {}, autoUpdate: s.autoUpdate ?? true, theme: s.theme ?? 0,
@@ -48,4 +48,28 @@ export function parseBackup(text) {
     }
   }
   return backup;
+}
+
+// Category IDs match the native clients; all fields are copied into a detached snapshot.
+export const BACKUP_SECTIONS = [
+  ['macros', 's_macros', ['macros']], ['groups', 's_groups', ['groups']],
+  ['rooms', 's_rooms', ['rooms', 'roomList']], ['favorites', 'favorites', ['favorites']],
+  ['hidden', 'backup_hidden', ['hidden', 'hiddenRemotes']],
+  ['tiles', 'backup_tiles', ['order', 'tileSpans']],
+  ['remotes', 's_remotes', ['remoteButtons', 'lgTvs']],
+  ['schedules', 's_schedules', ['schedules']], ['automations', 's_automations', ['automations']],
+  ['alerts', 'alerts_title', ['alerts']], ['shortcuts', 'backup_shortcuts', ['shortcuts', 'widget', 'tiles']],
+  ['settings', 'backup_settings', ['autoUpdate', 'theme', 'layout', 'language']],
+  ['monitor', 'backup_monitor_title', ['monitor']], ['keys', 'backup_keys', ['switchBot']],
+];
+
+export function selectBackup(current, imported, selected) {
+  const merged = JSON.parse(JSON.stringify(current));
+  for (const [id, , fields] of BACKUP_SECTIONS) if (selected.includes(id)) {
+    for (const field of fields) if (Object.hasOwn(imported, field)) merged[field] = JSON.parse(JSON.stringify(imported[field]));
+  }
+  return merged;
+}
+export function tileSpan(spans, key, columns = 2) {
+  return Math.min(Math.max(1, columns), spans?.[key] === 2 ? 2 : 1);
 }

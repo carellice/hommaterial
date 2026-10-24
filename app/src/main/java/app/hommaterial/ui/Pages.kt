@@ -30,7 +30,7 @@ fun availablePages(state: UiState): List<String> {
         .distinct().sortedBy { it.lowercase() }
     return buildList {
         add(PAGE_ALL)
-        if (visible.any { it.applianceId in state.favorites } || placed.any { it in state.favorites }) {
+        if (visible.any { it.applianceId in state.favorites } || placed.any { it in state.favorites } || state.groups.any { "group:${it.id}" in state.favorites }) {
             add(PAGE_FAVORITES)
         }
         if (state.groups.isNotEmpty()) add(PAGE_GROUPS)

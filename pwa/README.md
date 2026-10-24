@@ -84,8 +84,8 @@ nell'indirizzo.
   Servono a timer, azioni programmate, automazioni e avvisi.
 - **Le scelte dell'app Android:** esporta il backup da Android
   (**Impostazioni → Backup → Esporta**) e importalo nella PWA dallo stesso
-  menu. Stanze, gruppi, preferiti, dispositivi personalizzati e il resto
-  arrivano uguali.
+  menu. Prima del ripristino scegli le categorie: puoi importare gruppi e
+  dispositivi personalizzati conservando i preferiti e le altre scelte locali.
 - **SwitchBot:** in **Impostazioni → Telecomandi SwitchBot** inserisci token e
   chiave segreta, come nell'app Android.
 - **Più dispositivi:** se scrivi l'indirizzo del Worker in
@@ -106,7 +106,8 @@ Actions**. Chi la pubblica altrove mette il proprio indirizzo in
 ## Cosa cambia rispetto all'app Android
 
 C'è tutto quello che un browser permette: stanze, gruppi, preferiti,
-riordino, vista a griglia o elenco, ricerca, comandi vocali (dove il browser
+riordino e larghezza dei singoli riquadri (una o due colonne), gruppi nei
+preferiti, importazione selettiva dei backup, vista a griglia o elenco, ricerca, comandi vocali (dove il browser
 ha il riconoscimento vocale, come Chrome), luminosità e colori, timer,
 grafici dei sensori, avvisi, dispositivi personalizzati, telecomandi
 SwitchBot, azioni programmate, automazioni, modalità monitor con PIN e

@@ -11,7 +11,7 @@ import {
   emptyState, holds, cleared, macroKey, remoteKey, nextTime, placed, shownRemotes,
 } from './model.js';
 import { APP_VERSION } from './version.js';
-import { createBackup, parseBackup } from './backup.js';
+import { createBackup, parseBackup, selectBackup } from './backup.js';
 
 const cache = new Prefs('cache');
 const settings = new Prefs('settings');
@@ -97,6 +97,7 @@ function loadCached() {
     roomList: cache.get('roomList', []),
     groups: cache.get('groups', []),
     order: cache.get('order', {}),
+    tileSpans: cache.get('tileSpans', {}),
     macros: cache.get('macros', []),
     shortcuts: cache.get('shortcuts', null),
     widget: cache.get('widget', null),
@@ -120,7 +121,7 @@ function loadCached() {
     acSettings: switchBot.acSettings(),
     hiddenRemotes: switchBot.hidden(),
     pin: settings.has(PIN_KEY),
-    askMonitorRestore: false,
+    askBackupRestore: false,
     refreshing: false,
     voice: null,
     updatedAt: cache.get('updatedAt', null),
@@ -402,6 +403,12 @@ export function setHidden(device, hidden) {
 }
 
 /** Adds to the favorites, or takes away, a device by its applianceId, or a remote or custom device by its key. */
+export function setTileSpan(key, columns) {
+  const tileSpans = { ...state.tileSpans, [key]: columns === 2 ? 2 : 1 };
+  cache.set('tileSpans', tileSpans);
+  update({ tileSpans });
+}
+
 export function setFavorite(key, favorite) {
   const list = favorite ? withItem(state.favorites, key) : without(state.favorites, key);
   cache.set('favorites', list);
@@ -1030,24 +1037,21 @@ export async function importBackup(file) {
     say(str(backup ? 'backup_invalid' : 'backup_failed'));
     return;
   }
-  // The panel of a tablet may not suit the device the backup lands on: that is asked.
-  if (backup.monitor) {
-    pendingBackup = backup;
-    update({ askMonitorRestore: true });
-  } else {
-    restore(backup, false);
+  pendingBackup = backup;
+  update({ askBackupRestore: true });
+}
+
+export function finishImport(selected) {
+  const imported = pendingBackup;
+  pendingBackup = null;
+  update({ askBackupRestore: false });
+  if (imported && selected?.length) {
+    const backup = selectBackup(createBackup(state, switchBot.keys()), imported, selected);
+    restore(backup, selected);
   }
 }
 
-/** Answers whether the backup being read brings its monitor mode along; null gives the import up. */
-export function finishImport(monitor) {
-  const backup = pendingBackup;
-  pendingBackup = null;
-  update({ askMonitorRestore: false });
-  if (backup && monitor != null) restore(backup, monitor);
-}
-
-function restore(backup, monitor) {
+function restore(backup, selected) {
   const list = (v) => (Array.isArray(v) ? v.map(String) : []);
   const alerts = {};
   for (const [id, a] of Object.entries(backup.alerts || {})) alerts[id] = { above: a.above ?? null, below: a.below ?? null };
@@ -1062,6 +1066,7 @@ function restore(backup, monitor) {
       id: m.id, name: m.name, condition: m.condition ?? null, steps: m.steps || [], otherwise: m.otherwise || [],
     })),
     order: backup.order || {},
+    tileSpans: backup.tileSpans || {},
     schedules: (backup.schedules || []).map((s) => ({ ...s, days: list(s.days).map(Number) })),
     automations: (backup.automations || []).map((a) => ({ ...a })),
     shortcuts: backup.shortcuts ?? null,
@@ -1072,7 +1077,7 @@ function restore(backup, monitor) {
   };
   // Restored automations wait for a new crossing when their condition already holds.
   const automationsTripped = values.automations.filter((a) => holds(a, state.states[a.device] ?? emptyState()) === true).map((a) => a.id);
-  cache.edit({ ...values, alertsTripped: [], automationsTripped });
+  cache.edit({ ...values, ...(selected.includes('alerts') ? { alertsTripped: [] } : {}), ...(selected.includes('automations') ? { automationsTripped } : {}) });
   const theme = clamp(Number(backup.theme ?? 0), 0, 2);
   const layout = clamp(Number(backup.layout ?? 0), 0, 1);
   const language = backup.language || 'auto';
@@ -1087,8 +1092,8 @@ function restore(backup, monitor) {
     switchBot.putHidden(list(backup.hiddenRemotes));
     update({ hiddenRemotes: switchBot.hidden() });
   }
-  if (monitor && backup.monitor) setMonitor(monitorFromJson(backup.monitor));
-  if (backup.switchBot?.token) {
+  if (selected.includes('monitor') && backup.monitor) setMonitor(monitorFromJson(backup.monitor));
+  if (selected.includes('keys') && backup.switchBot?.token) {
     switchBot.connect(backup.switchBot.token, backup.switchBot.secret || '');
     update({ switchBot: true });
     guarded(async () => update({ remotes: await switchBot.fetchRemotes() }), true);

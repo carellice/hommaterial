@@ -12,6 +12,10 @@ import app.hommaterial.R
 import app.hommaterial.data.AcSetting
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.Automation
+import app.hommaterial.data.BackupSection
+import app.hommaterial.data.validateBackup
+import app.hommaterial.data.selectBackup
+import app.hommaterial.data.tileSpans
 import app.hommaterial.data.Cache
 import app.hommaterial.data.ColorChoice
 import app.hommaterial.data.Device
@@ -94,6 +98,7 @@ data class UiState(
     val groups: List<Group> = emptyList(),
     /** The order the user gave the tiles of each section of the home. See [Cache.order]. */
     val order: Map<String, List<String>> = emptyMap(),
+    val tileSpans: Map<String, Int> = emptyMap(),
     /** The custom devices: tiles that run a series of actions. */
     val macros: List<Macro> = emptyList(),
     /** What is listed under the app icon, or null for the favorites. See [Cache.shortcuts]. */
@@ -138,7 +143,7 @@ data class UiState(
     /** Whether a PIN was chosen for the monitor mode. */
     val pin: Boolean = false,
     /** Whether a backup being imported is waiting to know if its monitor mode comes along. */
-    val askMonitorRestore: Boolean = false,
+    val askBackupRestore: Boolean = false,
     val refreshing: Boolean = false,
     /** A spoken command understood only in part, waiting for the user to pick what was meant. */
     val voice: VoiceResult.Ask? = null,
@@ -256,6 +261,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             groups = local.groups(),
             macros = local.macros(),
             order = local.order(),
+            tileSpans = local.tileSpans(),
             shortcuts = local.shortcuts(),
             widget = local.widget(),
             favorites = local.favorites(),
@@ -709,6 +715,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         Quick.refresh(getApplication())
     }
 
+    fun setTileSpan(key: String, columns: Int) {
+        val spans = _state.value.tileSpans + (key to columns.coerceIn(1, 2))
+        local.putTileSpans(spans)
+        _state.update { it.copy(tileSpans = spans) }
+    }
+
     fun setOrder(order: Map<String, List<String>>) {
         local.putOrder(order)
         _state.update { it.copy(order = order) }
@@ -1006,7 +1018,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Writes the choices made in the app to the file the user picked. */
-    fun exportBackup(uri: Uri) {
+    private fun currentBackup(): JSONObject {
         val s = _state.value
         val alerts = JSONObject()
         for ((id, alert) in s.alerts) {
@@ -1028,6 +1040,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("automations", JSONArray(s.automations.map { it.toJson() }))
             .put("layout", s.layout)
             .put("order", JSONObject(s.order.mapValues { JSONArray(it.value) }))
+            .put("tileSpans", JSONObject(s.tileSpans))
             .put("shortcuts", s.shortcuts?.let { JSONArray(it) } ?: JSONObject.NULL)
             .put("widget", s.widget.toJson())
             .put("tiles", JSONArray(s.tileDevices.map { it ?: JSONObject.NULL }))
@@ -1046,6 +1059,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
         // So do the LG TVs with their keys, which serve only on the home network: no new pairing.
         if (s.lgTvs.isNotEmpty()) backup.put("lgTvs", JSONArray(s.lgTvs.map { it.toJson() }))
+        return backup
+    }
+
+    fun exportBackup(uri: Uri) {
+        val backup = currentBackup()
         viewModelScope.launch {
             val saved = runCatching {
                 withContext(Dispatchers.IO) {
@@ -1064,25 +1082,32 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val backup = runCatching {
                 withContext(Dispatchers.IO) {
-                    JSONObject(app.contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() })
+                    JSONObject(app.contentResolver.openInputStream(uri)!!.use { stream ->
+                        val output = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(8192)
+                        var count = stream.read(buffer)
+                        while (count != -1) {
+                            require(output.size() + count <= 5_000_000)
+                            output.write(buffer, 0, count)
+                            count = stream.read(buffer)
+                        }
+                        val bytes = output.toByteArray()
+                        require(bytes.size <= 5_000_000)
+                        bytes.decodeToString()
+                    })
                 }
             }.getOrNull()
-            if (backup == null || backup.optString("app") != BACKUP_APP) {
+            if (backup == null || backup.optString("app") != BACKUP_APP || backup.optInt("version") != 1) {
                 _messages.tryEmit(str(if (backup == null) R.string.backup_failed else R.string.backup_invalid))
                 return@launch
             }
-            // The panel of a tablet may not suit the device the backup lands on: that is asked.
-            if (backup.has("monitor")) {
-                pendingBackup = backup
-                _state.update { it.copy(askMonitorRestore = true) }
-            } else {
-                restore(backup, monitor = false)
-            }
+            pendingBackup = backup
+            _state.update { it.copy(askBackupRestore = true) }
         }
     }
 
-    /** Applies a backup read by [importBackup]; the monitor mode only when [monitor] says so. */
-    private fun restore(backup: JSONObject, monitor: Boolean) {
+    /** Applies a merged snapshot; runtime services only change for selected categories. */
+    private fun restore(backup: JSONObject, selected: Set<BackupSection>) {
         val app = getApplication<Application>()
         fun strings(name: String) =
             backup.optJSONArray(name)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty().toSet()
@@ -1097,13 +1122,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         local.putRoomList(list("roomList").orEmpty())
         local.putGroups(backup.optJSONArray("groups")?.mapObjects(Group::fromJson).orEmpty())
         local.putMacros(backup.optJSONArray("macros")?.mapObjects(Macro::fromJson).orEmpty())
-        Schedules.cancelAll(app)
-        backup.optJSONArray("schedules")?.mapObjects(Schedule::fromJson)?.forEach { Schedules.put(app, it) }
-        Automations.all(app).forEach { Automations.delete(app, it.id) }
-        backup.optJSONArray("automations")?.mapObjects(Automation::fromJson)?.forEach { automation ->
-            val already = automation.holds(local.states()[automation.device] ?: DeviceState()) == true
-            Automations.put(app, automation, already)
+        if (BackupSection.SCHEDULES in selected) {
+            Schedules.cancelAll(app)
+            backup.optJSONArray("schedules")?.mapObjects(Schedule::fromJson)?.forEach { Schedules.put(app, it) }
         }
+        if (BackupSection.AUTOMATIONS in selected) {
+            Automations.all(app).forEach { Automations.delete(app, it.id) }
+            backup.optJSONArray("automations")?.mapObjects(Automation::fromJson)?.forEach { automation ->
+                val already = automation.holds(local.states()[automation.device] ?: DeviceState()) == true
+                Automations.put(app, automation, already)
+            }
+        }
+        local.putTileSpans(tileSpans(backup.optJSONObject("tileSpans")))
         val order = backup.optJSONObject("order") ?: JSONObject()
         local.putOrder(
             order.keys().asSequence().associateWith { section ->
@@ -1116,18 +1146,20 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         for (slot in 0 until PowerTile.SLOTS) {
             local.putTileDevice(slot, tiles?.optString(slot)?.takeIf { it.isNotEmpty() && !tiles.isNull(slot) })
         }
-        val alerts = backup.optJSONObject("alerts") ?: JSONObject()
-        for (id in Alerts.all(app).keys) Alerts.set(app, id, Alert())
-        for (id in alerts.keys()) {
-            val o = alerts.getJSONObject(id)
-            Alerts.set(
-                app,
-                id,
-                Alert(
-                    above = if (o.isNull("above")) null else o.optDouble("above"),
-                    below = if (o.isNull("below")) null else o.optDouble("below"),
-                ),
-            )
+        if (BackupSection.ALERTS in selected) {
+            val alerts = backup.optJSONObject("alerts") ?: JSONObject()
+            for (id in Alerts.all(app).keys) Alerts.set(app, id, Alert())
+            for (id in alerts.keys()) {
+                val o = alerts.getJSONObject(id)
+                Alerts.set(
+                    app,
+                    id,
+                    Alert(
+                        above = if (o.isNull("above")) null else o.optDouble("above"),
+                        below = if (o.isNull("below")) null else o.optDouble("below"),
+                    ),
+                )
+            }
         }
         settings.edit()
             .putBoolean("autoUpdate", backup.optBoolean("autoUpdate", true))
@@ -1148,6 +1180,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 automations = Automations.all(app),
                 layout = settings.getInt("layout", 0),
                 order = local.order(),
+                tileSpans = local.tileSpans(),
                 shortcuts = local.shortcuts(),
                 widget = local.widget(),
                 tileDevices = local.tileDevices(),
@@ -1169,12 +1202,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             switchBot.putHidden(strings("hiddenRemotes"))
             _state.update { it.copy(hiddenRemotes = switchBot.hidden()) }
         }
-        backup.optJSONArray("lgTvs")?.let { saved ->
+        if (BackupSection.REMOTES in selected) backup.optJSONArray("lgTvs")?.let { saved ->
             val tvs = runCatching { saved.mapObjects(LgTv::fromJson) }.getOrNull()?.filter { it.id.startsWith(LG_PREFIX) }
             if (tvs != null) _state.update { it.copy(lgTvs = pairedTvs.replaceAll(tvs)) }
         }
-        if (monitor) backup.optJSONObject("monitor")?.let { setMonitor(MonitorConfig.fromJson(it)) }
-        backup.optJSONObject("switchBot")?.let { keys ->
+        if (BackupSection.MONITOR in selected) backup.optJSONObject("monitor")?.let { setMonitor(MonitorConfig.fromJson(it)) }
+        if (BackupSection.KEYS in selected) backup.optJSONObject("switchBot")?.let { keys ->
             val token = keys.optString("token")
             if (token.isNotEmpty()) {
                 switchBot.connect(token, keys.optString("secret"))
@@ -1188,12 +1221,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _messages.tryEmit(str(R.string.backup_imported))
     }
 
-    /** Answers whether the backup being read brings its monitor mode along; null gives the import up. */
-    fun finishImport(monitor: Boolean?) {
+    /** Applies the selected categories; null cancels without changing local data. */
+    fun finishImport(selected: Set<BackupSection>?) {
         val backup = pendingBackup
         pendingBackup = null
-        _state.update { it.copy(askMonitorRestore = false) }
-        if (backup != null && monitor != null) restore(backup, monitor)
+        _state.update { it.copy(askBackupRestore = false) }
+        if (backup != null && !selected.isNullOrEmpty()) {
+            val result = runCatching {
+                val merged = selectBackup(currentBackup(), backup, selected)
+                validateBackup(merged)
+                restore(merged, selected)
+            }
+            if (result.isFailure) _messages.tryEmit(str(R.string.backup_invalid))
+        }
     }
 
     fun readings(device: Device): List<Reading> = history.readings(device.applianceId)

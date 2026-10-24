@@ -94,7 +94,8 @@ private fun entries(cache: Cache, config: WidgetConfig): List<Entry> {
     val states = cache.states()
     val keys = config.items ?: run {
         val favorites = cache.favorites()
-        devices.filter { it.applianceId in favorites }.map { SHORTCUT_DEVICE + it.applianceId }
+        devices.filter { it.applianceId in favorites }.map { SHORTCUT_DEVICE + it.applianceId } +
+            groups.filter { "group:${it.id}" in favorites }.map { SHORTCUT_GROUP + it.id }
     }
     val macros = cache.macros()
     return keys.mapNotNull { key ->

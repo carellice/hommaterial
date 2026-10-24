@@ -576,4 +576,16 @@
     <string name="nfc_disabled">NFC is off: turn it on to write the tag.</string>
     <string name="nfc_settings">Open the NFC settings</string>
     <string name="nfc_done">Done</string>
+    <string name="tile_width">Tile width</string>
+    <string name="tile_one_column">1 column</string>
+    <string name="tile_two_columns">2 columns</string>
+    <string name="backup_choose">Choose what to import</string>
+    <string name="backup_choose_text">Selected categories replace the local choices. Everything else stays as it is. Alexa devices are loaded from your Amazon account.</string>
+    <string name="backup_hidden">Hidden devices</string>
+    <string name="backup_tiles">Tile order and width</string>
+    <string name="backup_shortcuts">Widgets and shortcuts</string>
+    <string name="backup_settings">Appearance and settings</string>
+    <string name="backup_keys">SwitchBot credentials</string>
+    <string name="backup_all">Select all</string>
+    <string name="backup_none">Clear selection</string>
 </resources>

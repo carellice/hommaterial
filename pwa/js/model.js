@@ -286,7 +286,7 @@ export function availablePages(s) {
   const rooms = [...new Set([...visible.map((d) => d.room).filter(Boolean), ...extras.map((k) => placeOf(s, k)).filter(Boolean)])]
     .sort(byName);
   const pages = [PAGE_ALL];
-  if (visible.some((d) => s.favorites.includes(d.applianceId)) || extras.some((k) => s.favorites.includes(k))) {
+  if (visible.some((d) => s.favorites.includes(d.applianceId)) || extras.some((k) => s.favorites.includes(k)) || s.groups.some((g) => s.favorites.includes(`group:${g.id}`))) {
     pages.push(PAGE_FAVORITES);
   }
   if (s.groups.length) pages.push(PAGE_GROUPS);
@@ -361,7 +361,7 @@ export function homeSections(page, s) {
   if (page !== PAGE_FAVORITES) for (const d of shown) (rooms[d.room ?? noRoom] ||= []).push(d);
 
   // Hidden devices do not count for a group, as they do not for a room.
-  const groupList = page === PAGE_ALL ? s.groups : page === PAGE_GROUPS ? s.groups.filter((g) => inOnly(g.id)) : [];
+  const groupList = (page === PAGE_ALL || page === PAGE_FAVORITES) ? s.groups : page === PAGE_GROUPS ? s.groups.filter((g) => inOnly(g.id)) : [];
   const groups = groupList
     .map((g) => entry.grp(g, s.devices.filter((d) => g.devices.includes(d.applianceId) && !s.hidden.includes(d.applianceId) && d.hasPower)))
     .filter((e) => e.devices.length);
@@ -396,6 +396,7 @@ export function homeSections(page, s) {
     ...shown.filter((d) => s.favorites.includes(d.applianceId)).sort((a, b) => byName(a.name, b.name)).map(entry.dev),
     ...s.macros.filter((m) => s.favorites.includes(macroKey(m.id))).map(entry.mac),
     ...inList.filter((r) => s.favorites.includes(remoteKey(r.id))).map(entry.rem),
+    ...groups.filter((e) => s.favorites.includes(e.id) && inOnly(e.group.id)),
   ];
 
   const section = (key, title, entries, switchable = []) => {
@@ -407,7 +408,7 @@ export function homeSections(page, s) {
   };
   const list = [
     section('favorites', str('favorites'), favorites),
-    section('groups', str('s_groups'), groups),
+    section('groups', str('s_groups'), page === PAGE_FAVORITES ? [] : groups),
     section('macros', str('s_macros'), macros.map(entry.mac)),
     section('remotes', str('s_remotes'), remotes.map(entry.rem)),
   ];
@@ -461,6 +462,7 @@ export function pagePicks(s, page) {
   else if (page === PAGE_FAVORITES) devices = visible.filter((d) => s.favorites.includes(d.applianceId));
   else devices = visible.filter((d) => d.room === room);
   const picks = devices.map((d) => ({ key: d.applianceId, label: d.name, hint: d.room ?? str('room_none') }));
+  if (page === PAGE_FAVORITES) picks.push(...s.groups.filter((g) => s.favorites.includes(`group:${g.id}`)).map((g) => ({ key: g.id, label: g.name })));
   if (room == null || !page.startsWith(PAGE_ROOM)) return picks;
   // What else was put in the room, to keep or to leave out as its devices.
   return [
