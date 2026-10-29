@@ -17,8 +17,9 @@ enum class BackupSection(val title: Int, vararg val fields: String) {
     ALERTS(R.string.alerts_title, "alerts"),
     SHORTCUTS(R.string.backup_shortcuts, "shortcuts", "widget", "tiles"),
     SETTINGS(R.string.backup_settings, "autoUpdate", "haptics", "hapticLevel", "theme", "layout", "language"),
+    ASSISTANT(R.string.backup_assistant, "assistant"),
     MONITOR(R.string.backup_monitor_title, "monitor"),
-    KEYS(R.string.backup_keys, "switchBot");
+    KEYS(R.string.backup_keys, "switchBot", "assistantKeys");
 }
 
 fun selectBackup(current: JSONObject, imported: JSONObject, selected: Set<BackupSection>): JSONObject {
@@ -41,6 +42,7 @@ fun validateBackup(backup: JSONObject) {
     backup.optJSONArray("lgTvs")?.mapObjects(LgTv::fromJson)
     backup.optJSONObject("widget")?.let(WidgetConfig::fromJson)
     backup.optJSONObject("monitor")?.let(MonitorConfig::fromJson)
+    backup.optJSONObject("assistant")?.optJSONArray("notes")?.mapObjects(AssistantNote::fromJson)
     for (name in listOf("order", "remoteButtons")) backup.optJSONObject(name)?.let { values ->
         for (key in values.keys()) values.getJSONArray(key).let { array -> repeat(array.length()) { array.getString(it) } }
     }

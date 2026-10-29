@@ -117,7 +117,7 @@ internal fun describe(action: MacroAction, state: UiState): String = when (actio
 }
 
 /** The keys every remote of a kind has, besides those the user added. */
-private fun standardCommands(remote: Remote): List<String> = when {
+internal fun standardCommands(remote: Remote): List<String> = when {
     remote.kind == RemoteKind.CUSTOM -> emptyList()
     // An LG TV also has the sound and the player, which it tells apart from the other keys.
     remote.lg -> listOf("turnOn", "turnOff", "volumeAdd", "volumeSub", "channelAdd", "channelSub", "setMute") + LG_MEDIA

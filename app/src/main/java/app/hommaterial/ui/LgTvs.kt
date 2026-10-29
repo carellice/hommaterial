@@ -125,7 +125,7 @@ internal fun LgTvDialog(search: TvSearch, vm: HomeViewModel) {
 }
 
 /** The keys of the LG remote that can be added as buttons, with their names; the numbers name themselves. */
-private val LG_KEYS = listOf(
+internal val LG_KEYS = listOf(
     "HOME" to R.string.lg_key_home,
     "BACK" to R.string.lg_key_back,
     "ENTER" to R.string.lg_key_ok,

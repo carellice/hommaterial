@@ -187,6 +187,8 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
 
     state.voice?.let { VoiceDialog(it, vm) }
+    var asking by rememberSaveable { mutableStateOf(false) }
+    if (asking) AssistantScreen(state, vm, onDismiss = { asking = false })
 
     // A wide screen has room for a side bar that splits the home in pages.
     val width = LocalConfiguration.current.screenWidthDp
@@ -255,6 +257,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                     IconButton(onClick = { query = "" }) {
                         Icon(Icons.Outlined.Search, contentDescription = str(R.string.search))
                     }
+                    if (state.assistant.configured) AssistantButton(onClick = { asking = true })
                     VoiceButton(vm)
                     OverflowMenu(state, vm, onSettings, onArrange = { arranging = true })
                 },

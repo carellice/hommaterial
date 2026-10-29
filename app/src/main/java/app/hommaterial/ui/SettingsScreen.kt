@@ -461,6 +461,8 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 Setting(title = str(R.string.lgtv_add), text = str(R.string.lgtv_add_text), onClick = vm::searchLgTvs)
             }
 
+            Section(R.string.s_assistant, R.string.assistant_text) { AssistantSettings(state, vm) }
+
             Section(R.string.s_updates) {
                 Toggle(R.string.auto_update, R.string.auto_update_text, state.autoUpdate, vm::setAutoUpdate)
                 Setting(
