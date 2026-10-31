@@ -72,14 +72,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
-import app.hommaterial.ChatLine
 import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.Teach
 import app.hommaterial.UiState
 import app.hommaterial.data.ASSISTANT_MODELS
 import app.hommaterial.data.AssistantKey
-import app.hommaterial.data.AssistantStep
 import app.hommaterial.data.Remote
 import app.hommaterial.data.RemoteKind
 import app.hommaterial.plural
@@ -108,37 +106,6 @@ internal fun UiState.assistantKeys(): Set<String> =
     placed.filter { it.applianceId !in hidden }.map { it.applianceId }.toSet() +
         groups.map { "group:${it.id}" } + macros.map { Quick.macroKey(it.id) } + shownRemotes.map { Quick.remoteKey(it.id) }
 
-/** What a step does, as a line of the chat. */
-internal fun assistantStepLabel(step: AssistantStep): String = when (step) {
-    is AssistantStep.Power -> str(if (step.on) R.string.voice_on else R.string.voice_off, step.device.name)
-    is AssistantStep.Brightness -> str(R.string.assistant_step_brightness, step.device.name, step.percent)
-    is AssistantStep.Color -> str(R.string.assistant_step_color, step.device.name, str(step.choice.label))
-    is AssistantStep.GroupPower -> str(if (step.on) R.string.voice_on else R.string.voice_off, step.group.name)
-    is AssistantStep.Run -> str(R.string.schedule_run, step.macro.name)
-    is AssistantStep.Press -> {
-        val key = if (step.key.command == "SetChannel") "${commandLabel(step.key.command)} ${step.parameter}" else step.key.label
-        if (step.times > 1) {
-            str(R.string.assistant_step_press_times, key, step.times, step.remote.name)
-        } else {
-            str(R.string.assistant_step_press, key, step.remote.name)
-        }
-    }
-    is AssistantStep.Ac -> if (step.on) {
-        str(R.string.assistant_step_ac, step.remote.name, step.setting.temperature)
-    } else {
-        str(R.string.voice_off, step.remote.name)
-    }
-    is AssistantStep.Wait -> plural(R.plurals.macro_wait, step.seconds)
-}
-
-/** The button of the top bar that opens the assistant, next to the microphone. */
-@Composable
-internal fun AssistantButton(onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(Icons.Outlined.AutoAwesome, contentDescription = str(R.string.assistant_button))
-    }
-}
-
 /** Asks the speech recognizer for a sentence and gives back the best guess. */
 @Composable
 private fun rememberDictation(onHeard: (String) -> Unit, onUnavailable: () -> Unit): () -> Unit {
@@ -151,140 +118,11 @@ private fun rememberDictation(onHeard: (String) -> Unit, onUnavailable: () -> Un
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, str(R.string.voice_language))
-            .putExtra(RecognizerIntent.EXTRA_PROMPT, str(R.string.assistant_hint))
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, str(R.string.assistant_answer))
         try {
             speech.launch(intent)
         } catch (e: ActivityNotFoundException) {
             onUnavailable()
-        }
-    }
-}
-
-/** The conversation with the assistant, over the whole screen: what was asked, what it did. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-internal fun AssistantScreen(state: UiState, vm: HomeViewModel, onDismiss: () -> Unit) {
-    val assistant = state.assistant
-    var typed by rememberSaveable { mutableStateOf("") }
-    fun send(text: String) {
-        if (text.isBlank() || assistant.thinking) return
-        vm.askAssistant(text.trim())
-        typed = ""
-    }
-    val dictate = rememberDictation(onHeard = ::send, onUnavailable = vm::speechUnavailable)
-    DetailsContainer(onDismiss, fullScreen = true) {
-        // The field stays above the keyboard.
-        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
-        SideEffect { window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE) }
-        Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
-            Row(Modifier.padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(str(R.string.assistant_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                if (assistant.chat.isNotEmpty()) {
-                    IconButton(onClick = vm::clearAssistant) {
-                        Icon(Icons.Outlined.RestartAlt, contentDescription = str(R.string.assistant_clear))
-                    }
-                }
-            }
-            val list = rememberLazyListState()
-            LaunchedEffect(assistant.chat.size, assistant.pending, assistant.thinking) {
-                val last = assistant.chat.size + 1
-                list.animateScrollToItem(last)
-            }
-            LazyColumn(
-                state = list,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (assistant.chat.isEmpty()) {
-                    item {
-                        Column(Modifier.padding(8.dp)) {
-                            Text(str(R.string.assistant_empty), style = MaterialTheme.typography.bodyLarge)
-                            FlowRow(
-                                Modifier.padding(top = 12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                for (example in listOf(R.string.assistant_example1, R.string.assistant_example2, R.string.assistant_example3)) {
-                                    AssistChip(onClick = { send(str(example)) }, label = { Text(str(example)) })
-                                }
-                            }
-                        }
-                    }
-                }
-                itemsIndexed(assistant.chat) { _, line -> Bubble(line) }
-                item {
-                    val pending = assistant.pending
-                    when {
-                        pending != null -> Row(
-                            Modifier.padding(start = 8.dp, top = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Button(onClick = { vm.confirmAssistant(true) }) { Text(str(R.string.assistant_run)) }
-                            OutlinedButton(onClick = { vm.confirmAssistant(false) }) { Text(str(R.string.cancel)) }
-                        }
-                        assistant.thinking -> Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                            Text(
-                                str(R.string.assistant_thinking),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 12.dp),
-                            )
-                        }
-                        else -> Spacer(Modifier.size(1.dp))
-                    }
-                }
-            }
-            Row(
-                Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OutlinedTextField(
-                    value = typed,
-                    onValueChange = { typed = it },
-                    placeholder = { Text(str(R.string.assistant_hint)) },
-                    maxLines = 4,
-                    shape = RoundedCornerShape(28.dp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { send(typed) }),
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = dictate, enabled = !assistant.thinking) {
-                    Icon(Icons.Outlined.Mic, contentDescription = str(R.string.assistant_dictate))
-                }
-                IconButton(onClick = { send(typed) }, enabled = typed.isNotBlank() && !assistant.thinking) {
-                    Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = str(R.string.assistant_send))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Bubble(line: ChatLine) {
-    val colors = MaterialTheme.colorScheme
-    val background = when {
-        line.user -> colors.primaryContainer
-        line.failed -> colors.errorContainer
-        else -> colors.surfaceContainerHigh
-    }
-    val foreground = when {
-        line.user -> colors.onPrimaryContainer
-        line.failed -> colors.onErrorContainer
-        else -> colors.onSurface
-    }
-    Box(Modifier.fillMaxWidth(), contentAlignment = if (line.user) Alignment.CenterEnd else Alignment.CenterStart) {
-        Column(
-            Modifier
-                .widthIn(max = 480.dp)
-                .padding(start = if (line.user) 48.dp else 0.dp, end = if (line.user) 0.dp else 48.dp)
-                .background(background, RoundedCornerShape(20.dp))
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        ) {
-            if (line.text.isNotEmpty()) Text(line.text, color = foreground, style = MaterialTheme.typography.bodyLarge)
-            for (step in line.steps) {
-                Text("• $step", color = foreground, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
-            }
         }
     }
 }

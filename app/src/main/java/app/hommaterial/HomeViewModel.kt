@@ -11,17 +11,13 @@ import androidx.lifecycle.viewModelScope
 import app.hommaterial.R
 import app.hommaterial.data.AcSetting
 import app.hommaterial.data.Alexa
-import app.hommaterial.data.ASSISTANT_CONFIRM_ABOVE
 import app.hommaterial.data.AssistantCatalog
 import app.hommaterial.data.AssistantException
 import app.hommaterial.data.AssistantNote
-import app.hommaterial.data.AssistantPlan
 import app.hommaterial.data.AssistantQuestion
-import app.hommaterial.data.AssistantStep
 import app.hommaterial.data.AssistantStore
 import app.hommaterial.data.WorkersAi
-import app.hommaterial.data.commandPrompt
-import app.hommaterial.data.parsePlan
+import app.hommaterial.data.correctionPrompt
 import app.hommaterial.data.parseQuestions
 import app.hommaterial.data.questionsPrompt
 import app.hommaterial.data.Automation
@@ -70,7 +66,6 @@ import app.hommaterial.ui.HAPTIC_LEVEL_DEFAULT
 import app.hommaterial.ui.HAPTIC_LEVEL_MIN
 import app.hommaterial.ui.Haptic
 import app.hommaterial.ui.assistantKeys
-import app.hommaterial.ui.assistantStepLabel
 import app.hommaterial.voice.ExtraCommand
 import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
@@ -156,7 +151,7 @@ data class UiState(
     val lgTvs: List<LgTv> = emptyList(),
     /** The search for an LG TV to pair, while its dialog is open. */
     val tvSearch: TvSearch? = null,
-    /** The assistant of Workers AI: its account, what it was taught, the conversation. */
+    /** The assistant of Workers AI, which puts right the names in spoken commands: its account, what it was taught. */
     val assistant: AssistantUi = AssistantUi(),
     /** Whether a PIN was chosen for the monitor mode. */
     val pin: Boolean = false,
@@ -165,6 +160,8 @@ data class UiState(
     val refreshing: Boolean = false,
     /** A spoken command understood only in part, waiting for the user to pick what was meant. */
     val voice: VoiceResult.Ask? = null,
+    /** Whether a spoken command is with the assistant, to have its names put right. */
+    val correcting: Boolean = false,
     /** When the states were last fetched from Alexa, in epoch milliseconds. */
     val updatedAt: Long? = null,
     /** A newer release found on GitHub, while it is being offered or downloaded. */
@@ -209,7 +206,7 @@ data class TvSearch(
     val asking: Boolean = false,
 )
 
-/** Where the assistant stands, from its set-up to the conversation of this session. */
+/** Where the assistant stands: its account and what it was taught. */
 data class AssistantUi(
     val configured: Boolean = false,
     val accountId: String = "",
@@ -221,16 +218,9 @@ data class AssistantUi(
     /** Whether the keys typed in the guide are being tried. */
     val testing: Boolean = false,
     val setupError: String? = null,
-    val chat: List<ChatLine> = emptyList(),
-    val thinking: Boolean = false,
-    /** Steps waiting for the user to say yes, since they switch a lot at once. */
-    val pending: AssistantPlan? = null,
     /** The questions about the home, while they are being asked. */
     val teach: Teach? = null,
 )
-
-/** A line of the conversation: what the user asked, or what the assistant said and did. */
-data class ChatLine(val user: Boolean, val text: String, val steps: List<String> = emptyList(), val failed: Boolean = false)
 
 /** The questions of the assistant, [index] being the one asked now; past the last one it is over. */
 data class Teach(
@@ -242,11 +232,6 @@ data class Teach(
     /** The keys of everything it was shown, which count as taught once it is over. */
     val seen: Set<String> = emptySet(),
 )
-
-// How much of the conversation goes with each request, so that "and the other one" is understood.
-private const val ASSISTANT_HISTORY = 6
-// Between two presses of the same key, for the appliance to take them one by one.
-private const val PRESS_GAP_MS = 400L
 
 private const val BACKUP_APP = "hommaterial"
 const val LAYOUT_GRID = 0
@@ -285,6 +270,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private var pendingBackup: JSONObject? = null
     private var tvSearchJob: Job? = null
     private var assistantJob: Job? = null
+    private var voiceJob: Job? = null
 
     init {
         // Shortcuts and widget may be stale after an update of the app or a change made elsewhere.
@@ -585,26 +571,73 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         if (onTile) PowerTile.offer(getApplication(), slot, name)
     }
 
-    /** Acts on what the speech recognizer [heard], its guesses best first. */
+    /**
+     * Acts on what the speech recognizer [heard], its guesses best first. What is not clearly
+     * understood goes to the assistant, when there is one, to have the names put right first.
+     */
     fun onSpeech(heard: List<String>) {
-        val s = _state.value
-        val result = parseVoice(heard, s.placed.filter { it.applianceId !in s.hidden })
-        // What Alexa does not know is tried when no device of hers was clearly meant.
-        if (result !is VoiceResult.Run) {
-            // A remote learnt key by key has no power key to be told about.
-            val remotes = s.shownRemotes.filter { it.kind != RemoteKind.CUSTOM }
-            val extra = parseExtras(heard, s.macros.map { it.id to it.name }, remotes.map { it.id to it.name })
-            if (extra is ExtraCommand.Run) {
-                val macro = s.macros.first { it.id == extra.macroId }
-                _messages.tryEmit(str(R.string.schedule_run, macro.name))
-                return runMacro(macro)
+        if (act(heard)) return
+        val result = parseVoice(heard, voiceDevices())
+        if (!assistantStore.configured || heard.all { it.isBlank() }) return answer(result)
+        _state.update { it.copy(correcting = true) }
+        voiceJob?.cancel()
+        voiceJob = viewModelScope.launch {
+            val corrected = try {
+                workersAi.correct(
+                    assistantStore.accountId(),
+                    assistantStore.token(),
+                    assistantStore.model(),
+                    correctionPrompt(assistantCatalog(), assistantStore.house()),
+                    heard.filter { it.isNotBlank() },
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Without the assistant the sentence is still read as it was heard.
+                android.util.Log.w("Assistant", "Correction failed", e)
+                ""
+            } finally {
+                _state.update { it.copy(correcting = false) }
             }
-            if (extra is ExtraCommand.Remote) {
-                val remote = remotes.first { it.id == extra.remoteId }
-                _messages.tryEmit(str(if (extra.on) R.string.voice_on else R.string.voice_off, remote.name))
-                return sendRemote(remote, if (extra.on) "turnOn" else "turnOff")
+            if (corrected.isEmpty() || !act(listOf(corrected))) {
+                // What was put right is offered first, should it still be understood only in part.
+                val again = if (corrected.isEmpty()) result else parseVoice(listOf(corrected) + heard, voiceDevices())
+                answer(if (again is VoiceResult.Unknown) result else again)
             }
         }
+    }
+
+    private fun voiceDevices(): List<Device> = _state.value.let { s -> s.placed.filter { it.applianceId !in s.hidden } }
+
+    /** Does what was [heard] when it is understood without doubt; false when it is not. */
+    private fun act(heard: List<String>): Boolean {
+        val s = _state.value
+        val result = parseVoice(heard, voiceDevices())
+        if (result is VoiceResult.Run) {
+            runVoice(result.command)
+            return true
+        }
+        // What Alexa does not know is tried when no device of hers was clearly meant.
+        // A remote learnt key by key has no power key to be told about.
+        val remotes = s.shownRemotes.filter { it.kind != RemoteKind.CUSTOM }
+        when (val extra = parseExtras(heard, s.macros.map { it.id to it.name }, remotes.map { it.id to it.name })) {
+            is ExtraCommand.Run -> {
+                val macro = s.macros.first { it.id == extra.macroId }
+                _messages.tryEmit(str(R.string.schedule_run, macro.name))
+                runMacro(macro)
+            }
+            is ExtraCommand.Remote -> {
+                val remote = remotes.first { it.id == extra.remoteId }
+                _messages.tryEmit(str(if (extra.on) R.string.voice_on else R.string.voice_off, remote.name))
+                sendRemote(remote, if (extra.on) "turnOn" else "turnOff")
+            }
+            null -> return false
+        }
+        return true
+    }
+
+    /** Tells what was understood only in part, or not at all. */
+    private fun answer(result: VoiceResult) {
         when (result) {
             is VoiceResult.Run -> runVoice(result.command)
             is VoiceResult.Ask -> _state.update { it.copy(voice = result) }
@@ -1067,7 +1100,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun disconnectAssistant() {
         assistantJob?.cancel()
         assistantStore.disconnect()
-        updateAssistant { storedAssistant(it).copy(chat = emptyList(), pending = null, thinking = false, teach = null) }
+        updateAssistant { storedAssistant(it).copy(teach = null) }
     }
 
     fun setAssistantModel(model: String) {
@@ -1152,149 +1185,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun closeTeaching() {
         assistantJob?.cancel()
         updateAssistant { it.copy(teach = null) }
-    }
-
-    /** Sends [text] to the assistant with the home as it is now, and does what it answers. */
-    fun askAssistant(text: String) {
-        if (!assistantStore.configured || _state.value.assistant.thinking) return
-        val before = _state.value.assistant.chat
-        updateAssistant { it.copy(chat = it.chat + ChatLine(user = true, text = text), thinking = true, pending = null) }
-        _haptics.tryEmit(Haptic.Key)
-        assistantJob?.cancel()
-        assistantJob = viewModelScope.launch {
-            val catalog = assistantCatalog()
-            val history = before.filter { !it.failed && it.text.isNotEmpty() }.takeLast(ASSISTANT_HISTORY)
-                .map { (if (it.user) "user" else "assistant") to it.text } + ("user" to text)
-            val plan = try {
-                val answer = workersAi.command(
-                    assistantStore.accountId(),
-                    assistantStore.token(),
-                    assistantStore.model(),
-                    commandPrompt(catalog, assistantStore.house(), assistantLanguage),
-                    history,
-                )
-                val s = _state.value
-                parsePlan(answer, catalog) { group ->
-                    s.devices.filter { it.applianceId in group.devices && it.applianceId !in s.hidden }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                val message = if (e is java.io.IOException) str(R.string.no_connection) else e.message ?: str(R.string.something_wrong)
-                _haptics.tryEmit(Haptic.Reject)
-                updateAssistant { it.copy(chat = it.chat + ChatLine(false, message, failed = true), thinking = false) }
-                return@launch
-            }
-            val said = listOfNotNull(plan.reply.takeIf { it.isNotEmpty() }, plan.question).distinct().joinToString(" ")
-            val notes = if (plan.ignored > 0) listOf(plural(R.plurals.assistant_ignored, plan.ignored)) else emptyList()
-            // What was left out goes to the log as the model wrote it, to see what it got wrong.
-            if (plan.ignored > 0) android.util.Log.w("Assistant", "Left out: ${plan.rejected}")
-            val steps = plan.steps.map(::assistantStepLabel)
-            when {
-                plan.steps.isEmpty() -> {
-                    val line = ChatLine(false, said.ifEmpty { str(R.string.assistant_nothing) }, notes)
-                    updateAssistant { it.copy(chat = it.chat + line, thinking = false) }
-                }
-                plan.switched > ASSISTANT_CONFIRM_ABOVE -> {
-                    val line = ChatLine(false, listOf(said, str(R.string.assistant_confirm)).filter { it.isNotEmpty() }.joinToString(" "), steps + notes)
-                    updateAssistant { it.copy(chat = it.chat + line, thinking = false, pending = plan) }
-                }
-                else -> {
-                    updateAssistant { it.copy(chat = it.chat + ChatLine(false, said, steps + notes)) }
-                    perform(plan)
-                }
-            }
-        }
-    }
-
-    /** Does the steps waiting for a yes, or drops them. */
-    fun confirmAssistant(run: Boolean) {
-        val plan = _state.value.assistant.pending ?: return
-        updateAssistant { it.copy(pending = null) }
-        if (!run) {
-            updateAssistant { it.copy(chat = it.chat + ChatLine(false, str(R.string.assistant_cancelled))) }
-            return
-        }
-        assistantJob = viewModelScope.launch { perform(plan) }
-    }
-
-    fun clearAssistant() {
-        assistantJob?.cancel()
-        updateAssistant { it.copy(chat = emptyList(), pending = null, thinking = false) }
-    }
-
-    /** Carries out the steps one after the other; one that fails does not stop the others. */
-    private suspend fun perform(plan: AssistantPlan) {
-        updateAssistant { it.copy(thinking = true) }
-        val failures = mutableListOf<String>()
-        for (step in plan.steps) {
-            try {
-                perform(step)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: NotLoggedInException) {
-                _state.update { it.copy(loggedIn = false, loginMessage = e.message) }
-                break
-            } catch (e: java.io.IOException) {
-                failures += str(R.string.assistant_failed_step, assistantStepLabel(step), str(R.string.no_connection))
-            } catch (e: Exception) {
-                failures += str(R.string.assistant_failed_step, assistantStepLabel(step), e.message ?: str(R.string.something_wrong))
-            }
-        }
-        saveCache()
-        _haptics.tryEmit(if (failures.isEmpty()) Haptic.Confirm else Haptic.Reject)
-        updateAssistant { a ->
-            a.copy(thinking = false, chat = a.chat + failures.map { ChatLine(false, it, failed = true) })
-        }
-    }
-
-    private suspend fun perform(step: AssistantStep) {
-        fun known(id: String, change: (DeviceState) -> DeviceState) =
-            _state.update { it.copy(states = it.states + (id to change(it.states[id] ?: DeviceState()).copy(reachable = true))) }
-        when (step) {
-            is AssistantStep.Power -> {
-                if (!step.on) cancelTimer(step.device)
-                api.setPower(step.device, step.on)
-                known(step.device.applianceId) { it.copy(power = step.on) }
-            }
-            is AssistantStep.Brightness -> {
-                api.setBrightness(step.device, step.percent)
-                known(step.device.applianceId) { it.copy(brightness = step.percent, power = true) }
-            }
-            is AssistantStep.Color -> {
-                if (step.choice.white) {
-                    api.setColorTemperature(step.device, step.choice.alexaName)
-                } else {
-                    api.setColor(step.device, step.choice.alexaName)
-                }
-                known(step.device.applianceId) { it.copy(colorName = step.choice.alexaName, power = true) }
-            }
-            is AssistantStep.GroupPower -> for (device in step.devices) {
-                if (!step.on) cancelTimer(device)
-                api.setPower(device, step.on)
-                known(device.applianceId) { it.copy(power = step.on) }
-            }
-            is AssistantStep.Run -> {
-                val outcome = Quick.runMacro(getApplication(), step.macro.id)
-                if (outcome.loginExpired) throw NotLoggedInException(str(R.string.login_expired))
-                if (!outcome.ok) throw Exception(outcome.message)
-            }
-            is AssistantStep.Press -> repeat(step.times) { i ->
-                if (i > 0) delay(PRESS_GAP_MS)
-                press(step.remote, step.key.command, step.parameter, step.key.custom)
-            }
-            is AssistantStep.Ac -> {
-                setAc(step.remote, step.setting)
-                val power = if (step.on) "on" else "off"
-                press(step.remote, "setAll", "${step.setting.temperature},${step.setting.mode},${step.setting.fan},$power", false)
-            }
-            is AssistantStep.Wait -> delay(step.seconds * 1000L)
-        }
-    }
-
-    private suspend fun press(remote: Remote, command: String, parameter: String, custom: Boolean) {
-        val tv = _state.value.lgTvs.find { it.id == remote.id }
-        if (tv != null) tvRemote.send(tv, command, parameter) else switchBot.send(remote, command, parameter, custom)
     }
 
     /** Presses a button of [remote]. Nothing comes back from an appliance: only a failure is told. */

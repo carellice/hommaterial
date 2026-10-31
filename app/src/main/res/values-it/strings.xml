@@ -584,7 +584,7 @@
     <string name="assistant_error">Errore di Cloudflare: %1$s</string>
     <string name="assistant_unreadable">Non riesco a leggere la risposta dell\'assistente. Riprova.</string>
     <string name="s_assistant">Assistente AI</string>
-    <string name="assistant_text">Comanda la casa scrivendo o parlando come faresti con una persona. Funziona con Cloudflare Workers AI e un tuo account gratuito: i nomi di dispositivi, stanze e tasti e le tue richieste vengono inviati a Cloudflare.</string>
+    <string name="assistant_text">Corregge i comandi del microfono in alto: se dici «accendi televisione Flavio» capisce che intendi «TV Flavio». Funziona con Cloudflare Workers AI e un tuo account gratuito: i nomi di dispositivi e stanze e le frasi che detti vengono inviati a Cloudflare.</string>
     <string name="assistant_setup">Configura l\'assistente</string>
     <string name="assistant_setup_text">Ti guido passo per passo: pochi minuti, gratis</string>
     <string name="assistant_linked">Collegato a Cloudflare</string>
@@ -636,31 +636,6 @@
     <string name="assistant_house_hint">Ad esempio: «camera di Flavio» è la cameretta; la TV grande è quella del soggiorno.</string>
     <string name="assistant_notes_none">Ancora nessuna nota sui dispositivi: usa «Insegna all\'assistente».</string>
     <string name="assistant_note_delete">Elimina nota</string>
-    <string name="assistant_button">Assistente AI</string>
-    <string name="assistant_title">Assistente</string>
-    <string name="assistant_hint">Chiedi qualcosa…</string>
-    <string name="assistant_send">Invia</string>
-    <string name="assistant_empty">Dimmi cosa fare, come lo diresti a una persona.</string>
-    <string name="assistant_example1">Alza il volume della TV di 5</string>
-    <string name="assistant_example2">Spegni tutte le luci accese</string>
-    <string name="assistant_example3">Che temperatura c\'è in soggiorno?</string>
-    <string name="assistant_thinking">Ci penso…</string>
-    <string name="assistant_confirm">Devo fare tutto questo?</string>
-    <string name="assistant_run">Esegui</string>
-    <string name="assistant_cancelled">Annullato.</string>
-    <string name="assistant_failed_step">Non riuscito: %1$s (%2$s)</string>
-    <plurals name="assistant_ignored">
-        <item quantity="one">%d azione tralasciata perché non valida.</item>
-        <item quantity="many">%d azioni tralasciate perché non valide.</item>
-        <item quantity="other">%d azioni tralasciate perché non valide.</item>
-    </plurals>
-    <string name="assistant_nothing">Non ho trovato niente da fare.</string>
-    <string name="assistant_clear">Nuova conversazione</string>
     <string name="assistant_dictate">Detta</string>
-    <string name="assistant_step_press">%1$s · %2$s</string>
-    <string name="assistant_step_press_times">%1$s ×%2$d · %3$s</string>
-    <string name="assistant_step_brightness">%1$s al %2$d%%</string>
-    <string name="assistant_step_color">%1$s: %2$s</string>
-    <string name="assistant_step_ac">%1$s a %2$d°</string>
     <string name="backup_assistant">Note dell\'assistente AI</string>
 </resources>

@@ -182,18 +182,17 @@ collegati al proprio account Alexa.
   del lettore e, come tasti propri, le app e gli ingressi del TV. Funzionano
   solo con il telefono sulla stessa rete del TV; per accenderlo da spento va
   attivata sul TV l'accensione dalla rete.
-- Solo su Android, un assistente AI comanda la casa scrivendo o parlando come
-  a una persona («alza il volume 5 volte al televisore in camera di Flavio»).
-  Funziona con Cloudflare Workers AI e un account gratuito dell'utente:
-  Impostazioni → Assistente AI guida passo per passo nella creazione
-  dell'account, dell'Account ID e del token. Al primo collegamento analizza
-  dispositivi, gruppi, dispositivi personalizzati e telecomandi e chiede a
-  parole cosa sono quelli che non capisce; le risposte si correggono in
-  «Cosa sa l'assistente». Il pulsante AI accanto al microfono apre la chat:
-  accende e spegne, regola luminosità e colori, preme i tasti dei telecomandi
-  anche più volte, regola il condizionatore e risponde sugli stati. L'app
-  esegue solo azioni su cose che esistono e chiede conferma quando si
-  accendono o spengono più di cinque cose insieme.
+- Solo su Android, un assistente AI corregge i comandi dati con il microfono in
+  alto: conosce i nomi di dispositivi, stanze, dispositivi personalizzati e
+  telecomandi, e se dici «accendi televisione Flavio» capisce che intendi
+  «TV Flavio». Interviene solo quando la frase non corrisponde già esattamente
+  a un nome; dopo la correzione l'app esegue il comando come sempre, quindi
+  agisce solo su cose che esistono. Funziona con Cloudflare Workers AI e un
+  account gratuito dell'utente: Impostazioni → Assistente AI guida passo per
+  passo nella creazione dell'account, dell'Account ID e del token. Al primo
+  collegamento chiede a parole cosa sono le cose dai nomi poco chiari; le
+  risposte, che aiutano a riconoscere i soprannomi, si correggono in «Cosa sa
+  l'assistente».
 
 - I dispositivi personalizzati sono riquadri che con un tocco eseguono una
   serie di azioni, una dopo l'altra: accendere o spegnere dispositivi,
@@ -276,8 +275,8 @@ istruzioni, con la guida di configurazione passo per passo, sono in
 - Solo se colleghi SwitchBot, l'app parla anche con i server di SwitchBot, per
   elencare i telecomandi e inviare i loro comandi.
 - Solo se configuri l'assistente AI, l'app invia a Cloudflare Workers AI, con
-  il tuo account, le richieste fatte all'assistente, i nomi di dispositivi,
-  stanze e tasti, i loro stati e le note che gli hai insegnato. L'Account ID e
+  il tuo account, le frasi dettate al microfono che l'app non capisce da sola,
+  i nomi di dispositivi, stanze e tasti e le note che gli hai insegnato. L'Account ID e
   il token restano sul telefono e vanno nel backup, come le chiavi di
   SwitchBot.
 - I TV LG si comandano solo sulla rete di casa, senza passare da internet. La

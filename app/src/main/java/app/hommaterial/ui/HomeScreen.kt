@@ -187,8 +187,6 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
 
     state.voice?.let { VoiceDialog(it, vm) }
-    var asking by rememberSaveable { mutableStateOf(false) }
-    if (asking) AssistantScreen(state, vm, onDismiss = { asking = false })
 
     // A wide screen has room for a side bar that splits the home in pages.
     val width = LocalConfiguration.current.screenWidthDp
@@ -257,8 +255,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                     IconButton(onClick = { query = "" }) {
                         Icon(Icons.Outlined.Search, contentDescription = str(R.string.search))
                     }
-                    if (state.assistant.configured) AssistantButton(onClick = { asking = true })
-                    VoiceButton(vm)
+                    VoiceButton(vm, correcting = state.correcting)
                     OverflowMenu(state, vm, onSettings, onArrange = { arranging = true })
                 },
             )
@@ -1165,9 +1162,12 @@ private fun ageText(updatedAt: Long, now: Long): String {
     }
 }
 
-/** Asks the phone's speech recognizer for a sentence and passes on what it heard. */
+/**
+ * Asks the phone's speech recognizer for a sentence and passes on what it heard; it spins while
+ * the assistant is [correcting] the names in it.
+ */
 @Composable
-private fun VoiceButton(vm: HomeViewModel) {
+private fun VoiceButton(vm: HomeViewModel, correcting: Boolean) {
     val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             vm.onSpeech(result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty())
@@ -1186,8 +1186,13 @@ private fun VoiceButton(vm: HomeViewModel) {
                 vm.speechUnavailable()
             }
         },
+        enabled = !correcting,
     ) {
-        Icon(Icons.Outlined.Mic, contentDescription = str(R.string.voice_button))
+        if (correcting) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        } else {
+            Icon(Icons.Outlined.Mic, contentDescription = str(R.string.voice_button))
+        }
     }
 }
 

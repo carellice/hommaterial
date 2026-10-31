@@ -596,7 +596,7 @@
     <string name="assistant_error">Cloudflare error: %1$s</string>
     <string name="assistant_unreadable">The answer of the assistant could not be read. Try again.</string>
     <string name="s_assistant">AI assistant</string>
-    <string name="assistant_text">Control the home by typing or speaking as you would to a person. It runs on Cloudflare Workers AI with a free account of your own: the names of devices, rooms and keys and your requests are sent to Cloudflare.</string>
+    <string name="assistant_text">Corrects the commands of the microphone at the top: say “turn on television Flavio” and it understands you mean “TV Flavio”. It runs on Cloudflare Workers AI with a free account of yours: the names of devices and rooms and what you say are sent to Cloudflare.</string>
     <string name="assistant_setup">Set up the assistant</string>
     <string name="assistant_setup_text">A step-by-step guide, a few minutes and free</string>
     <string name="assistant_linked">Linked to Cloudflare</string>
@@ -646,30 +646,6 @@
     <string name="assistant_house_hint">For example: \"Flavio\'s room\" is the kids\' bedroom; the big TV is the one in the living room.</string>
     <string name="assistant_notes_none">No notes about the devices yet: use \"Teach the assistant\".</string>
     <string name="assistant_note_delete">Delete note</string>
-    <string name="assistant_button">AI assistant</string>
-    <string name="assistant_title">Assistant</string>
-    <string name="assistant_hint">Ask something…</string>
-    <string name="assistant_send">Send</string>
-    <string name="assistant_empty">Tell me what to do, as you would say it to a person.</string>
-    <string name="assistant_example1">Turn the TV volume up by 5</string>
-    <string name="assistant_example2">Switch off all the lights that are on</string>
-    <string name="assistant_example3">What is the temperature in the living room?</string>
-    <string name="assistant_thinking">Thinking…</string>
-    <string name="assistant_confirm">Shall I do all of this?</string>
-    <string name="assistant_run">Do it</string>
-    <string name="assistant_cancelled">Cancelled.</string>
-    <string name="assistant_failed_step">Not done: %1$s (%2$s)</string>
-    <plurals name="assistant_ignored">
-        <item quantity="one">%d action left out because it was not valid.</item>
-        <item quantity="other">%d actions left out because they were not valid.</item>
-    </plurals>
-    <string name="assistant_nothing">I found nothing to do.</string>
-    <string name="assistant_clear">New conversation</string>
     <string name="assistant_dictate">Dictate</string>
-    <string name="assistant_step_press">%1$s · %2$s</string>
-    <string name="assistant_step_press_times">%1$s ×%2$d · %3$s</string>
-    <string name="assistant_step_brightness">%1$s at %2$d%%</string>
-    <string name="assistant_step_color">%1$s: %2$s</string>
-    <string name="assistant_step_ac">%1$s at %2$d°</string>
     <string name="backup_assistant">AI assistant notes</string>
 </resources>

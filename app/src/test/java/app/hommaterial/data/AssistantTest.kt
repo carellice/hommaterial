@@ -40,8 +40,6 @@ class AssistantTest {
         taught = taught,
     )
 
-    private fun plan(json: String) = parsePlan(JSONObject(json), catalog()) { g -> listOf(lamp, plug).filter { it.applianceId in g.devices } }
-
     @Test
     fun theHomeIsWrittenWithShortIds() {
         val text = catalog(listOf(AssistantNote("plug", "Cosa c'è attaccato?", "La lampada del comodino")), taught = setOf("lamp")).describe(true)
@@ -56,64 +54,6 @@ class AssistantTest {
         assertTrue(text.contains("keys: F1"))
         assertFalse(text.contains("lg:1") || text.contains("fan1") || text.contains("ac1"))
         assertFalse(catalog().describe(false).contains("now"))
-    }
-
-    @Test
-    fun aRequestBecomesSteps() {
-        val p = plan(
-            """{"actions":[{"target":"r1","do":"press","command":"volumeAdd","times":5},
-            {"target":"d1","do":"brightness","value":"30%"},{"target":"d1","do":"color","value":"blue"},
-            {"target":"g1","do":"off"},{"target":"m1","do":"run"},{"do":"wait","value":"3"},
-            {"target":"r2","do":"ac","value":"22,2,1,on"},{"target":"R3","do":"press","command":"f1"},
-            {"target":"r1","do":"on"}],"reply":"Fatto","question":""}""",
-        )
-        assertEquals(0, p.ignored)
-        assertEquals("Fatto", p.reply)
-        assertNull(p.question)
-        assertEquals(AssistantStep.Press(tv, AssistantKey("volumeAdd", false, "Volume su"), 5), p.steps[0])
-        assertEquals(AssistantStep.Brightness(lamp, 30), p.steps[1])
-        assertEquals("blue", (p.steps[2] as AssistantStep.Color).choice.alexaName)
-        assertEquals(AssistantStep.GroupPower(group, listOf(lamp, plug), false), p.steps[3])
-        assertEquals(AssistantStep.Run(macro), p.steps[4])
-        assertEquals(AssistantStep.Wait(3), p.steps[5])
-        assertEquals(AssistantStep.Ac(clima, AcSetting(22, 2, 1), true), p.steps[6])
-        assertEquals(AssistantStep.Press(fan, AssistantKey("F1", true, "F1"), 1), p.steps[7])
-        assertEquals(AssistantStep.Press(tv, AssistantKey("turnOn", false, "Accendi"), 1), p.steps[8])
-        assertEquals(3, p.switched)
-    }
-
-    @Test
-    fun whatModelsWriteInsteadIsUnderstood() {
-        val p = plan(
-            """{"actions":[{"target":"r1 (TV camera)","action":"press","command":"volumeAdd=Volume su","times":"5"},
-            {"target":"TV camera","do":"volumeAdd","times":2},{"device":"d1","do":"turn_on"},
-            {"target":"r1","do":"press","command":"Netflix"},{"target":"d1","do":"brightness","value":30},
-            {"target":"m1","do":"start"},{"do":"pause","seconds":2}],"reply":"ok"}""",
-        )
-        assertEquals(emptyList<String>(), p.rejected)
-        val volume = AssistantKey("volumeAdd", false, "Volume su")
-        assertEquals(AssistantStep.Press(tv, volume, 5), p.steps[0])
-        assertEquals(AssistantStep.Press(tv, volume, 2), p.steps[1])
-        assertEquals(AssistantStep.Power(lamp, true), p.steps[2])
-        assertEquals("app:netflix", (p.steps[3] as AssistantStep.Press).key.command)
-        assertEquals(AssistantStep.Brightness(lamp, 30), p.steps[4])
-        assertEquals(AssistantStep.Run(macro), p.steps[5])
-        assertEquals(AssistantStep.Wait(2), p.steps[6])
-        assertTrue(plan("""{"actions":[{"target":"d9","do":"on"}]}""").rejected.single().contains("d9"))
-    }
-
-    @Test
-    fun whatDoesNotExistIsLeftOut() {
-        val p = plan(
-            """{"actions":[{"target":"d9","do":"on"},{"target":"d2","do":"brightness","value":"50"},
-            {"target":"r1","do":"press","command":"volumeAdd","times":500},{"target":"r1","do":"press","command":"HACK"},
-            {"target":"d1","do":"color","value":"plaid"},{"target":"r2","do":"ac","value":"40,2,1,on"},
-            {"target":"d3","do":"on"},{"do":"wait","value":"600"},{"target":"r3","do":"on"},"x"],
-            "reply":"","question":"Quale TV?"}""",
-        )
-        assertTrue(p.steps.isEmpty())
-        assertEquals(10, p.ignored)
-        assertEquals("Quale TV?", p.question)
     }
 
     @Test
@@ -133,11 +73,22 @@ class AssistantTest {
     }
 
     @Test
+    fun theNamesToCorrectAreWhatVoiceCanReach() {
+        val names = catalog(listOf(AssistantNote("plug", "Cosa c'è attaccato?", "La lampada del comodino"))).names()
+        assertTrue(names, names.contains("\"Luce scrivania\" (device, in \"Camera di Flavio\")"))
+        assertTrue(names.contains("\"Presa 2\" (device) — owner's notes: Cosa c'è attaccato? La lampada del comodino"))
+        assertTrue(names.contains("\"Film\" (custom device, in \"Soggiorno\")"))
+        assertTrue(names.contains("\"TV camera\" (remote, in \"Camera di Flavio\")"))
+        assertTrue(names.contains("Rooms: \"Camera di Flavio\", \"Soggiorno\""))
+        // A sensor is not switched, a group is not reached by voice, and the keys are not names.
+        assertFalse(names.contains("Termometro") || names.contains("Luci") || names.contains("Volume su"))
+    }
+
+    @Test
     fun promptsCarryTheHome() {
-        val prompt = commandPrompt(catalog(), "Flavio è mio figlio", "Italian")
+        val prompt = correctionPrompt(catalog(), "Flavio è mio figlio")
         assertTrue(prompt.contains("Flavio è mio figlio"))
-        assertTrue(prompt.contains("d1: device"))
-        assertTrue(prompt.contains("in Italian"))
+        assertTrue(prompt.contains("\"TV camera\" (remote"))
         assertTrue(questionsPrompt(catalog(), "", "Italian").contains("[NEW]"))
     }
 
@@ -151,24 +102,25 @@ class AssistantTest {
 
     @Test
     fun answersComeBackAsJson() = runBlocking {
-        server.enqueue(MockResponse().setBody("""{"success":true,"errors":[],"result":{"response":{"actions":[],"reply":"Ciao"}}}"""))
+        server.enqueue(MockResponse().setBody("""{"success":true,"errors":[],"result":{"response":{"text":" accendi TV Flavio "}}}"""))
         server.enqueue(MockResponse().setBody("""{"success":true,"errors":[],"result":{"response":"Sure! {\"questions\":[]}"}}"""))
-        val answer = client().command(account, "tok", ASSISTANT_MODELS[0], "sys", listOf("user" to "ciao"))
-        assertEquals("Ciao", answer.getString("reply"))
+        val answer = client().correct(account, "tok", ASSISTANT_MODELS[0], "sys", listOf("accendi televisione flavio", "accendi tv flavia"))
+        assertEquals("accendi TV Flavio", answer)
         val request = server.takeRequest()
         assertEquals("/client/v4/accounts/$account/ai/run/${ASSISTANT_MODELS[0]}", request.path)
         assertEquals("Bearer tok", request.getHeader("Authorization"))
         val body = JSONObject(request.body.readUtf8())
         assertEquals("json_schema", body.getJSONObject("response_format").getString("type"))
         assertEquals("system", body.getJSONArray("messages").getJSONObject(0).getString("role"))
+        assertEquals("1. accendi televisione flavio\n2. accendi tv flavia", body.getJSONArray("messages").getJSONObject(1).getString("content"))
         assertEquals(0, client().questions(account, "tok", ASSISTANT_MODELS[0], "sys").getJSONArray("questions").length())
     }
 
     @Test
     fun aSchemaTheModelCannotKeepIsDroppedOnce() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"success":false,"errors":[{"code":5006,"message":"JSON Mode couldn't be met"}]}"""))
-        server.enqueue(MockResponse().setBody("""{"success":true,"result":{"response":"{\"actions\":[],\"reply\":\"ok\"}"}}"""))
-        assertEquals("ok", client().command(account, "tok", ASSISTANT_MODELS[0], "sys", emptyList()).getString("reply"))
+        server.enqueue(MockResponse().setBody("""{"success":true,"result":{"response":"{\"text\":\"ok\"}"}}"""))
+        assertEquals("ok", client().correct(account, "tok", ASSISTANT_MODELS[0], "sys", listOf("ok")))
         server.takeRequest()
         assertFalse(JSONObject(server.takeRequest().body.readUtf8()).has("response_format"))
     }
