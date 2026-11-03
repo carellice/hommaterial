@@ -122,6 +122,44 @@ public sealed partial class MainWindow
         }
         body.Children.Add(media);
 
+        // Written in the text field open on the TV, as its search, while typed here; Enter sends it.
+        var keyboard = new TextBox { Header = "Scrivi sul TV", PlaceholderText = "Apri un campo di testo sul TV, poi scrivi qui" };
+        var sent = ""; var typing = false; var told = false;
+        async Task TypeAsync()
+        {
+            if (typing) return;
+            typing = true;
+            try
+            {
+                // One change at a time, always the last one, so that only the difference goes.
+                while (keyboard.Text != sent)
+                {
+                    var typed = keyboard.Text;
+                    await lgTv.TypeAsync(tv, sent, typed, lifetime.Token);
+                    sent = typed; told = false;
+                }
+            }
+            catch (Exception error) when (error is not OperationCanceledException) { if (!told) ShowError(error); told = true; }
+            finally { typing = false; }
+        }
+        keyboard.TextChanged += (_, _) => _ = TypeAsync();
+        async Task EnterAsync()
+        {
+            while (typing) await Task.Delay(50, lifetime.Token);
+            await lgTv.EnterAsync(tv, lifetime.Token);
+            // The TV closes its keyboard on Enter: the next text starts anew.
+            sent = ""; keyboard.Text = "";
+        }
+        keyboard.KeyDown += async (_, e) =>
+        {
+            if (e.Key != global::Windows.System.VirtualKey.Enter) return;
+            e.Handled = true;
+            try { await EnterAsync(); } catch (Exception error) when (error is not OperationCanceledException) { ShowError(error); }
+        };
+        var keyboardActions = Row(8);
+        keyboardActions.Children.Add(AsyncButton("Invio", EnterAsync));
+        body.Children.Add(keyboard); body.Children.Add(keyboardActions);
+
         // The sources, such as the HDMI ports, asked to the TV as the panel opens like its apps.
         var sources = new ComboBox { Header = "Sorgente", HorizontalAlignment = HorizontalAlignment.Stretch, PlaceholderText = "Chiedo al TV le sue sorgenti…" };
         void FillSources(Dictionary<string, string>? known)

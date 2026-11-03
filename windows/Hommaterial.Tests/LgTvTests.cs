@@ -19,6 +19,10 @@ static class LgTvTests
             && LgTvClient.Action("SetChannel", "uno") is null && LgTvClient.Action("setVolume", "120") is null, "TV LG: canale per numero e volume nei limiti");
         check(LgTvClient.Action("app:netflix") is WebOsCall { Uri: "ssap://system.launcher/launch" } app && app.Payload?["id"]?.ToString() == "netflix"
             && LgTvClient.Action("key:UP") is WebOsKey { Name: "UP" } && LgTvClient.Action("key:up\nname:POWER") is null && LgTvClient.Action("selfDestruct") is null, "TV LG: app, tasti e comandi sconosciuti");
+        var more = LgTvClient.Typing("cia", "ciao"); var changed = LgTvClient.Typing("casa", "cane"); var emoji = LgTvClient.Typing("a😀", "a");
+        check(LgTvClient.Typing("ciao", "ciao").Count == 0 && more is [{ Uri: "ssap://com.webos.service.ime/insertText" } insert] && insert.Payload?["text"]?.ToString() == "o"
+            && changed is [{ Uri: "ssap://com.webos.service.ime/deleteCharacters" } delete, { } write] && delete.Payload?["count"]?.GetValue<int>() == 2 && write.Payload?["text"]?.ToString() == "ne"
+            && emoji is [{ } one] && one.Payload?["count"]?.GetValue<int>() == 1, "TV LG: la tastiera manda solo ciò che cambia");
         var register = LgTvClient.RegisterMessage(null);
         check(register["payload"]?["pairingType"]?.ToString() == "PROMPT" && register["payload"]?["client-key"] is null
             && LgTvClient.RegisterMessage("abc")["payload"]?["client-key"]?.ToString() == "abc", "TV LG: registrazione con la chiave solo quando c'è");

@@ -50,6 +50,26 @@ class LgTvTest {
     }
 
     @Test
+    fun typingSendsOnlyWhatChanged() {
+        assertEquals(emptyList<WebOsAction.Call>(), webOsTyping("ciao", "ciao"))
+        val more = webOsTyping("cia", "ciao").single()
+        assertEquals("ssap://com.webos.service.ime/insertText", more.uri)
+        assertEquals("o", more.payload.getString("text"))
+        val less = webOsTyping("ciao", "ci").single()
+        assertEquals("ssap://com.webos.service.ime/deleteCharacters", less.uri)
+        assertEquals(2, less.payload.getInt("count"))
+        val changed = webOsTyping("casa", "cane")
+        assertEquals(2, changed[0].payload.getInt("count"))
+        assertEquals("ne", changed[1].payload.getString("text"))
+        // An emoji is one character for the TV, though two for Kotlin.
+        val emoji = webOsTyping("a😀", "a")
+        assertEquals(1, emoji.single().payload.getInt("count"))
+        val swapped = webOsTyping("😀", "😁")
+        assertEquals(1, swapped[0].payload.getInt("count"))
+        assertEquals("😁", swapped[1].payload.getString("text"))
+    }
+
+    @Test
     fun theRegistrationCarriesTheKeyOnlyOnceGiven() {
         val first = webOsRegister(null)
         assertEquals("register", first.getString("type"))

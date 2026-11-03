@@ -1061,6 +1061,22 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Writes in the text field open on [remote], an LG TV, turning what was [sent] into [typed];
+     * false when the TV did not take it. [quiet] keeps the failure untold, as when already told.
+     */
+    suspend fun typeOnLgTv(remote: Remote, sent: String, typed: String, quiet: Boolean = false): Boolean {
+        val tv = _state.value.lgTvs.find { it.id == remote.id } ?: return false
+        return guarded(quiet) { tvRemote.type(tv, sent, typed) }
+    }
+
+    /** Presses Enter on the keyboard of [remote], an LG TV. */
+    suspend fun enterOnLgTv(remote: Remote): Boolean {
+        val tv = _state.value.lgTvs.find { it.id == remote.id } ?: return false
+        _haptics.tryEmit(Haptic.Key)
+        return guarded { tvRemote.enter(tv) }.also { if (!it) _haptics.tryEmit(Haptic.Reject) }
+    }
+
     /** Shows a message on [tv], to see that it answers. */
     fun testLgTv(tv: LgTv) {
         _state.update { it.copy(busy = it.busy + tv.id) }

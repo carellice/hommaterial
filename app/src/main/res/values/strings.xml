@@ -375,6 +375,10 @@
     <string name="lgtv_source">Source</string>
     <string name="lgtv_sources_loading">Asking the TV for its sources…</string>
     <string name="lgtv_sources_none">The TV does not answer: turn it on to see its sources.</string>
+    <string name="lgtv_keyboard">Keyboard</string>
+    <string name="lgtv_keyboard_how">Open a text field on the TV, such as the search of an app, then write here: the text appears on the TV as you type.</string>
+    <string name="lgtv_keyboard_text">Text for the TV</string>
+    <string name="lgtv_keyboard_enter">Enter</string>
     <string name="close">Close</string>
     <string name="lgtv_apps">Apps and inputs</string>
     <string name="lgtv_keys">Keys</string>

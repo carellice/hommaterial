@@ -363,6 +363,10 @@
     <string name="lgtv_source">Sorgente</string>
     <string name="lgtv_sources_loading">Chiedo al TV le sue sorgenti…</string>
     <string name="lgtv_sources_none">Il TV non risponde: accendilo per vedere le sue sorgenti.</string>
+    <string name="lgtv_keyboard">Tastiera</string>
+    <string name="lgtv_keyboard_how">Apri un campo di testo sul TV, come la ricerca di un\'app, poi scrivi qui: il testo compare sul TV mentre scrivi.</string>
+    <string name="lgtv_keyboard_text">Testo per il TV</string>
+    <string name="lgtv_keyboard_enter">Invio</string>
     <string name="close">Chiudi</string>
     <string name="lgtv_apps">App e ingressi</string>
     <string name="lgtv_keys">Tasti</string>

@@ -217,6 +217,22 @@ internal fun webOsInputs(payload: JSONObject): Map<String, String> =
         .filter { (id, _) -> id.isNotEmpty() }
         .associate { (id, label) -> id to label.ifBlank { id } }
 
+/**
+ * What turns the text [sent] to the TV into [typed], on the keyboard the TV shows in its text
+ * fields: the characters after what the two share are deleted, then the new ones written.
+ */
+internal fun webOsTyping(sent: String, typed: String): List<WebOsAction.Call> {
+    var same = sent.commonPrefixWith(typed).length
+    // Not halfway into a character made of two, as an emoji.
+    if (same > 0 && Character.isHighSurrogate(sent[same - 1])) same--
+    val removed = sent.codePointCount(same, sent.length)
+    val added = typed.substring(same)
+    return buildList {
+        if (removed > 0) add(WebOsAction.Call("ssap://com.webos.service.ime/deleteCharacters", JSONObject().put("count", removed)))
+        if (added.isNotEmpty()) add(WebOsAction.Call("ssap://com.webos.service.ime/insertText", JSONObject().put("text", added).put("replace", 0)))
+    }
+}
+
 internal fun ssdpSearch(): String =
     "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 2\r\nST: $SSDP_TARGET\r\n\r\n"
 
@@ -328,6 +344,17 @@ class LgTvClient(private val http: OkHttpClient, private val port: Int = WEBOS_P
     /** The sources of [tv], by id, such as the HDMI ports and the antenna. */
     suspend fun inputs(tv: LgTv): Map<String, String> = session(tv) {
         webOsInputs(it.main.call(WebOsAction.Call("ssap://tv/getExternalInputList")))
+    }
+
+    /** Turns the text [sent] in the field open on [tv] into [typed]; see [webOsTyping]. */
+    suspend fun type(tv: LgTv, sent: String, typed: String) {
+        val calls = webOsTyping(sent, typed)
+        if (calls.isNotEmpty()) session(tv) { connection -> calls.forEach { connection.main.call(it) } }
+    }
+
+    /** Presses Enter on the keyboard of [tv], as at the end of a search. */
+    suspend fun enter(tv: LgTv) {
+        session(tv) { it.main.call(WebOsAction.Call("ssap://com.webos.service.ime/sendEnterKey")) }
     }
 
     /** Closes the connections kept open. */

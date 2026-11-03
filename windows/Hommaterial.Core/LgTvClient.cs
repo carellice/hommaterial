@@ -105,6 +105,21 @@ public sealed class LgTvClient(int port = 3001) : IDisposable
                 inputs.TryAdd(id, device["label"]?.ToString() is { } label && !string.IsNullOrWhiteSpace(label) ? label : id);
         return inputs;
     }
+    // What turns the text sent to the TV into the one typed, on the keyboard the TV shows in its text fields: the
+    // characters after what the two share are deleted, then the new ones written.
+    public static List<WebOsCall> Typing(string sent, string typed)
+    {
+        var same = 0;
+        while (same < sent.Length && same < typed.Length && sent[same] == typed[same]) same++;
+        // Not halfway into a character made of two, as an emoji.
+        if (same > 0 && char.IsHighSurrogate(sent[same - 1])) same--;
+        var removed = 0;
+        for (var i = same; i < sent.Length; i++) if (!char.IsLowSurrogate(sent[i])) removed++;
+        var calls = new List<WebOsCall>();
+        if (removed > 0) calls.Add(new WebOsCall("ssap://com.webos.service.ime/deleteCharacters", new() { ["count"] = removed }));
+        if (same < typed.Length) calls.Add(new WebOsCall("ssap://com.webos.service.ime/insertText", new() { ["text"] = typed[same..], ["replace"] = 0 }));
+        return calls;
+    }
     static bool IsMac(string text) => System.Text.RegularExpressions.Regex.IsMatch(text, "^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$");
     // The magic packet: six bytes 0xFF, then the address sixteen times.
     public static byte[] WakePacket(string mac)
@@ -197,6 +212,18 @@ public sealed class LgTvClient(int port = 3001) : IDisposable
 
     public Task<Dictionary<string, string>> InputsAsync(LgTv tv, CancellationToken cancellation = default) =>
         WithSessionAsync(tv, async k => Inputs(await k.Main.CallAsync(new WebOsCall("ssap://tv/getExternalInputList"), cancellation)), cancellation);
+
+    // Turns the text sent to the field open on the TV into the one typed; see Typing.
+    public async Task TypeAsync(LgTv tv, string sent, string typed, CancellationToken cancellation = default)
+    {
+        var calls = Typing(sent, typed);
+        if (calls.Count == 0) return;
+        await WithSessionAsync(tv, async k => { foreach (var call in calls) await k.Main.CallAsync(call, cancellation); return true; }, cancellation);
+    }
+
+    // Presses Enter on the keyboard of the TV, as at the end of a search.
+    public Task EnterAsync(LgTv tv, CancellationToken cancellation = default) =>
+        WithSessionAsync(tv, k => k.Main.CallAsync(new WebOsCall("ssap://com.webos.service.ime/sendEnterKey"), cancellation), cancellation);
 
     // Wakes the TV from standby, which works only while its network stays on.
     public static async Task WakeAsync(LgTv tv, CancellationToken cancellation = default)

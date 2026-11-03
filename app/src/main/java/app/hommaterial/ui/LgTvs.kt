@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.outlined.FastForward
 import androidx.compose.material.icons.outlined.FastRewind
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Pause
@@ -43,15 +45,20 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -166,6 +173,8 @@ internal fun LgControls(remote: Remote, state: UiState, vm: HomeViewModel) {
     fun press(key: String) = vm.sendRemote(remote, "key:$key")
     var choosingSource by remember { mutableStateOf(false) }
     if (choosingSource) LgSourceDialog(remote, state, vm, onDismiss = { choosingSource = false })
+    var typing by remember { mutableStateOf(false) }
+    if (typing) LgKeyboardDialog(remote, vm, onDismiss = { typing = false })
     Column(
         Modifier.fillMaxWidth().padding(top = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -211,11 +220,69 @@ internal fun LgControls(remote: Remote, state: UiState, vm: HomeViewModel) {
             }
         }
     }
-    FilledTonalButton(onClick = { choosingSource = true }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-        Icon(Icons.AutoMirrored.Outlined.Input, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(str(R.string.lgtv_source))
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        FilledTonalButton(onClick = { choosingSource = true }, modifier = Modifier.weight(1f)) {
+            Icon(Icons.AutoMirrored.Outlined.Input, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(str(R.string.lgtv_source), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        FilledTonalButton(onClick = { typing = true }, modifier = Modifier.weight(1f)) {
+            Icon(Icons.Outlined.Keyboard, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(str(R.string.lgtv_keyboard), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
+}
+
+/**
+ * The keyboard of the phone for the text fields of the TV, as its search: what is written here
+ * goes to the TV as it is typed, and Enter sends it.
+ */
+@Composable
+private fun LgKeyboardDialog(remote: Remote, vm: HomeViewModel, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf("") }
+    var enters by remember { mutableIntStateOf(0) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    LaunchedEffect(remote.id) {
+        // What the TV has, so that only the difference goes; one change at a time, the last one.
+        var sent = ""
+        var entered = 0
+        var told = false
+        snapshotFlow { text to enters }.collect { (typed, enter) ->
+            if (typed != sent) {
+                if (vm.typeOnLgTv(remote, sent, typed, quiet = told)) sent = typed else told = true
+            }
+            if (enter > entered) {
+                entered = enter
+                // The TV closes its keyboard on Enter: the next text starts anew.
+                if (vm.enterOnLgTv(remote)) {
+                    sent = ""
+                    text = ""
+                }
+            }
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.lgtv_keyboard)) },
+        text = {
+            Column {
+                Text(str(R.string.lgtv_keyboard_how), style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text(str(R.string.lgtv_keyboard_text)) },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { enters++ }),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp).focusRequester(focus),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { enters++ }) { Text(str(R.string.lgtv_keyboard_enter)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.close)) } },
+    )
 }
 
 /** The sources of the TV, such as its HDMI ports, asked to it as the dialog opens: a tap switches to one. */
