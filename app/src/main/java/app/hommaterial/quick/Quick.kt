@@ -17,6 +17,7 @@ import app.hommaterial.data.History
 import app.hommaterial.data.LG_PREFIX
 import app.hommaterial.data.LgTvs
 import app.hommaterial.data.NotLoggedInException
+import app.hommaterial.data.ServerSync
 import app.hommaterial.data.SwitchBot
 import app.hommaterial.str
 import java.io.IOException
@@ -205,8 +206,18 @@ object Quick {
             Outcome(false, e.message ?: str(R.string.something_wrong))
         }
 
+    /** Says [text] briefly at the bottom of the screen, from anywhere. */
+    fun toast(context: Context, text: String) {
+        scope.launch { Toast.makeText(context.applicationContext, text, Toast.LENGTH_SHORT).show() }
+    }
+
     /** Fetches the current state of what the widget shows and of the sensors; failures leave things as they are. */
     suspend fun fetchFavorites(context: Context) {
+        // The home server reads them all the time: the phone takes its copy, and what it did.
+        if (ServerSync.active) {
+            runCatching { ServerSync.pull() }
+            return
+        }
         val cache = Cache(context)
         val hidden = cache.hidden()
         val favorites = cache.favorites()

@@ -1,5 +1,6 @@
 package app.hommaterial.data
 
+import app.hommaterial.App
 import app.hommaterial.R
 import app.hommaterial.str
 import kotlinx.coroutines.CancellationException
@@ -64,7 +65,17 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
         }
 
     /** Controllable devices and sensors, each tagged with its Alexa room. */
-    suspend fun devices(): List<Device> = coroutineScope {
+    suspend fun devices(): List<Device> {
+        // On the home server the list comes from there, read anew.
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/alexa/refresh", JSONObject())
+            ServerSync.pull()
+            return Cache(App.instance).devices()
+        }
+        return amazonDevices()
+    }
+
+    private suspend fun amazonDevices(): List<Device> = coroutineScope {
         val endpoints = async { call("POST", "/nexus/v1/graphql", JSONObject().put("query", DEVICES_QUERY)) }
         val groups = async { call("GET", "/api/phoenix/group") }
 
@@ -104,6 +115,11 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
     /** Current state of every given device, keyed by applianceId. */
     suspend fun states(devices: List<Device>): Map<String, DeviceState> {
         if (devices.isEmpty()) return emptyMap()
+        if (ServerSync.active) {
+            val answer = ServerSync.call("POST", "/api/alexa/states", JSONObject().put("ids", JSONArray(devices.map { it.applianceId })))
+            val states = answer.optJSONObject("states") ?: JSONObject()
+            return states.keys().asSequence().associateWith { DeviceState.fromJson(states.getJSONObject(it)) }
+        }
         val requests = JSONArray(
             devices.map { JSONObject().put("entityId", it.applianceId).put("entityType", "APPLIANCE") },
         )
@@ -139,6 +155,7 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
      * Meant to be copied out of the app when support for a new kind of device is being written.
      */
     suspend fun diagnostics(device: Device): String {
+        if (ServerSync.active) return ServerSync.call("GET", "/api/alexa/diagnostics/${ServerSync.encode(device.applianceId)}").optString("text")
         fun find(response: JSONObject) =
             response.optJSONObject("data")?.optJSONObject("endpoints")?.optJSONArray("items")
                 ?.mapObjects { it }
@@ -174,18 +191,27 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
     }
 
     suspend fun setPower(device: Device, on: Boolean) =
-        control(device, JSONObject().put("action", if (on) "turnOn" else "turnOff"))
+        if (ServerSync.active) server(device, JSONObject().put("action", "power").put("on", on))
+        else control(device, JSONObject().put("action", if (on) "turnOn" else "turnOff"))
 
     suspend fun setBrightness(device: Device, percent: Int) =
-        control(device, JSONObject().put("action", "setBrightness").put("brightness", percent))
+        if (ServerSync.active) server(device, JSONObject().put("action", "brightness").put("brightness", percent))
+        else control(device, JSONObject().put("action", "setBrightness").put("brightness", percent))
 
     /** [colorName] is one of the names Alexa gives to colors, such as "red" or "sky_blue". */
     suspend fun setColor(device: Device, colorName: String) =
-        control(device, JSONObject().put("action", "setColor").put("colorName", colorName))
+        if (ServerSync.active) server(device, JSONObject().put("action", "color").put("color", colorName).put("white", false))
+        else control(device, JSONObject().put("action", "setColor").put("colorName", colorName))
 
     /** [whiteName] is one of the names Alexa gives to shades of white, such as "warm_white". */
     suspend fun setColorTemperature(device: Device, whiteName: String) =
-        control(device, JSONObject().put("action", "setColorTemperature").put("colorTemperatureName", whiteName))
+        if (ServerSync.active) server(device, JSONObject().put("action", "color").put("color", whiteName).put("white", true))
+        else control(device, JSONObject().put("action", "setColorTemperature").put("colorTemperatureName", whiteName))
+
+    /** A command through the home server, which speaks to Alexa with its own sign-in. */
+    private suspend fun server(device: Device, body: JSONObject) {
+        ServerSync.call("POST", "/api/alexa/control", body.put("applianceId", device.applianceId))
+    }
 
     private suspend fun control(device: Device, parameters: JSONObject) {
         val request = JSONObject()

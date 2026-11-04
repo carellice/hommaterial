@@ -264,6 +264,21 @@ route('POST', '/api/alexa/login', async (req, res) => {
   ok(res)
 })
 
+/** The sign-in made by the Android app, given to the server: the phone keeps using its own page of Amazon. */
+route('POST', '/api/alexa/token', async (req, res) => {
+  const { refreshToken, marketplace } = await readJson<{ refreshToken?: string; marketplace?: string }>(req)
+  const value = text(refreshToken, 5000).trim()
+  if (!value) throw new HttpError(400, str('something_wrong'))
+  await alexa.adoptToken(value, marketplace ? text(marketplace, 40) : null)
+  data.touch()
+  try {
+    await engine.refresh()
+  } catch {
+    // The app asks again by itself.
+  }
+  ok(res)
+})
+
 route('POST', '/api/alexa/logout', (_req, res) => {
   alexa.logout()
   // What Amazon gave goes, with the timers, the schedules and the automations that act on it.
@@ -285,6 +300,19 @@ route('POST', '/api/alexa/poll', async (req, res) => {
   await engine.poll(Array.isArray(ids) ? ids.map(String) : null)
   json(res, 200, { revision: data.revision() })
 })
+
+/** The states of the devices asked, read now: for the Android app, which shows them at once. */
+route('POST', '/api/alexa/states', async (req, res) => {
+  const { ids } = await readJson<{ ids?: string[] }>(req)
+  const list = (Array.isArray(ids) ? ids : []).map((it) => text(it, 300))
+  const known = new Set(data.get<{ applianceId: string }[]>('devices').map((d) => d.applianceId))
+  const fresh = await alexa.states(list.filter((id) => known.has(id)))
+  engine.received(fresh)
+  json(res, 200, { states: fresh })
+})
+
+/** What happened on the server since the last note the Android app showed. */
+route('GET', '/api/notices', (_req, res, _p, url) => json(res, 200, { notices: engine.notices(Number(url.searchParams.get('after') ?? 0)) }))
 
 function requireDevice(id: string) {
   const device = engine.device(id)
@@ -364,11 +392,14 @@ route('POST', '/api/schedules', async (req, res) => {
   if (!Number.isFinite(at)) throw new HttpError(400, str('something_wrong'))
   const days = (Array.isArray(body.days) ? body.days : []).map(Number).filter((d) => Number.isInteger(d) && d >= 1 && d <= 7)
   const time = new Date(at)
+  // The Android app gives its own id, so that the schedule keeps it on both sides.
+  const id = /^[\w-]{8,64}$/.test(String((body as { id?: string }).id ?? '')) ? String((body as { id?: string }).id) : randomUUID()
+  const enabled = (body as { enabled?: boolean }).enabled !== false
   const schedule = {
-    id: randomUUID(), action: action(body.action), label: text(body.label, 300), at,
-    hour: time.getHours(), minute: time.getMinutes(), days: [...new Set(days)], enabled: true,
+    id, action: action(body.action), label: text(body.label, 300), at,
+    hour: time.getHours(), minute: time.getMinutes(), days: [...new Set(days)], enabled,
   }
-  engine.saveSchedules([...data.get<Schedule[]>('schedules'), schedule])
+  engine.saveSchedules([...data.get<Schedule[]>('schedules').filter((it) => it.id !== id), schedule])
   json(res, 200, schedule)
 })
 
@@ -395,10 +426,10 @@ route('POST', '/api/automations', async (req, res) => {
   const device = requireDevice(text(body.device, 200))
   if (!TRIGGERS.includes(String(body.trigger)) || !Number.isFinite(Number(body.threshold ?? 0))) throw new HttpError(400, str('something_wrong'))
   const automation: Automation = {
-    id: randomUUID(), device: device.applianceId, trigger: String(body.trigger), threshold: Number(body.threshold ?? 0),
-    action: action(body.action), title: text(body.title, 300), label: text(body.label, 300), enabled: true,
+    id: /^[\w-]{8,64}$/.test(String(body.id ?? '')) ? String(body.id) : randomUUID(), device: device.applianceId, trigger: String(body.trigger), threshold: Number(body.threshold ?? 0),
+    action: action(body.action), title: text(body.title, 300), label: text(body.label, 300), enabled: body.enabled !== false,
   }
-  data.set('automations', [...data.get<Automation[]>('automations'), automation])
+  data.set('automations', [...data.get<Automation[]>('automations').filter((a) => a.id !== automation.id), automation])
   engine.armAutomation(automation)
   json(res, 200, automation)
 })
@@ -611,6 +642,21 @@ route('POST', '/api/assistant/questions', async (req, res) => {
   })
 })
 
+/**
+ * The Android app writes its own instructions, from what it knows of the home: the server only
+ * adds the keys. [kind] is "correct", with the guesses heard, or "questions".
+ */
+route('POST', '/api/assistant/ask', async (req, res) => {
+  const { kind, system, heard } = await readJson<{ kind?: string; system?: string; heard?: string[] }>(req)
+  const prompt = text(system, 60_000)
+  if (kind === 'correct') {
+    const guesses = (Array.isArray(heard) ? heard : []).map((it) => text(it, 500)).filter((it) => it.trim())
+    json(res, 200, { text: guesses.length ? await assistant.correct(prompt, guesses) : '' })
+  } else {
+    json(res, 200, { answer: await assistant.questions(prompt) })
+  }
+})
+
 // --- backup, in the format of the Android app ----------------------------------------------------
 
 /** What the backup holds besides the choices: the keys, which only the server knows. */
@@ -657,6 +703,50 @@ route('POST', '/api/backup/restore', async (req, res) => {
   }
   data.touch()
   json(res, 200, { switchBot: linked })
+})
+
+/**
+ * Replaces the choices of the account with a whole backup in the format of the Android app: what
+ * the phone sends when it starts using the server with the data it already has.
+ */
+route('POST', '/api/backup/import', async (req, res) => {
+  const backup = await readJson<Record<string, any>>(req)
+  if (backup?.app !== 'hommaterial' || backup.version !== 1) throw new HttpError(400, str('backup_invalid'))
+  const list = (v: unknown) => (Array.isArray(v) ? v.map(String) : [])
+  const object = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {})
+  const alerts: Record<string, { above: number | null; below: number | null }> = {}
+  for (const [id, a] of Object.entries(object(backup.alerts) as Record<string, any>)) {
+    alerts[id] = { above: Number.isFinite(a?.above) ? a.above : null, below: Number.isFinite(a?.below) ? a.below : null }
+  }
+  const now = Date.now()
+  const schedules = (Array.isArray(backup.schedules) ? backup.schedules : [])
+    .map((it: Schedule) => (it.days?.length && it.enabled && it.at <= now ? { ...it, at: nextTime(it.hour, it.minute, it.days, now) } : it))
+    .filter((it: Schedule) => it.days?.length || it.at > now)
+  data.edit({
+    favorites: list(backup.favorites), hidden: list(backup.hidden), rooms: object(backup.rooms), roomList: list(backup.roomList),
+    groups: Array.isArray(backup.groups) ? backup.groups : [], macros: Array.isArray(backup.macros) ? backup.macros : [],
+    order: object(backup.order), tileSpans: object(backup.tileSpans), shortcuts: Array.isArray(backup.shortcuts) ? backup.shortcuts : null,
+    widget: backup.widget ?? null, tiles: Array.from({ length: 10 }, (_, i) => backup.tiles?.[i] ?? null),
+    schedules, automations: Array.isArray(backup.automations) ? backup.automations : [], alerts,
+    remoteButtons: object(backup.remoteButtons), hiddenRemotes: list(backup.hiddenRemotes),
+    autoUpdate: backup.autoUpdate !== false, haptics: backup.haptics !== false, hapticLevel: Number(backup.hapticLevel ?? 70),
+    assistantNotes: Array.isArray(backup.assistant?.notes) ? backup.assistant.notes : [],
+    assistantHouse: String(backup.assistant?.house ?? ''), assistantTaught: list(backup.assistant?.taught),
+  })
+  for (const automation of data.get<Automation[]>('automations')) engine.armAutomation(automation)
+  for (const id of Object.keys(alerts)) engine.resetAlert(id)
+  if (Array.isArray(backup.lgTvs)) lgtv.replaceAll(backup.lgTvs)
+  if (backup.switchBot?.token) {
+    switchBot.connect(text(backup.switchBot.token, 500), text(backup.switchBot.secret, 500))
+    try {
+      data.set('remotes', await switchBot.fetchRemotes())
+    } catch {
+      // The remotes come with the next refresh.
+    }
+  }
+  if (backup.assistantKeys?.token) assistant.connect(text(backup.assistantKeys.accountId, 100), text(backup.assistantKeys.token, 500))
+  data.touch()
+  ok(res)
 })
 
 // --- push ----------------------------------------------------------------------------------------

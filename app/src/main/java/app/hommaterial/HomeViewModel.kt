@@ -16,15 +16,8 @@ import app.hommaterial.data.AssistantException
 import app.hommaterial.data.AssistantNote
 import app.hommaterial.data.AssistantQuestion
 import app.hommaterial.data.AssistantStore
-import app.hommaterial.data.WorkersAi
-import app.hommaterial.data.correctionPrompt
-import app.hommaterial.data.parseQuestions
-import app.hommaterial.data.questionsPrompt
 import app.hommaterial.data.Automation
 import app.hommaterial.data.BackupSection
-import app.hommaterial.data.validateBackup
-import app.hommaterial.data.selectBackup
-import app.hommaterial.data.tileSpans
 import app.hommaterial.data.Cache
 import app.hommaterial.data.ColorChoice
 import app.hommaterial.data.Device
@@ -46,13 +39,21 @@ import app.hommaterial.data.Reading
 import app.hommaterial.data.Remote
 import app.hommaterial.data.RemoteKind
 import app.hommaterial.data.Schedule
+import app.hommaterial.data.ServerSync
 import app.hommaterial.data.SwitchBot
 import app.hommaterial.data.Update
 import app.hommaterial.data.Updater
 import app.hommaterial.data.WidgetConfig
+import app.hommaterial.data.WorkersAi
+import app.hommaterial.data.correctionPrompt
 import app.hommaterial.data.mapObjects
 import app.hommaterial.data.nextTime
+import app.hommaterial.data.parseQuestions
+import app.hommaterial.data.questionsPrompt
+import app.hommaterial.data.selectBackup
+import app.hommaterial.data.tileSpans
 import app.hommaterial.data.toJsonArray
+import app.hommaterial.data.validateBackup
 import app.hommaterial.plural
 import app.hommaterial.quick.Alert
 import app.hommaterial.quick.Alerts
@@ -71,6 +72,7 @@ import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
 import app.hommaterial.voice.parseExtras
 import app.hommaterial.voice.parseVoice
+import java.io.File
 import java.security.MessageDigest
 import java.util.Calendar
 import java.util.UUID
@@ -170,6 +172,11 @@ data class UiState(
     val updatePrompt: Boolean = false,
     /** Download progress from 0 to 1, null when no download is running. */
     val updateProgress: Float? = null,
+    /** Linked to the home server, waiting for the user to say whose data to keep: the phone's or the server's. */
+    val serverChoice: Boolean = false,
+    /** Linking to the home server, or switching its data, in progress. */
+    val serverBusy: Boolean = false,
+    val serverError: String? = null,
 ) {
     /** The devices in the rooms the user put them in, which are those of Alexa unless moved. */
     val placed: List<Device>
@@ -238,6 +245,8 @@ const val LAYOUT_GRID = 0
 const val LAYOUT_LIST = 1
 private const val PIN_KEY = "monitorPin"
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
+/** What the phone had before it used the home server, to go back to it. */
+private const val BEFORE_SERVER = "dati-prima-del-server.json"
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val alexa = Alexa.get(app)
@@ -278,6 +287,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         // The tile, the widget, the shortcuts and the timers act while the app is open too.
         viewModelScope.launch {
             Quick.changes.collect {
+                // On the home server anything may have changed: everything is read again.
+                if (ServerSync.active) return@collect reloadFromPhone()
                 _state.update { s ->
                     s.copy(
                         states = s.states + local.states().filterKeys { it !in s.busy },
@@ -344,6 +355,32 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         taught = assistantStore.taught(),
     )
 
+    /** Reads again everything the phone keeps, as after a sync with the server, keeping what is under way. */
+    private fun reloadFromPhone() {
+        val fresh = loadCached()
+        _state.update { s ->
+            fresh.copy(
+                states = fresh.states + s.states.filterKeys { it in s.busy },
+                busy = s.busy,
+                refreshing = s.refreshing,
+                signingIn = s.signingIn,
+                loginMessage = s.loginMessage,
+                showHidden = s.showHidden,
+                tvSearch = s.tvSearch,
+                voice = s.voice,
+                correcting = s.correcting,
+                askBackupRestore = s.askBackupRestore,
+                update = s.update,
+                updatePrompt = s.updatePrompt,
+                updateProgress = s.updateProgress,
+                serverChoice = s.serverChoice,
+                serverBusy = s.serverBusy,
+                serverError = s.serverError,
+                assistant = storedAssistant(s.assistant),
+            )
+        }
+    }
+
     private fun updateAssistant(change: (AssistantUi) -> AssistantUi) =
         _state.update { it.copy(assistant = change(it.assistant)) }
 
@@ -371,6 +408,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 auth.completeLogin(attempt, code, cookies)
+                // On the home server the sign-in goes there: the server speaks to Amazon.
+                if (ServerSync.active) {
+                    ServerSync.call(
+                        "POST",
+                        "/api/alexa/token",
+                        JSONObject().put("refreshToken", auth.refreshToken).put("marketplace", auth.marketplace.domain),
+                    )
+                    ServerSync.pull(force = true)
+                }
                 _state.update { it.copy(loggedIn = true, signingIn = false) }
                 refresh()
             } catch (e: CancellationException) {
@@ -383,6 +429,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun logout() {
         refreshJob?.cancel()
+        // On the home server the sign-in is the server's: signing out clears the home there.
+        if (ServerSync.active) {
+            auth.logout()
+            viewModelScope.launch {
+                guarded {
+                    ServerSync.call("POST", "/api/alexa/logout", JSONObject())
+                    ServerSync.pull(force = true)
+                }
+            }
+            return
+        }
         auth.logout()
         Timers.cancelAll(getApplication())
         Schedules.cancelAll(getApplication())
@@ -955,14 +1012,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Links the SwitchBot account, keeping the keys only if SwitchBot accepts them. */
     fun connectSwitchBot(token: String, secret: String) {
-        switchBot.connect(token.trim(), secret.trim())
         viewModelScope.launch {
             val linked = guarded {
-                val remotes = switchBot.fetchRemotes()
+                val remotes = switchBot.link(token.trim(), secret.trim())
                 _state.update { it.copy(switchBot = true, switchBotRemotes = remotes) }
                 _messages.tryEmit(plural(R.plurals.remotes_found, remotes.size))
             }
-            if (!linked) switchBot.disconnect()
+            if (!linked && !ServerSync.active) switchBot.disconnect()
         }
     }
 
@@ -1105,7 +1161,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 updateAssistant { it.copy(testing = false, setupError = error) }
                 return@launch
             }
-            assistantStore.connect(accountId.trim(), token.trim())
+            // On the home server the test has linked them there already.
+            if (!ServerSync.active) assistantStore.connect(accountId.trim(), token.trim())
             updateAssistant { storedAssistant(it).copy(testing = false) }
             _messages.tryEmit(str(R.string.assistant_test_ok))
             // The first time, it goes on to learn the home.
@@ -1256,6 +1313,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Writes the choices made in the app to the file the user picked. */
+    /** The backup as now; on the home server the keys come from there, which alone has them. */
+    private suspend fun currentBackupWithKeys(): JSONObject {
+        val backup = currentBackup()
+        if (!ServerSync.active) return backup
+        val keys = ServerSync.keys()
+        backup.remove("switchBot")
+        backup.remove("assistantKeys")
+        keys.optJSONObject("switchBot")?.let { backup.put("switchBot", it) }
+        keys.optJSONObject("assistantKeys")?.let { backup.put("assistantKeys", it) }
+        keys.optJSONArray("lgTvs")?.let { backup.put("lgTvs", it) }
+        return backup
+    }
+
     private fun currentBackup(): JSONObject {
         val s = _state.value
         val alerts = JSONObject()
@@ -1306,8 +1376,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun exportBackup(uri: Uri) {
-        val backup = currentBackup()
         viewModelScope.launch {
+            val backup = if (ServerSync.active) {
+                try {
+                    currentBackupWithKeys()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _messages.tryEmit(e.message ?: str(R.string.no_connection))
+                    return@launch
+                }
+            } else {
+                currentBackup()
+            }
             val saved = runCatching {
                 withContext(Dispatchers.IO) {
                     getApplication<Application>().contentResolver.openOutputStream(uri, "wt")!!.use {
@@ -1486,6 +1567,102 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun readings(device: Device): List<Reading> = history.readings(device.applianceId)
+
+    // --- the home server -------------------------------------------------------------------------
+
+    /**
+     * Signs in to the home server. When the phone has data of its own, the user then says whose
+     * to keep; before that, what the phone has is saved aside, to go back to it.
+     */
+    fun linkServer(url: String, username: String, password: String, register: Boolean, invite: String) {
+        _state.update { it.copy(serverBusy = true, serverError = null) }
+        viewModelScope.launch {
+            try {
+                File(getApplication<Application>().filesDir, BEFORE_SERVER).writeText(currentBackup().toString())
+                ServerSync.link(url, username, password, register, invite)
+                val s = _state.value
+                val phoneHasData = auth.refreshToken != null || s.devices.isNotEmpty() || s.groups.isNotEmpty() ||
+                    s.macros.isNotEmpty() || s.schedules.isNotEmpty() || s.automations.isNotEmpty()
+                if (phoneHasData) {
+                    _state.update { it.copy(serverBusy = false, serverChoice = true) }
+                } else {
+                    switchData(phone = false)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(serverBusy = false, serverError = e.message ?: str(R.string.something_wrong)) }
+            }
+        }
+    }
+
+    /** Starts using the server with the data of the phone ([phone]) or with those of the server. */
+    fun chooseServerData(phone: Boolean) {
+        _state.update { it.copy(serverChoice = false, serverBusy = true) }
+        viewModelScope.launch { switchData(phone) }
+    }
+
+    private suspend fun switchData(phone: Boolean) {
+        try {
+            if (phone) {
+                ServerSync.usePhoneData(currentBackup(), auth.refreshToken, auth.marketplace.domain)
+            } else {
+                ServerSync.useServerData()
+            }
+            // The phone no longer carries anything out: the server does, and the phone tells what it did.
+            Alerts.schedule(getApplication())
+            reloadFromPhone()
+            _state.update { it.copy(serverBusy = false, loggedIn = auth.isLoggedIn) }
+            _messages.tryEmit(str(R.string.server_linked))
+            refresh()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Never half on the server: back to the phone as it was.
+            ServerSync.unlink()
+            _state.update { it.copy(serverBusy = false, serverError = e.message ?: str(R.string.something_wrong)) }
+        }
+    }
+
+    /** Gives up linking before choosing the data: nothing changed on the phone. */
+    fun cancelServerLink() {
+        _state.update { it.copy(serverChoice = false) }
+        viewModelScope.launch { ServerSync.unlink() }
+    }
+
+    /**
+     * Stops using the home server. With [restore] the phone goes back to what it had before;
+     * otherwise it keeps the copy of the server, with the keys the server held, to carry on alone.
+     */
+    fun unlinkServer(restore: Boolean) {
+        _state.update { it.copy(serverBusy = true) }
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val before = File(app.filesDir, BEFORE_SERVER)
+            val keys = if (restore) null else runCatching { ServerSync.keys() }.getOrNull()
+            ServerSync.unlink()
+            if (restore && before.exists()) {
+                runCatching { restore(JSONObject(before.readText()), BackupSection.entries.toSet()) }
+            } else if (keys != null) {
+                keys.optJSONObject("switchBot")?.let { switchBot.connect(it.optString("token"), it.optString("secret")) }
+                keys.optJSONObject("assistantKeys")?.let { assistantStore.connect(it.optString("accountId"), it.optString("token")) }
+                keys.optJSONArray("lgTvs")?.let { tvs -> pairedTvs.replaceAll(runCatching { tvs.mapObjects(LgTv::fromJson) }.getOrDefault(emptyList())) }
+            }
+            before.delete()
+            // The phone carries out its timers and schedules again.
+            Timers.rearm(app)
+            Schedules.rearm(app)
+            Alerts.schedule(app)
+            reloadFromPhone()
+            _state.update { it.copy(serverBusy = false, loggedIn = auth.isLoggedIn) }
+            Quick.refresh(app)
+        }
+    }
+
+    /** Takes everything from the server now, as the settings ask. */
+    fun syncServer() {
+        viewModelScope.launch { guarded { ServerSync.pull(force = true) } }
+    }
 
     fun toggleShowHidden() {
         _state.update { it.copy(showHidden = !it.showHidden) }

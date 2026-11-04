@@ -39,9 +39,22 @@ const withTimeout = <T>(promise: Promise<T>, ms: number) =>
 /** A key unique on the whole server for something of the current account. */
 const scoped = (id: string) => `${currentUserId()}:${id}`
 
+const NOTICES_KEPT = 30
+
+/**
+ * Tells how something went: a push to the browsers, and a note the Android app in server mode
+ * reads to show it as its own notification.
+ */
 function notify(title: string, body: string, tag: string) {
   push({ title, body, tag, url: '/' }).catch((e) => console.warn('Notifica non inviata:', e))
+  const notices = getSecret<{ id: number; at: number; title: string; body: string; tag: string }[]>('notices', [])
+  const id = (notices.at(-1)?.id ?? 0) + 1
+  setSecret('notices', [...notices, { id, at: Date.now(), title, body, tag }].slice(-NOTICES_KEPT))
 }
+
+/** The notes of what happened after [after], the id of the last one already seen. */
+export const notices = (after: number) =>
+  getSecret<{ id: number }[]>('notices', []).filter((it) => it.id > after)
 
 // --- devices and their states -----------------------------------------------------------------
 

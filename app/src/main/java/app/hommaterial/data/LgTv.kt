@@ -2,6 +2,7 @@ package app.hommaterial.data
 
 import android.content.Context
 import androidx.annotation.StringRes
+import app.hommaterial.App
 import app.hommaterial.R
 import app.hommaterial.str
 import java.net.DatagramPacket
@@ -29,9 +30,9 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
@@ -258,7 +259,16 @@ class LgTvClient(private val http: OkHttpClient, private val port: Int = WEBOS_P
     }
 
     /** Looks for TVs on the network for [millis], with the search of the second screen apps. */
-    suspend fun discover(millis: Long = 3_000): List<FoundTv> = withContext(Dispatchers.IO) {
+    suspend fun discover(millis: Long = 3_000): List<FoundTv> {
+        // The home server looks on its own network, which is the one of the TVs.
+        if (ServerSync.active) {
+            val found = ServerSync.call("POST", "/api/lg/discover", JSONObject()).optJSONArray("found") ?: JSONArray()
+            return found.mapObjects { o -> FoundTv(o.getString("host"), o.optString("name").takeIf { it.isNotBlank() && it != "null" }) }
+        }
+        return discoverHere(millis)
+    }
+
+    private suspend fun discoverHere(millis: Long): List<FoundTv> = withContext(Dispatchers.IO) {
         val found = linkedMapOf<String, FoundTv>()
         DatagramSocket().use { socket ->
             socket.soTimeout = 300
@@ -288,6 +298,7 @@ class LgTvClient(private val http: OkHttpClient, private val port: Int = WEBOS_P
      * shown on screen once it accepted.
      */
     suspend fun pair(host: String, greeting: String, onAsking: () -> Unit = {}): LgTv {
+        if (ServerSync.active) return pairOnServer(host, onAsking)
         var seen: String? = null
         val session = open("wss://$host:$port", host, trusting(null) { seen = it })
         try {
@@ -317,8 +328,31 @@ class LgTvClient(private val http: OkHttpClient, private val port: Int = WEBOS_P
         }
     }
 
+    /** Pairs through the home server, which keeps the key; the phone gets the TV without it. */
+    private suspend fun pairOnServer(host: String, onAsking: () -> Unit): LgTv {
+        ServerSync.call("POST", "/api/lg/pair", JSONObject().put("host", host))
+        while (true) {
+            delay(1_000)
+            val pairing = try {
+                ServerSync.call("GET", "/api/lg/pair")
+            } catch (e: java.io.IOException) {
+                continue
+            }
+            if (pairing.optBoolean("asking")) onAsking()
+            pairing.optString("error").takeIf { it.isNotBlank() && it != "null" }?.let { throw Exception(it) }
+            if (pairing.optBoolean("done")) {
+                ServerSync.pull()
+                return LgTvs(App.instance).all().find { it.host == host } ?: throw LgTvException(R.string.lgtv_unreachable, host)
+            }
+        }
+    }
+
     /** Carries out a [command] of the app on [tv]; see [webOsAction]. */
     suspend fun send(tv: LgTv, command: String, parameter: String = "default") {
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/remotes/send", JSONObject().put("id", tv.id).put("command", command).put("parameter", parameter))
+            return
+        }
         when (val action = webOsAction(command, parameter) ?: throw LgTvException(R.string.lgtv_unknown_command, command)) {
             WebOsAction.Wake -> wake(tv)
             is WebOsAction.Call -> session(tv) { it.main.call(action) }
@@ -337,23 +371,38 @@ class LgTvClient(private val http: OkHttpClient, private val port: Int = WEBOS_P
     }
 
     /** The apps and the inputs of [tv], by id. */
-    suspend fun apps(tv: LgTv): Map<String, String> = session(tv) {
-        webOsApps(it.main.call(WebOsAction.Call("ssap://com.webos.applicationManager/listLaunchPoints")))
+    suspend fun apps(tv: LgTv): Map<String, String> {
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/lg/${ServerSync.encode(tv.id)}/apps", JSONObject())
+            ServerSync.pull()
+            return LgTvs(App.instance).all().find { it.id == tv.id }?.apps.orEmpty()
+        }
+        return session(tv) { webOsApps(it.main.call(WebOsAction.Call("ssap://com.webos.applicationManager/listLaunchPoints"))) }
     }
 
     /** The sources of [tv], by id, such as the HDMI ports and the antenna. */
-    suspend fun inputs(tv: LgTv): Map<String, String> = session(tv) {
-        webOsInputs(it.main.call(WebOsAction.Call("ssap://tv/getExternalInputList")))
+    suspend fun inputs(tv: LgTv): Map<String, String> {
+        // The server asks for them together with the apps.
+        if (ServerSync.active) return LgTvs(App.instance).all().find { it.id == tv.id }?.inputs.orEmpty()
+        return session(tv) { webOsInputs(it.main.call(WebOsAction.Call("ssap://tv/getExternalInputList"))) }
     }
 
     /** Turns the text [sent] in the field open on [tv] into [typed]; see [webOsTyping]. */
     suspend fun type(tv: LgTv, sent: String, typed: String) {
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/lg/${ServerSync.encode(tv.id)}/type", JSONObject().put("sent", sent).put("typed", typed))
+            return
+        }
         val calls = webOsTyping(sent, typed)
         if (calls.isNotEmpty()) session(tv) { connection -> calls.forEach { connection.main.call(it) } }
     }
 
     /** Presses Enter on the keyboard of [tv], as at the end of a search. */
     suspend fun enter(tv: LgTv) {
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/lg/${ServerSync.encode(tv.id)}/enter", JSONObject())
+            return
+        }
         session(tv) { it.main.call(WebOsAction.Call("ssap://com.webos.service.ime/sendEnterKey")) }
     }
 
@@ -572,11 +621,18 @@ class LgTvs(context: Context) {
     /** Keeps [tv], in its place when known, else in the place of one paired before at the same address. */
     fun put(tv: LgTv): List<LgTv> {
         val all = all()
+        // On the home server a new name is given there; a TV paired through it is there already.
+        all.find { it.id == tv.id }?.takeIf { ServerSync.active && it.name != tv.name }?.let {
+            ServerSync.send("POST", "/api/lg/${ServerSync.encode(tv.id)}/rename", JSONObject().put("name", tv.name))
+        }
         if (all.any { it.id == tv.id }) return save(all.map { if (it.id == tv.id) tv else it })
         return save(all.filter { it.host != tv.host } + tv)
     }
 
-    fun remove(id: String): List<LgTv> = save(all().filter { it.id != id })
+    fun remove(id: String): List<LgTv> {
+        if (ServerSync.active) ServerSync.send("DELETE", "/api/lg/${ServerSync.encode(id)}")
+        return save(all().filter { it.id != id })
+    }
 
     /** Keeps only [tvs], as those of a backup. */
     fun replaceAll(tvs: List<LgTv>): List<LgTv> = save(tvs.distinctBy { it.id })

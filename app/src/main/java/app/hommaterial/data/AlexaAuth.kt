@@ -95,7 +95,11 @@ class AlexaAuth(context: Context, private val http: OkHttpClient) {
         prefs.getString("csrf", null)?.let { Session(cookie, it) }
     }
 
-    val isLoggedIn: Boolean get() = prefs.contains("refreshToken")
+    /** Signed in to Amazon: on the phone, or on the home server when the app uses one. */
+    val isLoggedIn: Boolean get() = if (ServerSync.active) ServerSync.alexaLoggedIn else prefs.contains("refreshToken")
+
+    /** The token of the sign-in made on the phone, to hand to the home server. */
+    val refreshToken: String? get() = prefs.getString("refreshToken", null)
 
     /** Defaults to the marketplace of the phone's country until the user picks one. */
     var marketplace: Marketplace

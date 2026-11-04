@@ -400,6 +400,8 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 )
             }
 
+            Section(R.string.s_server, R.string.server_text) { ServerSettings(state, vm) }
+
             Section(R.string.s_switchbot, R.string.switchbot_text) {
                 if (state.switchBot) {
                     Setting(

@@ -11,10 +11,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -22,31 +26,50 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.UiState
 import app.hommaterial.data.LOGIN_DOMAIN
 import app.hommaterial.data.MARKETPLACES
+import app.hommaterial.data.ServerSync
 import app.hommaterial.str
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(state: UiState, vm: HomeViewModel) {
+    var linking by rememberSaveable { mutableStateOf(false) }
+    val config by ServerSync.store.config.collectAsStateWithLifecycle()
+    LaunchedEffect(config) { if (config != null) linking = false }
+    if (linking || state.serverBusy && config == null) ServerLinkDialog(state, vm, onDismiss = { linking = false })
+    if (state.serverChoice) ServerChoiceDialog(vm)
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(str(R.string.login_title)) },
-                actions = { if (!state.signingIn) MarketplacePicker(state, vm) },
+                actions = {
+                    if (!state.signingIn) {
+                        // A phone that will use the home server can link it before, or instead of, signing in here.
+                        if (!ServerSync.active) {
+                            IconButton(onClick = { linking = true }) {
+                                Icon(Icons.Outlined.Dns, contentDescription = str(R.string.server_link))
+                            }
+                        }
+                        MarketplacePicker(state, vm)
+                    }
+                },
             )
         },
     ) { padding ->

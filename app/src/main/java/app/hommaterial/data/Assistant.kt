@@ -39,21 +39,32 @@ class AssistantException(@StringRes val text: Int, private vararg val args: Any)
 class AssistantStore(context: Context) {
     private val prefs = context.getSharedPreferences("assistant", Context.MODE_PRIVATE)
 
-    val configured: Boolean get() = prefs.contains("token")
+    val configured: Boolean get() = if (ServerSync.active) ServerSync.assistantLinked else prefs.contains("token")
 
-    fun accountId(): String = prefs.getString("accountId", "").orEmpty()
+    fun accountId(): String = if (ServerSync.active) ServerSync.assistantAccount else prefs.getString("accountId", "").orEmpty()
 
     fun token(): String = prefs.getString("token", "").orEmpty()
 
-    fun model(): String = prefs.getString("model", null)?.takeIf { it in ASSISTANT_MODELS } ?: ASSISTANT_MODELS.first()
+    fun model(): String = (if (ServerSync.active) ServerSync.assistantModel else prefs.getString("model", null))
+        ?.takeIf { it in ASSISTANT_MODELS } ?: ASSISTANT_MODELS.first()
 
-    fun connect(accountId: String, token: String) =
-        prefs.edit().putString("accountId", accountId).putString("token", token).apply()
+    fun connect(accountId: String, token: String) {
+        if (ServerSync.active) {
+            ServerSync.send("POST", "/api/assistant/connect", JSONObject().put("accountId", accountId).put("token", token))
+        } else {
+            prefs.edit().putString("accountId", accountId).putString("token", token).apply()
+        }
+    }
 
     /** Forgets the account; what was taught stays, for when it is linked again. */
-    fun disconnect() = prefs.edit().remove("accountId").remove("token").apply()
+    fun disconnect() {
+        if (ServerSync.active) ServerSync.send("POST", "/api/assistant/disconnect") else prefs.edit().remove("accountId").remove("token").apply()
+    }
 
-    fun putModel(model: String) = prefs.edit().putString("model", model).apply()
+    fun putModel(model: String) {
+        if (ServerSync.active) ServerSync.send("POST", "/api/assistant/model", JSONObject().put("model", model))
+        else prefs.edit().putString("model", model).apply()
+    }
 
     fun notes(): List<AssistantNote> = runCatching {
         JSONArray(prefs.getString("notes", "[]")).mapObjects(AssistantNote::fromJson)
@@ -322,20 +333,32 @@ ${catalog.names()}
  * answer is asked as JSON, read back from what the model returned.
  */
 class WorkersAi(private val http: OkHttpClient, private val base: String = "https://api.cloudflare.com/client/v4") {
-    /** Checks the account and the token with the smallest request there is. */
+    /** Checks the account and the token with the smallest request there is; on the home server, links them there. */
     suspend fun test(accountId: String, token: String, model: String) {
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/assistant/connect", JSONObject().put("accountId", accountId).put("token", token))
+            ServerSync.pull()
+            return
+        }
         run(accountId, token, model, listOf("user" to "Reply with OK."), schema = null, maxTokens = 4)
     }
 
     /** What the user meant by the guesses of the speech recognizer [heard], with the names put right. */
     suspend fun correct(accountId: String, token: String, model: String, system: String, heard: List<String>): String {
+        if (ServerSync.active) {
+            val body = JSONObject().put("kind", "correct").put("system", system).put("heard", JSONArray(heard))
+            return ServerSync.call("POST", "/api/assistant/ask", body).optString("text").trim()
+        }
         val guesses = heard.mapIndexed { i, it -> "${i + 1}. $it" }.joinToString("\n")
         return json(accountId, token, model, listOf("system" to system, "user" to guesses), SCHEMA_TEXT, 120)
             .optString("text").trim()
     }
 
     suspend fun questions(accountId: String, token: String, model: String, system: String): JSONObject =
-        json(accountId, token, model, listOf("system" to system, "user" to "Ask your questions."), SCHEMA_QUESTIONS, 1500)
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/assistant/ask", JSONObject().put("kind", "questions").put("system", system))
+                .optJSONObject("answer") ?: JSONObject()
+        } else json(accountId, token, model, listOf("system" to system, "user" to "Ask your questions."), SCHEMA_QUESTIONS, 1500)
 
     private suspend fun json(
         accountId: String,

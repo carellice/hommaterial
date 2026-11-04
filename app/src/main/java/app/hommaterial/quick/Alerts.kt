@@ -19,6 +19,7 @@ import app.hommaterial.data.Automation
 import app.hommaterial.data.Cache
 import app.hommaterial.data.DeviceState
 import app.hommaterial.data.Schedule
+import app.hommaterial.data.ServerSync
 import app.hommaterial.str
 import java.text.DateFormat
 import java.util.Date
@@ -50,6 +51,10 @@ object Alerts {
 
     /** Sets the alerts of a sensor and starts or stops the periodic check accordingly. */
     fun set(context: Context, applianceId: String, alert: Alert) {
+        if (ServerSync.active) {
+            val body = JSONObject().put("above", alert.above ?: JSONObject.NULL).put("below", alert.below ?: JSONObject.NULL)
+            ServerSync.send("POST", "/api/alerts/${ServerSync.encode(applianceId)}", body)
+        }
         val prefs = Cache(context).prefs
         val alerts = if (alert == Alert()) all(context) - applianceId else all(context) + (applianceId to alert)
         val json = JSONObject()
@@ -65,8 +70,9 @@ object Alerts {
     /** Keeps the periodic check running only while there is something to check. */
     fun schedule(context: Context) {
         val work = WorkManager.getInstance(context)
-        // The automations lean on the same check: it is what brings them fresh states.
-        if (all(context).isEmpty() && Automations.all(context).none { it.enabled }) {
+        // The automations lean on the same check: it is what brings them fresh states. On the home
+        // server it brings what the server did, to be told with notifications.
+        if (!ServerSync.active && all(context).isEmpty() && Automations.all(context).none { it.enabled }) {
             work.cancelUniqueWork(WORK)
             return
         }
@@ -78,6 +84,8 @@ object Alerts {
 
     /** Notifies about the thresholds that freshly fetched [states] have just crossed. */
     fun check(context: Context, states: Map<String, DeviceState>) {
+        // The home server watches them, all the time.
+        if (ServerSync.active) return
         val alerts = all(context)
         if (alerts.isEmpty()) return
         val cache = Cache(context)

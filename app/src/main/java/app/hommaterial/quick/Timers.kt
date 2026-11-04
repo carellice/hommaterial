@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import app.hommaterial.R
 import app.hommaterial.data.Cache
+import app.hommaterial.data.ServerSync
 import app.hommaterial.str
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -33,19 +34,28 @@ object Timers {
 
     fun set(context: Context, applianceId: String, at: Long) {
         save(context, all(context) + (applianceId to at))
+        // On the home server the server switches it off: the phone keeps no alarm.
+        if (ServerSync.active) {
+            val minutes = (at - System.currentTimeMillis()) / 60_000.0
+            ServerSync.send("POST", "/api/timers", JSONObject().put("applianceId", applianceId).put("minutes", minutes))
+            return
+        }
         arm(context, applianceId, at)
     }
 
     fun cancel(context: Context, applianceId: String) {
         if (applianceId !in all(context)) return
         save(context, all(context) - applianceId)
+        if (ServerSync.active) ServerSync.send("DELETE", "/api/timers/${ServerSync.encode(applianceId)}")
         context.getSystemService(AlarmManager::class.java).cancel(pending(context, applianceId))
     }
 
     fun cancelAll(context: Context) = all(context).keys.forEach { cancel(context, it) }
 
     /** Alarms do not survive a restart of the phone: this sets them again, firing the overdue ones. */
-    fun rearm(context: Context) = all(context).forEach { (id, at) -> arm(context, id, at) }
+    fun rearm(context: Context) {
+        if (!ServerSync.active) all(context).forEach { (id, at) -> arm(context, id, at) }
+    }
 
     internal fun retry(context: Context, applianceId: String) =
         arm(context, applianceId, System.currentTimeMillis() + RETRY_DELAY_MS)
@@ -84,6 +94,8 @@ class TimerReceiver : BroadcastReceiver() {
             return
         }
         val id = intent.data?.schemeSpecificPart ?: return
+        // An alarm left from before the home server, which now does it.
+        if (ServerSync.active) return
         // Cancelled in the meantime, or a leftover from before a sign-out.
         val due = Timers.all(app)[id] ?: return
         val pending = goAsync()

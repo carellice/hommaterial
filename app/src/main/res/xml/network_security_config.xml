@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The home server may use the certificate authority its installation created ("HTTPS in casa"),
+  which the user installs on the phone, or plain http on the home network or behind a proxy.
+  Amazon, SwitchBot and GitHub use public certificates as always.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

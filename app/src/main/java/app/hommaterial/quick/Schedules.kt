@@ -14,6 +14,7 @@ import app.hommaterial.data.ACTION_REMOTE
 import app.hommaterial.data.Cache
 import app.hommaterial.data.MacroAction
 import app.hommaterial.data.Schedule
+import app.hommaterial.data.ServerSync
 import app.hommaterial.data.mapObjects
 import app.hommaterial.data.nextTime
 import app.hommaterial.str
@@ -42,18 +43,26 @@ object Schedules {
     /** Adds a schedule, or replaces the one with the same id, and sets or clears its alarm. */
     fun put(context: Context, schedule: Schedule) {
         save(context, all(context).filter { it.id != schedule.id } + schedule)
+        // On the home server the server carries it out: the phone keeps no alarm.
+        if (ServerSync.active) {
+            ServerSync.send("POST", "/api/schedules", schedule.toJson())
+            return
+        }
         if (schedule.enabled) arm(context, schedule.id, schedule.at) else disarm(context, schedule.id)
     }
 
     fun delete(context: Context, id: String) {
         save(context, all(context).filter { it.id != id })
+        if (ServerSync.active) ServerSync.send("DELETE", "/api/schedules/${ServerSync.encode(id)}")
         disarm(context, id)
     }
 
     fun cancelAll(context: Context) = all(context).forEach { delete(context, it.id) }
 
     /** Alarms do not survive a restart of the phone: this sets them again, firing the overdue ones. */
-    fun rearm(context: Context) = all(context).filter { it.enabled }.forEach { arm(context, it.id, it.at) }
+    fun rearm(context: Context) {
+        if (!ServerSync.active) all(context).filter { it.enabled }.forEach { arm(context, it.id, it.at) }
+    }
 
     internal fun retry(context: Context, id: String) = arm(context, id, System.currentTimeMillis() + RETRY_DELAY_MS)
 
@@ -101,6 +110,8 @@ class ScheduleReceiver : BroadcastReceiver() {
             return
         }
         val id = intent.data?.schemeSpecificPart ?: return
+        // An alarm left from before the home server, which now does it.
+        if (ServerSync.active) return
         // Deleted or switched off in the meantime, or a leftover from before a sign-out.
         val schedule = Schedules.all(app).find { it.id == id && it.enabled } ?: return
         val pending = goAsync()

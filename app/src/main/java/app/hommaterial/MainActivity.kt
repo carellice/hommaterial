@@ -45,6 +45,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.hommaterial.data.ServerSync
 import app.hommaterial.ui.HomeScreen
 import app.hommaterial.ui.LocalHaptics
 import app.hommaterial.ui.LoginScreen
@@ -59,6 +60,7 @@ import kotlinx.coroutines.delay
 
 private const val SETTINGS_SLIDE_MS = 320
 private const val REST_FADE_MS = 600
+private const val SERVER_SYNC_MS = 30_000L
 
 class MainActivity : ComponentActivity() {
     private var fullscreen = false
@@ -101,6 +103,20 @@ class MainActivity : ComponentActivity() {
                             delay(monitor.refreshSeconds * 1000L)
                             vm.poll()
                             vm.checkForUpdate(manual = false)
+                        }
+                    }
+                }
+            }
+            // On the home server what changed elsewhere, on the web or on other phones, shows up here
+            // within half a minute while the app is in sight.
+            val server by ServerSync.store.config.collectAsStateWithLifecycle()
+            if (server != null) {
+                val lifecycle = LocalLifecycleOwner.current
+                LaunchedEffect(server) {
+                    lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                        while (true) {
+                            runCatching { ServerSync.pull() }
+                            delay(SERVER_SYNC_MS)
                         }
                     }
                 }

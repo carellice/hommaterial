@@ -26,6 +26,8 @@ class History(context: Context) {
 
     /** Notes down the sensor readings found in freshly fetched [states]. */
     fun record(states: Map<String, DeviceState>, now: Long = System.currentTimeMillis()) {
+        // The home server keeps it, and the phone copies it from there.
+        if (ServerSync.active) return
         val editor = prefs.edit()
         for ((id, state) in states) {
             val temperature = state.temperature?.takeIf { !it.isNaN() } ?: continue

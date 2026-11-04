@@ -271,6 +271,20 @@ async function exchangeForSession(): Promise<Session> {
   return fresh
 }
 
+/** Takes the refresh token the Android app got with its own sign-in, checking that Amazon accepts it. */
+export async function adoptToken(refreshToken: string, domain: string | null) {
+  if (domain) setMarketplace(domain)
+  const before = getSecret<string | null>('alexa_refresh', null)
+  setSecret('alexa_refresh', refreshToken)
+  setSecret('alexa_session', null)
+  try {
+    await session(true)
+  } catch (e) {
+    setSecret('alexa_refresh', before)
+    throw e
+  }
+}
+
 export function logout() {
   for (const key of ['alexa_refresh', 'alexa_session', 'alexa_attempt']) setSecret(key, null)
 }

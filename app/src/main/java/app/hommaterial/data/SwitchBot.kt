@@ -73,12 +73,30 @@ data class AcSetting(val temperature: Int = 24, val mode: Int = 2, val fan: Int 
 class SwitchBot(context: Context, private val http: OkHttpClient) {
     private val prefs = context.getSharedPreferences("switchbot", Context.MODE_PRIVATE)
 
-    val connected: Boolean get() = prefs.contains("token")
+    val connected: Boolean get() = if (ServerSync.active) ServerSync.switchBotLinked else prefs.contains("token")
 
-    fun connect(token: String, secret: String) =
-        prefs.edit().putString("token", token).putString("secret", secret).apply()
+    /** Keeps the keys; on the home server they go there, and SwitchBot is asked from there. */
+    suspend fun link(token: String, secret: String): List<Remote> {
+        if (!ServerSync.active) {
+            connect(token, secret)
+            return fetchRemotes()
+        }
+        ServerSync.call("POST", "/api/switchbot/connect", JSONObject().put("token", token).put("secret", secret))
+        ServerSync.pull()
+        return remotes()
+    }
 
-    fun disconnect() = prefs.edit().clear().apply()
+    fun connect(token: String, secret: String) {
+        if (ServerSync.active) {
+            ServerSync.send("POST", "/api/switchbot/connect", JSONObject().put("token", token).put("secret", secret))
+        } else {
+            prefs.edit().putString("token", token).putString("secret", secret).apply()
+        }
+    }
+
+    fun disconnect() {
+        if (ServerSync.active) ServerSync.send("POST", "/api/switchbot/disconnect") else prefs.edit().clear().apply()
+    }
 
     /** The token and the secret, for the backup; null while not linked. */
     fun keys(): Pair<String, String>? =
@@ -90,6 +108,11 @@ class SwitchBot(context: Context, private val http: OkHttpClient) {
     }.getOrDefault(emptyList())
 
     suspend fun fetchRemotes(): List<Remote> {
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/switchbot/remotes", JSONObject())
+            ServerSync.pull()
+            return remotes()
+        }
         val list = call("GET", "/devices").optJSONArray("infraredRemoteList") ?: JSONArray()
         val remotes = list.mapObjects {
             Remote(it.getString("deviceId"), it.optString("deviceName"), it.optString("remoteType"))
@@ -100,6 +123,14 @@ class SwitchBot(context: Context, private val http: OkHttpClient) {
 
     /** Presses a button: one of those SwitchBot knows for the kind of remote, or a [custom] one by its name. */
     suspend fun send(remote: Remote, command: String, parameter: String = "default", custom: Boolean = false) {
+        if (ServerSync.active) {
+            ServerSync.call(
+                "POST",
+                "/api/remotes/send",
+                JSONObject().put("id", remote.id).put("command", command).put("parameter", parameter).put("custom", custom),
+            )
+            return
+        }
         val body = JSONObject()
             .put("command", command)
             .put("parameter", parameter)

@@ -5,6 +5,7 @@ import app.hommaterial.R
 import app.hommaterial.data.Automation
 import app.hommaterial.data.Cache
 import app.hommaterial.data.DeviceState
+import app.hommaterial.data.ServerSync
 import app.hommaterial.data.mapObjects
 import app.hommaterial.str
 import kotlinx.coroutines.launch
@@ -28,6 +29,7 @@ object Automations {
      * waits for it to come true again: it is not for what was so before it existed.
      */
     fun put(context: Context, automation: Automation, holds: Boolean) {
+        if (ServerSync.active) ServerSync.send("POST", "/api/automations", automation.toJson())
         val cache = Cache(context)
         val all = all(context).filter { it.id != automation.id } + automation
         val tripped = if (holds) tripped(cache) + automation.id else tripped(cache) - automation.id
@@ -39,6 +41,7 @@ object Automations {
     }
 
     fun delete(context: Context, id: String) {
+        if (ServerSync.active) ServerSync.send("DELETE", "/api/automations/${ServerSync.encode(id)}")
         val cache = Cache(context)
         cache.prefs.edit()
             .putString("automations", JSONArray(all(context).filter { it.id != id }.map { it.toJson() }).toString())
@@ -49,6 +52,8 @@ object Automations {
 
     /** Runs the automations whose condition freshly fetched [states] have just met. */
     fun check(context: Context, states: Map<String, DeviceState>) {
+        // The home server watches them, all the time.
+        if (ServerSync.active) return
         val automations = all(context).filter { it.enabled }
         if (automations.isEmpty()) return
         val cache = Cache(context)

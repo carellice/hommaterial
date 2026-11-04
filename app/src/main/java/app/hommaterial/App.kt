@@ -3,11 +3,13 @@ package app.hommaterial
 import android.app.Application
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
+import app.hommaterial.data.ServerSync
 
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        ServerSync.init(this)
     }
 
     companion object {
