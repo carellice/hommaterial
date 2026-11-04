@@ -257,7 +257,7 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
                 .mapObjects(ListItem::fromJson)
         }
         val body = JSONObject().put("itemAttributesToProject", JSONArray().put("quantity").put("note"))
-        val raw = call("POST", "$LISTS/${listId.encoded()}/items/fetch?limit=200", body, site = "www")
+        val raw = call("POST", "$LISTS/${listId.encoded()}/items/fetch?limit=100", body, site = "www")
         return (raw.optJSONArray("itemInfoList") ?: JSONArray()).mapObjects(ListItem::fromAmazon)
     }
 

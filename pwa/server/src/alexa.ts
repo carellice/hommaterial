@@ -494,7 +494,7 @@ const toItem = (it: any): ListItem => ({
 })
 
 export async function listItems(listId: string): Promise<ListItem[]> {
-  const answer = await api('POST', `${LISTS}/${pathId(listId)}/items/fetch?limit=200`, {
+  const answer = await api('POST', `${LISTS}/${pathId(listId)}/items/fetch?limit=100`, {
     itemAttributesToProject: ['quantity', 'note'],
   }, 'www')
   return (answer.itemInfoList ?? []).map(toItem)
