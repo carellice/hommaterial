@@ -42,7 +42,8 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
             repeat(2) { attempt ->
                 val request = Request.Builder()
                     .url("https://$site.${market.domain}$path")
-                    .header("User-Agent", USER_AGENT)
+                    // The lists answer only to the agent of the Alexa app itself, as alexa-remote sends it.
+                    .header("User-Agent", if (site == "www") LISTS_USER_AGENT else USER_AGENT)
                     .header("Accept", "application/json; charset=utf-8")
                     .header("Accept-Language", market.locale)
                     .header("Referer", "https://$host/spa/index.html")
@@ -57,7 +58,9 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
                         // The web session lasts a few days; the first 401 just means it needs renewing.
                         response.code == 401 && attempt == 0 -> session = auth.session(forceRefresh = true)
                         response.code == 401 -> throw NotLoggedInException(str(R.string.login_expired))
-                        !response.isSuccessful -> throw Exception(str(R.string.alexa_error, response.code))
+                        !response.isSuccessful -> throw Exception(
+                            str(R.string.alexa_error, response.code) + amazonReason(text, response.header("x-amzn-ErrorType")),
+                        )
                         else -> return@withContext if (text.isBlank()) JSONObject() else JSONObject(text)
                     }
                 }
@@ -290,10 +293,24 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
         call("DELETE", "$LISTS/${listId.encoded()}/items/${item.id.encoded()}?version=${item.version}", site = "www")
     }
 
-    private fun String.encoded(): String = java.net.URLEncoder.encode(this, "UTF-8").replace("+", "%20")
+    // The ids go in the path as they are, as alexa-remote sends them: Amazon refuses them encoded
+    // (an id ending in "=" sent as "%3D"). Only what would break the path is escaped.
+    private fun String.encoded(): String = replace("%", "%25").replace(" ", "%20").replace("?", "%3F").replace("#", "%23")
 }
 
 private const val LISTS = "/alexashoppinglists/api/v2/lists"
+private const val LISTS_USER_AGENT = "AppleWebKit PitanguiBridge/2.2.595606.0-[HARDWARE=iPhone14_7][SOFTWARE=17.4.1][DEVICE=iPhone]"
+
+/** Why Amazon refused a call, in its own words when it gives them, to show after the code. */
+internal fun amazonReason(body: String, errorType: String?): String {
+    val said = runCatching {
+        val o = JSONObject(body)
+        listOf("message", "Message", "errorMessage", "error", "code", "type").firstNotNullOfOrNull { key ->
+            o.optString(key).takeIf { it.isNotBlank() && it != "null" }
+        }
+    }.getOrNull() ?: errorType?.substringBefore(':')?.takeIf { it.isNotBlank() }
+    return said?.let { ": " + it.take(120) }.orEmpty()
+}
 
 /** A list of Alexa: [type] is TO_DO, SHOPPING_LIST or one the user made; [active] how many items are still to do. */
 data class AlexaList(val id: String, val name: String, val type: String, val active: Int?) {

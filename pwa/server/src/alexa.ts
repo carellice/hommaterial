@@ -55,7 +55,7 @@ export type DeviceState = {
 
 type Attempt = { deviceId: string; frc: string; mapMd: string; verifier: string; url: string }
 type Session = { cookie: string; csrf: string }
-type Answer = { status: number; cookies: string[]; body: string }
+type Answer = { status: number; cookies: string[]; body: string; errorType: string | null }
 
 const hex = (bytes: Buffer) => bytes.toString('hex')
 const base64Url = (bytes: Buffer) => bytes.toString('base64url')
@@ -75,7 +75,7 @@ const cookieHeader = (jar: Record<string, string>) => Object.entries(jar).map(([
 /** One request to Amazon, without following redirects: their cookies matter. */
 async function call(url: string, method: string, headers: Record<string, string>, body: string | null = null): Promise<Answer> {
   const response = await request(url, { method, headers, body: body ?? undefined, redirect: 'manual' })
-  return { status: response.status, cookies: response.headers.getSetCookie(), body: await response.text() }
+  return { status: response.status, cookies: response.headers.getSetCookie(), body: await response.text(), errorType: response.headers.get('x-amzn-errortype') }
 }
 
 export const emptyState = (): DeviceState => ({
@@ -291,6 +291,24 @@ export function logout() {
 
 // --- the API -------------------------------------------------------------------------------------
 
+/** Why Amazon refused a call, in its own words when it gives them, to show after the code. */
+function amazonReason(body: string, errorType: string | null): string {
+  let said: string | null = null
+  try {
+    const o = JSON.parse(body)
+    for (const key of ['message', 'Message', 'errorMessage', 'error', 'code', 'type']) {
+      if (typeof o?.[key] === 'string' && o[key].trim()) {
+        said = o[key]
+        break
+      }
+    }
+  } catch {
+    said = null
+  }
+  said ??= errorType?.split(':')[0] || null
+  return said ? ': ' + said.slice(0, 120) : ''
+}
+
 /** A call to the Alexa web API; [site] is "www" for the lists, which live on the shop's own host. */
 async function api(method: string, path: string, body: unknown = null, site = 'alexa'): Promise<any> {
   const market = marketplace()
@@ -298,7 +316,8 @@ async function api(method: string, path: string, body: unknown = null, site = 'a
   let current = await session()
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await call(`https://${site}.${market.domain}${path}`, method, {
-      'User-Agent': USER_AGENT,
+      // The lists answer only to the agent of the Alexa app itself, as alexa-remote sends it.
+      'User-Agent': site === 'www' ? LISTS_USER_AGENT : USER_AGENT,
       Accept: 'application/json; charset=utf-8',
       'Accept-Language': market.locale,
       Referer: `https://${host}/spa/index.html`,
@@ -313,7 +332,9 @@ async function api(method: string, path: string, body: unknown = null, site = 'a
       continue
     }
     if (response.status === 401) throw new NotLoggedInError(str('login_expired'))
-    if (response.status < 200 || response.status >= 300) throw new HttpError(502, str('alexa_error', response.status))
+    if (response.status < 200 || response.status >= 300) {
+      throw new HttpError(502, str('alexa_error', response.status) + amazonReason(response.body, response.errorType))
+    }
     if (!response.body.trim()) return {}
     try {
       return JSON.parse(response.body)
@@ -442,6 +463,11 @@ export type AlexaList = { id: string; name: string; type: string; active: number
 export type ListItem = { id: string; name: string; completed: boolean; version: number; updatedAt: number | null }
 
 const LISTS = '/alexashoppinglists/api/v2/lists'
+const LISTS_USER_AGENT = 'AppleWebKit PitanguiBridge/2.2.595606.0-[HARDWARE=iPhone14_7][SOFTWARE=17.4.1][DEVICE=iPhone]'
+
+// The ids go in the path as they are, as alexa-remote sends them: Amazon refuses them encoded
+// (an id ending in "=" sent as "%3D"). Only what would break the path is escaped.
+const pathId = (id: string) => id.replace(/%/g, '%25').replace(/ /g, '%20').replace(/\?/g, '%3F').replace(/#/g, '%23')
 
 export async function lists(): Promise<AlexaList[]> {
   const answer = await api('POST', `${LISTS}/fetch`, {
@@ -468,14 +494,14 @@ const toItem = (it: any): ListItem => ({
 })
 
 export async function listItems(listId: string): Promise<ListItem[]> {
-  const answer = await api('POST', `${LISTS}/${encodeURIComponent(listId)}/items/fetch?limit=200`, {
+  const answer = await api('POST', `${LISTS}/${pathId(listId)}/items/fetch?limit=200`, {
     itemAttributesToProject: ['quantity', 'note'],
   }, 'www')
   return (answer.itemInfoList ?? []).map(toItem)
 }
 
 export async function addListItem(listId: string, name: string): Promise<ListItem | null> {
-  const answer = await api('POST', `${LISTS}/${encodeURIComponent(listId)}/items`, {
+  const answer = await api('POST', `${LISTS}/${pathId(listId)}/items`, {
     items: [{ itemType: 'KEYWORD', itemName: name }],
   }, 'www')
   const created = (answer.itemInfoList ?? [])[0]
@@ -487,12 +513,12 @@ export async function updateListItem(listId: string, itemId: string, version: nu
   const itemAttributesToUpdate = []
   if (change.name != null) itemAttributesToUpdate.push({ type: 'itemName', value: change.name })
   if (change.completed != null) itemAttributesToUpdate.push({ type: 'itemStatus', value: change.completed ? 'COMPLETE' : 'ACTIVE' })
-  await api('PUT', `${LISTS}/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}?version=${version}`, {
+  await api('PUT', `${LISTS}/${pathId(listId)}/items/${pathId(itemId)}?version=${version}`, {
     itemAttributesToUpdate,
     itemAttributesToRemove: [],
   }, 'www')
 }
 
 export async function deleteListItem(listId: string, itemId: string, version: number) {
-  await api('DELETE', `${LISTS}/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}?version=${version}`, null, 'www')
+  await api('DELETE', `${LISTS}/${pathId(listId)}/items/${pathId(itemId)}?version=${version}`, null, 'www')
 }
