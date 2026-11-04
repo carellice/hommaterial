@@ -16,7 +16,7 @@ enum class BackupSection(val title: Int, vararg val fields: String) {
     AUTOMATIONS(R.string.s_automations, "automations"),
     ALERTS(R.string.alerts_title, "alerts"),
     SHORTCUTS(R.string.backup_shortcuts, "shortcuts", "widget", "tiles"),
-    SETTINGS(R.string.backup_settings, "autoUpdate", "haptics", "hapticLevel", "theme", "layout", "language"),
+    SETTINGS(R.string.backup_settings, "autoUpdate", "haptics", "hapticLevel", "theme", "accent", "layout", "language"),
     ASSISTANT(R.string.backup_assistant, "assistant"),
     MONITOR(R.string.backup_monitor_title, "monitor"),
     KEYS(R.string.backup_keys, "switchBot", "assistantKeys");

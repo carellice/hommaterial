@@ -30,15 +30,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import app.hommaterial.R
@@ -57,20 +53,6 @@ private val TABS = listOf(
     Tab(TAB_HOME, R.string.nav_home, Icons.Outlined.Home, Icons.Filled.Home),
     Tab(TAB_LISTS, R.string.s_lists, Icons.Outlined.Checklist, Icons.Filled.Checklist),
 )
-
-/**
- * Hides the bar while the page scrolls down and brings it back as soon as it scrolls up, as the
- * bars of the Google apps do: [onShow] is told which.
- */
-@Composable
-internal fun rememberBarScroll(onShow: (Boolean) -> Unit): NestedScrollConnection = remember(onShow) {
-    object : NestedScrollConnection {
-        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            if (available.y < -6f) onShow(false) else if (available.y > 6f) onShow(true)
-            return Offset.Zero
-        }
-    }
-}
 
 /**
  * The floating bar at the bottom of the app: a pill over the page, where the chosen tab grows to

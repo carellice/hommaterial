@@ -131,6 +131,7 @@ function initialState() {
     showHidden: false,
     layout: settings.get('layout', LAYOUT_GRID),
     theme: settings.get('theme', 0),
+    accent: settings.get('accent', 'auto'),
     language: settings.get('language', 'auto'),
     monitor: monitorFromJson(settings.get('monitor', {})),
     pin: settings.has(PIN_KEY),
@@ -988,6 +989,11 @@ export function setTheme(theme) {
   update({ theme });
 }
 
+export function setAccent(accent) {
+  settings.set('accent', accent);
+  update({ accent });
+}
+
 export function setLanguage(language) {
   settings.set('language', language);
   applyLanguage(language);
@@ -1120,9 +1126,10 @@ async function restore(backup, selected) {
   const theme = clamp(Number(backup.theme ?? 0), 0, 2);
   const layout = clamp(Number(backup.layout ?? 0), 0, 1);
   const language = backup.language || 'auto';
-  settings.edit({ theme, layout, language });
+  const accent = typeof backup.accent === 'string' && backup.accent ? backup.accent : 'auto';
+  settings.edit({ theme, accent, layout, language });
   applyLanguage(language);
-  update({ theme, layout, language });
+  update({ theme, accent, layout, language });
   if (selected.includes('monitor') && backup.monitor) setMonitor(monitorFromJson(backup.monitor));
   await sync(true);
   if (answer.switchBot) refresh();

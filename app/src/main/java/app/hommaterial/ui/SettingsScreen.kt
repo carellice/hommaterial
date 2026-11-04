@@ -1,5 +1,51 @@
 package app.hommaterial.ui
 
+import androidx.compose.material.icons.outlined.ToggleOn
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.SettingsRemote
+import androidx.compose.material.icons.outlined.Tv
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material.icons.outlined.MeetingRoom
+import androidx.compose.material.icons.outlined.DevicesOther
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.Shortcut
+import androidx.compose.material.icons.outlined.Widgets
+import androidx.compose.material.icons.outlined.TabletAndroid
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.TipsAndUpdates
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Wallpaper
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -367,6 +413,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             Section(R.string.s_appearance) {
                 val themes = listOf(R.string.theme_auto, R.string.theme_light, R.string.theme_dark)
                 Chips(R.string.theme, themes.mapIndexed { i, label -> i to str(label) }, state.theme, vm::setTheme)
+                AccentPicker(state.accent, vm::setAccent)
                 val layouts = listOf(LAYOUT_GRID to str(R.string.layout_grid), LAYOUT_LIST to str(R.string.layout_list))
                 Chips(R.string.layout, layouts, state.layout, vm::setLayout)
                 Toggle(R.string.haptics, R.string.haptics_text, state.haptics, vm::setHaptics)
@@ -701,9 +748,18 @@ private fun Accordion(
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(20.dp)) {
         Column {
             Row(
-                Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(horizontal = 16.dp, vertical = 18.dp),
+                Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                sectionIcon(title)?.let { icon ->
+                    Box(
+                        Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                }
                 Text(str(title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Icon(Icons.Outlined.ExpandMore, contentDescription = null, modifier = Modifier.rotate(turn))
             }
@@ -726,6 +782,33 @@ private fun Accordion(
             }
         }
     }
+}
+
+/** The icon at the head of each section, so that a long list of them is quick to scan. */
+private fun sectionIcon(@StringRes title: Int): ImageVector? = when (title) {
+    R.string.s_appearance -> Icons.Outlined.Palette
+    R.string.s_notifications -> Icons.Outlined.Notifications
+    R.string.s_server -> Icons.Outlined.Dns
+    R.string.s_switchbot -> Icons.Outlined.SettingsRemote
+    R.string.s_lgtv -> Icons.Outlined.Tv
+    R.string.s_assistant -> Icons.Outlined.AutoAwesome
+    R.string.s_updates -> Icons.Outlined.SystemUpdate
+    R.string.s_rooms -> Icons.Outlined.MeetingRoom
+    R.string.s_devices -> Icons.Outlined.DevicesOther
+    R.string.s_groups -> Icons.Outlined.Layers
+    R.string.s_macros_settings -> Icons.Outlined.Extension
+    R.string.s_shortcuts -> Icons.Outlined.Shortcut
+    R.string.s_widget -> Icons.Outlined.Widgets
+    R.string.s_monitor -> Icons.Outlined.TabletAndroid
+    R.string.s_tiles -> Icons.Outlined.ToggleOn
+    R.string.s_timers -> Icons.Outlined.Timer
+    R.string.s_alerts -> Icons.Outlined.WarningAmber
+    R.string.s_backup -> Icons.Outlined.Backup
+    R.string.s_data -> Icons.Outlined.Storage
+    R.string.s_account -> Icons.Outlined.AccountCircle
+    R.string.s_hints -> Icons.Outlined.TipsAndUpdates
+    R.string.s_about -> Icons.Outlined.Info
+    else -> null
 }
 
 /** An entry of an ordered list, with the arrows that move it one place up or down. */
@@ -783,6 +866,92 @@ internal fun Chips(
                 )
             }
         }
+    }
+}
+
+/**
+ * The color of the app: a swatch for each accent, and first the one that follows the wallpaper of
+ * the phone. The chosen swatch is ringed and ticked.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AccentPicker(selected: String, onSelect: (String) -> Unit) {
+    val haptic = LocalHaptics.current
+    val colors = MaterialTheme.colorScheme
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(str(R.string.accent), style = MaterialTheme.typography.bodyLarge)
+        if (hasWallpaperColors) {
+            Text(
+                str(R.string.accent_text),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant,
+            )
+        }
+        FlowRow(
+            Modifier.padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // The automatic swatch shows the color the wallpaper gives, whatever the app has now.
+            val context = LocalContext.current
+            val wallpaper = remember {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) dynamicLightColorScheme(context).primary else null
+            }
+            val choices = buildList {
+                // Without the colors of the wallpaper, the automatic accent would be the blue again.
+                if (hasWallpaperColors) add(Triple(ACCENT_AUTO, R.string.accent_auto, wallpaper))
+                ACCENTS.forEach { add(Triple(it.key, it.label, it.seed)) }
+            }
+            val shown = selected.takeIf { key -> choices.any { it.first == key } } ?: choices.first().first
+            for ((key, label, seed) in choices) {
+                Swatch(seed, key == shown, str(label), auto = key == ACCENT_AUTO) {
+                    haptic(Haptic.Tick)
+                    onSelect(key)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Swatch(seed: Color?, selected: Boolean, label: String, auto: Boolean = false, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val ring by animateDpAsState(if (selected) 3.dp else 0.dp, label = "ring")
+    val tick by animateFloatAsState(
+        if (selected) 1f else 0f,
+        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "tick",
+    )
+    Box(
+        Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .border(ring, colors.onSurface, CircleShape)
+            .padding(if (selected) 5.dp else 0.dp)
+            .clip(CircleShape)
+            .background(seed ?: colors.primaryContainer)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (auto) {
+            Icon(
+                Icons.Outlined.Wallpaper,
+                contentDescription = null,
+                tint = if ((seed ?: colors.primaryContainer).luminance() > 0.5f) Color.Black else Color.White,
+                modifier = Modifier.size(22.dp).alpha(1f - tick),
+            )
+        }
+        Icon(
+            Icons.Outlined.Check,
+            contentDescription = null,
+            tint = when {
+                seed == null -> colors.onPrimaryContainer
+                seed.luminance() > 0.5f -> Color.Black
+                else -> Color.White
+            },
+            modifier = Modifier.size(22.dp).graphicsLayer { scaleX = tick; scaleY = tick; alpha = tick },
+        )
     }
 }
 

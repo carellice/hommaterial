@@ -127,7 +127,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -212,10 +211,8 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     BackHandler(enabled = query != null) { query = null }
     // The tile asked to open its panel, by its id, until it does.
     val opening = remember { mutableStateOf<String?>(null) }
-    // The page of the bottom bar, and whether the bar shows: it hides while the page scrolls down.
+    // The page of the bottom bar, which stays in sight but for the search and the keyboard.
     var tab by rememberSaveable { mutableStateOf(TAB_HOME) }
-    var barShown by remember { mutableStateOf(true) }
-    val barScroll = rememberBarScroll { barShown = it }
     val lists = rememberListsModel(vm)
     BackHandler(enabled = tab != TAB_HOME && query == null) { tab = TAB_HOME }
     val typing = WindowInsets.isImeVisible
@@ -285,7 +282,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
         // Over the bottom bar, not on it.
         snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = if (query == null) BOTTOM_BAR_SPACE else 0.dp)) },
     ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize().nestedScroll(barScroll)) {
+        Box(Modifier.padding(padding).fillMaxSize()) {
         AnimatedContent(
             tab,
             transitionSpec = {
@@ -328,11 +325,8 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
         }
         FloatingBottomBar(
             current = tab,
-            visible = query == null && !typing && barShown,
-            onSelect = {
-                tab = it
-                barShown = true
-            },
+            visible = query == null && !typing,
+            onSelect = { tab = it },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
         )
         }

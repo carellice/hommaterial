@@ -43,7 +43,8 @@ Material. Il server porta tutto quello che il telefono faceva fuori dalle scherm
 | `lgtv` (TV con chiave e impronta) | `meta` `lgtv`; in `kv` `lgTvs` senza chiave né impronta | fatto |
 | `assistant` (account, modello, notes, house, taught) | chiavi e modello in `meta`, il resto in `kv` | fatto |
 | `auth` (refresh token, cookie, csrf, marketplace) | `meta` per account | fatto |
-| `settings` (tema, layout, lingua, monitor, PIN) | `localStorage` per dispositivo, come per tablet sull'Android | fatto |
+| `settings` (tema, colore principale, layout, lingua, monitor, PIN) | `localStorage` per dispositivo, come per tablet sull'Android | fatto |
+| Colori dei temi (`ui/AccentSchemes.kt`) | `shared/accent-schemes.js`, scritti insieme da `tools/accents.mjs` | fatto |
 | Backup JSON v1 (`BackupSelection.kt`) | `shared/backup.js` + `/api/backup/keys` e `/api/backup/restore` | fatto |
 
 ## Lavori in sottofondo e notifiche

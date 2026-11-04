@@ -111,25 +111,10 @@ export function HomeScreen({ onSettings }) {
   }, []);
   const found = query != null ? search(query, homeSections(PAGE_ALL, s)) : [];
   const look = homeLook(s, wide);
-  // The page of the bottom bar, and whether the bar shows: it hides while the page scrolls down.
+  // The page of the bottom bar, which stays in sight but for the search and the keyboard.
   const [tab, setTab] = useState(TAB_HOME);
   useBack(() => setTab(TAB_HOME), tab !== TAB_HOME && query == null);
-  const [barShown, setBarShown] = useState(true);
   const typing = useKeyboard();
-  const scrolled = useRef(new WeakMap());
-  const onScroll = (e) => {
-    const node = e.target;
-    if (!(node instanceof Element)) return;
-    const before = scrolled.current.get(node) ?? 0;
-    const delta = node.scrollTop - before;
-    scrolled.current.set(node, node.scrollTop);
-    if (delta > 6 && node.scrollTop > 24) setBarShown(false);
-    else if (delta < -6 || node.scrollTop <= 0) setBarShown(true);
-  };
-  const choose = (next) => {
-    setTab(next);
-    setBarShown(true);
-  };
 
   /** What a touch on the tile of [entry] does: the search runs it for the one it found first. */
   function activate(entry) {
@@ -150,7 +135,7 @@ export function HomeScreen({ onSettings }) {
   }
 
   return html`
-    <div class="screen" onScrollCapture=${onScroll}>
+    <div class="screen">
       <div class="top-bar">
         ${tab === TAB_LISTS
           ? html`<div class="title"><div class="title-large">${str('s_lists')}</div></div>`
@@ -179,7 +164,7 @@ export function HomeScreen({ onSettings }) {
           </div>
         <//>
       </div>`}
-      <${BottomBar} current=${tab} visible=${query == null && !typing && barShown} onSelect=${choose} />
+      <${BottomBar} current=${tab} visible=${query == null && !typing} onSelect=${setTab} />
       ${arranging && html`<${ArrangeDialog} s=${s} onDismiss=${() => setArranging(false)} />`}
       ${s.voice && html`<${VoiceDialog} ask=${s.voice} />`}
     </div>`;

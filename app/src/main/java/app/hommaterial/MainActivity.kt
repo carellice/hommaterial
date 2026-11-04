@@ -20,10 +20,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.hommaterial.data.ServerSync
+import app.hommaterial.ui.accentScheme
 import app.hommaterial.ui.HomeScreen
 import app.hommaterial.ui.LocalHaptics
 import app.hommaterial.ui.LoginScreen
@@ -147,7 +144,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-            HommaterialTheme(dark, haptics = state.haptics, hapticLevel = state.hapticLevel) {
+            HommaterialTheme(dark, state.accent, haptics = state.haptics, hapticLevel = state.hapticLevel) {
                 val haptic = LocalHaptics.current
                 LaunchedEffect(vm, haptic) { vm.haptics.collect(haptic) }
                 // Every return to the app shows fresh states.
@@ -227,13 +224,8 @@ private fun isNight(at: Long, from: Int, to: Int): Boolean {
 }
 
 @Composable
-private fun HommaterialTheme(dark: Boolean, haptics: Boolean, hapticLevel: Int, content: @Composable () -> Unit) {
-    val colors = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (dark) dynamicDarkColorScheme(LocalContext.current) else dynamicLightColorScheme(LocalContext.current)
-        dark -> darkColorScheme()
-        else -> lightColorScheme()
-    }
+private fun HommaterialTheme(dark: Boolean, accent: String, haptics: Boolean, hapticLevel: Int, content: @Composable () -> Unit) {
+    val colors = accentScheme(accent, dark, LocalContext.current)
     MaterialTheme(colorScheme = colors) {
         // Painted behind every screen: what a sliding screen uncovers is the theme, not the window.
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

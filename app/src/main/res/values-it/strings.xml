@@ -697,4 +697,16 @@
     <string name="list_empty_text">Aggiungi qui sopra quello che c\'è da fare, o chiedilo ad Alexa.</string>
     <string name="lists_failed">Non è stato possibile leggere le liste.</string>
     <string name="lists_retry">Riprova</string>
+    <string name="accent">Colore principale</string>
+    <string name="accent_text">Automatico prende i colori dello sfondo del telefono.</string>
+    <string name="accent_auto">Automatico</string>
+    <string name="accent_blue">Blu</string>
+    <string name="accent_sky">Azzurro</string>
+    <string name="accent_teal">Verde acqua</string>
+    <string name="accent_green">Verde</string>
+    <string name="accent_yellow">Giallo</string>
+    <string name="accent_orange">Arancione</string>
+    <string name="accent_red">Rosso</string>
+    <string name="accent_pink">Rosa</string>
+    <string name="accent_purple">Viola</string>
 </resources>

@@ -707,4 +707,16 @@
     <string name="list_empty_text">Add what needs doing above, or ask Alexa.</string>
     <string name="lists_failed">Could not read the lists.</string>
     <string name="lists_retry">Try again</string>
+    <string name="accent">Main color</string>
+    <string name="accent_text">Automatic takes the colors of the wallpaper of the phone.</string>
+    <string name="accent_auto">Automatic</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_sky">Light blue</string>
+    <string name="accent_teal">Teal</string>
+    <string name="accent_green">Green</string>
+    <string name="accent_yellow">Yellow</string>
+    <string name="accent_orange">Orange</string>
+    <string name="accent_red">Red</string>
+    <string name="accent_pink">Pink</string>
+    <string name="accent_purple">Purple</string>
 </resources>

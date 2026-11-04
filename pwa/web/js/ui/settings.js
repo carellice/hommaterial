@@ -5,6 +5,7 @@ import {
 } from './common.js';
 import * as store from '../store.js';
 import { BACKUP_SECTIONS } from '/shared/backup.js';
+import { ACCENTS, accentSeed, shownAccent } from '/shared/accents.js';
 import { DEFAULT_MONITOR } from '../store.js';
 import { str, plural, clock, degrees } from '/shared/i18n.js';
 import {
@@ -22,10 +23,14 @@ import { HINTS, SignOutDialog } from './home.js';
 const SOURCE_URL = 'https://github.com/carellice/hommaterial';
 
 /** A section of the settings that opens and closes on a tap of its title. */
-function Section({ title, text, open, onToggle, children }) {
+// The icon at the head of each section, so that a long list of them is quick to scan.
+const SECTION_ICONS = { appearance: 'palette', notifications: 'notifications', switchbot: 'settings_remote', lgtv: 'tv', assistant: 'auto_awesome', updates: 'system_update', rooms: 'meeting_room', devices: 'devices_other', groups: 'layers', macros: 'extension', monitor: 'tablet_android', timers: 'timer', alerts: 'warning', backup: 'backup', data: 'storage', account: 'account_circle', server: 'dns', hints: 'tips_and_updates', about: 'info' };
+
+function Section({ title, text, icon, open, onToggle, children }) {
   return html`
     <div class=${`card accordion ${open ? 'open' : ''}`}>
       <button class="accordion-head" aria-expanded=${open} onClick=${onToggle}>
+        ${icon && html`<span class="section-icon"><${Icon} name=${icon} /></span>`}
         <span class="title-medium grow">${title}</span><${Icon} name="expand_more" />
       </button>
       ${open && html`<div class="accordion-body">
@@ -43,7 +48,7 @@ export function SettingsScreen({ onBack }) {
   const importInput = useRef(null);
   const close = () => setDialog(null);
   const section = (key, title, text, children) => html`
-    <${Section} title=${str(title)} text=${text && str(text)} open=${open.includes(key)}
+    <${Section} title=${str(title)} text=${text && str(text)} icon=${SECTION_ICONS[key]} open=${open.includes(key)}
       onToggle=${() => setOpen(open.includes(key) ? open.filter((k) => k !== key) : [...open, key])}>${children}<//>`;
 
   const all = placed(s);
@@ -140,6 +145,7 @@ export function SettingsScreen({ onBack }) {
         ${section('appearance', 's_appearance', null, html`
           <${Chips} title=${str('theme')} choices=${[[0, str('theme_auto')], [1, str('theme_light')], [2, str('theme_dark')]]}
             selected=${s.theme} onSelect=${store.setTheme} />
+          <${AccentPicker} selected=${s.accent} onSelect=${store.setAccent} />
           <${Chips} title=${str('layout')} choices=${[[LAYOUT_GRID, str('layout_grid')], [LAYOUT_LIST, str('layout_list')]]}
             selected=${s.layout} onSelect=${store.setLayout} />
           <${Chips} title=${str('language_choose')} choices=${[['auto', str('pwa_language_auto')], ['it', 'Italiano'], ['en', 'English']]}
@@ -406,4 +412,28 @@ function BackupImportDialog() {
       <span style="padding-left:12px">${str(label)}</span>
     </label>`)}
   <//>`;
+}
+
+/** The color of the app: a swatch for each accent, the chosen one ringed and ticked (ui/SettingsScreen.kt). */
+function AccentPicker({ selected, onSelect }) {
+  const shown = shownAccent(selected);
+  return html`
+    <div class="setting-block">
+      <div class="body-large">${str('accent')}</div>
+      <div class="swatches" role="radiogroup" aria-label=${str('accent')}>
+        ${ACCENTS.map((key) => html`
+          <button key=${key} class=${`swatch ${key === shown ? 'selected' : ''} ${light(accentSeed(key)) ? 'light' : ''}`}
+            style=${`--swatch:${accentSeed(key)}`} role="radio" aria-checked=${key === shown}
+            aria-label=${str(`accent_${key}`)} title=${str(`accent_${key}`)} onClick=${() => onSelect(key)}>
+            <${Icon} name="check" />
+          </button>`)}
+      </div>
+    </div>`;
+}
+
+/** Whether [hex] is light enough for a dark tick on it. */
+function light(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5;
 }

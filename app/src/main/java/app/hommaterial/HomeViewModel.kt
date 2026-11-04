@@ -1,5 +1,6 @@
 package app.hommaterial
 
+import app.hommaterial.ui.ACCENT_AUTO
 import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -142,6 +143,8 @@ data class UiState(
     val layout: Int = LAYOUT_GRID,
     /** 0 follows the phone, 1 is always light, 2 always dark. */
     val theme: Int = 0,
+    /** The color of the app: one of the accents, or [ACCENT_AUTO] for that of the wallpaper. */
+    val accent: String = ACCENT_AUTO,
     /** How this tablet behaves as the panel of the home. */
     val monitor: MonitorConfig = MonitorConfig(),
     /** Whether the SwitchBot account is linked, for the infrared remotes of its hubs. */
@@ -333,6 +336,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             haptics = settings.getBoolean("haptics", true),
             hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
             theme = settings.getInt("theme", 0),
+            accent = settings.getString("accent", null) ?: ACCENT_AUTO,
             layout = settings.getInt("layout", LAYOUT_GRID),
             monitor = runCatching {
                 MonitorConfig.fromJson(JSONObject(settings.getString("monitor", "{}")!!))
@@ -457,6 +461,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 marketplace = auth.marketplace,
                 autoUpdate = it.autoUpdate,
                 theme = it.theme,
+                accent = it.accent,
                 layout = it.layout,
                 monitor = it.monitor,
                 pin = it.pin,
@@ -985,6 +990,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(theme = theme) }
     }
 
+    fun setAccent(accent: String) {
+        settings.edit().putString("accent", accent).apply()
+        _state.update { it.copy(accent = accent) }
+    }
+
     fun setMonitor(config: MonitorConfig) {
         settings.edit().putString("monitor", config.toJson().toString()).apply()
         _state.update { it.copy(monitor = config) }
@@ -1359,6 +1369,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("haptics", s.haptics)
             .put("hapticLevel", s.hapticLevel)
             .put("theme", s.theme)
+            .put("accent", s.accent)
             .put("remoteButtons", JSONObject(s.remoteButtons.mapValues { JSONArray(it.value) }))
             .put("hiddenRemotes", JSONArray(s.hiddenRemotes))
             // Without the PIN: a file that travels must not carry it, not even scrambled.
@@ -1492,6 +1503,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .putBoolean("haptics", backup.optBoolean("haptics", true))
             .putInt("hapticLevel", backup.optInt("hapticLevel", HAPTIC_LEVEL_DEFAULT).coerceIn(HAPTIC_LEVEL_MIN, 100))
             .putInt("theme", backup.optInt("theme", 0).coerceIn(0, 2))
+            .putString("accent", backup.optString("accent", ACCENT_AUTO).ifBlank { ACCENT_AUTO })
             .putInt("layout", backup.optInt("layout", 0).coerceIn(0, 1))
             .apply()
         _state.update {
@@ -1515,6 +1527,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 haptics = settings.getBoolean("haptics", true),
                 hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
                 theme = settings.getInt("theme", 0),
+                accent = settings.getString("accent", null) ?: ACCENT_AUTO,
             )
         }
         backup.optJSONObject("remoteButtons")?.let { saved ->

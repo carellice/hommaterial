@@ -3,6 +3,7 @@ import { html, useState, useEffect, useRef } from '../lib.js';
 import { Dialog, Snackbar, useStore, useNow } from './common.js';
 import * as store from '../store.js';
 import { str } from '/shared/i18n.js';
+import { accentCss } from '/shared/accents.js';
 import { HomeScreen } from './home.js';
 import { SettingsScreen } from './settings.js';
 import { OnboardingScreen, LoginScreen, RestScreen } from './screens.js';
@@ -15,16 +16,24 @@ function isNight(at, from, to) {
   return from <= to ? hour >= from && hour < to : hour >= from || hour < to;
 }
 
-function useTheme(theme) {
+function useTheme(theme, accent) {
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 1) root.dataset.theme = 'light';
     else if (theme === 2) root.dataset.theme = 'dark';
     else delete root.dataset.theme;
+    // The colors of the accent, after app.css so that they win over its own.
+    let style = document.getElementById('accent');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'accent';
+      document.head.appendChild(style);
+    }
+    style.textContent = accentCss(accent);
     // The bar of the browser takes the color of the background chosen in the app.
     const background = getComputedStyle(root).getPropertyValue('--background').trim();
     document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => meta.setAttribute('content', background));
-  }, [theme]);
+  }, [theme, accent]);
 }
 
 /** Keeps the screen lit while [on], taking the lock again whenever the page comes back in sight. */
@@ -72,7 +81,7 @@ export function App() {
   const [resting, setResting] = useState(false);
   const touches = useRef(0);
   const [touched, setTouched] = useState(0);
-  useTheme(s.theme);
+  useTheme(s.theme, s.accent);
   useResume(s.account, s.loggedIn);
   useEffect(() => {
     store.checkSession();
