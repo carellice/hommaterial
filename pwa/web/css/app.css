@@ -884,3 +884,68 @@ a { color: var(--primary); }
 .phrase-add { display: flex; align-items: flex-start; gap: 4px; padding: 4px 8px 12px 16px; }
 .phrase-add .field { flex: 1; }
 .phrase-add .icon-btn { margin-top: 22px; }
+
+/* ——— Listening to the microphone ——— */
+.icon-btn.listening { color: var(--on-primary-container); background: var(--primary-container); }
+.listen-scrim { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--scrim, #000) 32%, transparent); animation: listen-fade 200ms ease-out; }
+.listen-panel {
+  position: fixed;
+  z-index: 61;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  width: min(420px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  padding: 28px 24px 24px;
+  border-radius: 28px;
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.22);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  animation: listen-rise 420ms var(--spring);
+}
+.listen-close { position: absolute; top: 8px; right: 8px; }
+.listen-mic {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 8px;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-container-highest);
+  color: var(--on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 260ms, color 260ms, transform 380ms var(--spring);
+}
+.listen-mic .icon { position: relative; z-index: 1; font-size: 36px; }
+.listen-mic .ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--primary);
+  opacity: 0;
+}
+.listen-panel.ready .listen-mic { background: var(--primary); color: var(--on-primary); }
+.listen-panel.ready .listen-mic .ring { animation: listen-ring 1800ms cubic-bezier(0.2, 0.6, 0.4, 1) infinite; }
+.listen-panel.ready .listen-mic .ring + .ring { animation-delay: 900ms; }
+.listen-panel.speaking .listen-mic { transform: scale(1.08); }
+.listen-panel.speaking .listen-mic .ring { animation-duration: 1100ms; }
+.listen-panel.speaking .listen-mic .ring + .ring { animation-delay: 550ms; }
+.listen-text { min-height: 1.5em; max-width: 100%; font-size: 1.15rem; line-height: 1.45; color: var(--on-surface-variant); overflow-wrap: anywhere; }
+.listen-text.heard { color: var(--on-surface); font-weight: 500; }
+.listen-to { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+.listen-to .icon { font-size: 18px; }
+@keyframes listen-ring { from { transform: scale(1); opacity: 0.35; } to { transform: scale(1.9); opacity: 0; } }
+@keyframes listen-rise { from { transform: translate(-50%, 40px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+@keyframes listen-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .listen-panel, .listen-scrim { animation: none; }
+  .listen-panel.ready .listen-mic .ring { animation: none; opacity: 0.18; transform: scale(1.25); }
+}

@@ -1,5 +1,5 @@
 // The home: tiles of devices, groups, custom devices and remotes, in sections and pages.
-import { html, useState, useEffect, useRef } from '../lib.js';
+import { html, render, useState, useEffect, useRef, useLayoutEffect } from '../lib.js';
 import {
   Icon, IconButton, Spinner, Switch, Details, Dialog, FullDialog, Menu, ConfirmDialog, PinDialog,
   Card, Chips, OrderRow, useStore, useNow, useWidth, usePress, useBack,
@@ -683,9 +683,12 @@ function ArrangeDialog({ s, onDismiss }) {
     <//>`;
 }
 
-/** Asks the browser's speech recognizer for a sentence and passes on what it heard. */
+/**
+ * Asks the browser's speech recognizer for a sentence and passes on what it heard. The browser
+ * shows nothing while it listens, so a panel does: when it is ready, and the words as they come.
+ */
 function VoiceButton() {
-  const [listening, setListening] = useState(false);
+  const [session, setSession] = useState(null);
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const listen = () => {
     if (!Recognition) {
@@ -695,29 +698,84 @@ function VoiceButton() {
     const recognition = new Recognition();
     recognition.lang = str('voice_language');
     recognition.maxAlternatives = 5;
-    recognition.interimResults = false;
-    let heard = false;
+    recognition.interimResults = true;
+    let heard = null;
+    let cancelled = false;
+    const show = (change) => setSession((it) => (it ? { ...it, ...change } : it));
+    // Ready once the microphone is open: speaking before is lost.
+    recognition.onaudiostart = () => show({ phase: 'listening' });
+    recognition.onspeechstart = () => show({ speaking: true });
+    recognition.onspeechend = () => show({ speaking: false });
     recognition.onresult = (e) => {
-      heard = true;
-      store.onSpeech(Array.from(e.results[0], (alternative) => alternative.transcript));
+      const text = Array.from(e.results, (r) => r[0].transcript).join(' ').trim();
+      show({ text });
+      const last = e.results[e.results.length - 1];
+      if (last.isFinal) heard = Array.from(last, (alternative) => alternative.transcript);
     };
     recognition.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') store.speechUnavailable();
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        cancelled = true;
+        store.speechUnavailable();
+      }
     };
     recognition.onend = () => {
-      setListening(false);
-      if (!heard) store.onSpeech([]);
+      setSession(null);
+      if (!cancelled) store.onSpeech(heard ?? []);
     };
     try {
       recognition.start();
-      setListening(true);
+      setSession({
+        phase: 'starting', text: '', speaking: false,
+        stop: () => recognition.stop(),
+        cancel: () => {
+          cancelled = true;
+          recognition.abort();
+        },
+      });
     } catch {
       store.speechUnavailable();
     }
   };
-  return html`<button class="icon-btn" aria-label=${str('voice_button')} title=${listening ? str('voice_prompt') : str('voice_button')}
-    onClick=${listen} style=${listening ? 'color:var(--primary);background:var(--primary-container)' : ''}>
-    <${Icon} name="mic" filled=${listening} /></button>`;
+  return html`
+    <button class=${`icon-btn ${session ? 'listening' : ''}`} aria-label=${str('voice_button')} title=${str('voice_button')}
+      aria-pressed=${!!session} onClick=${() => (session ? session.stop() : listen())}>
+      <${Icon} name="mic" filled=${!!session} /></button>
+    ${session && html`<${OnTop}><${ListeningPanel} session=${session} /><//>`}`;
+}
+
+/** Shows [children] on top of the whole page, out of the bar that holds the button. */
+function OnTop({ children }) {
+  const host = useRef(null);
+  if (!host.current) host.current = document.createElement('div');
+  useLayoutEffect(() => {
+    document.body.appendChild(host.current);
+    return () => {
+      render(null, host.current);
+      host.current.remove();
+    };
+  }, []);
+  useLayoutEffect(() => render(children, host.current));
+  return null;
+}
+
+/** What the microphone hears while it listens: a tap on it ends the sentence, the cross or Back drops it. */
+function ListeningPanel({ session }) {
+  const s = useStore();
+  useBack(session.cancel);
+  const ready = session.phase === 'listening';
+  const hint = str(s.voiceEcho ? 'voice_prompt_alexa' : 'voice_prompt');
+  return html`
+    <div class="listen-scrim" onClick=${session.stop}></div>
+    <div class=${`listen-panel ${ready ? 'ready' : ''} ${session.speaking ? 'speaking' : ''}`} role="status" aria-live="polite">
+      <${IconButton} icon="close" label=${str('cancel')} cls="listen-close" onClick=${session.cancel} />
+      <button class="listen-mic" aria-label=${str('pwa_voice_done')} onClick=${session.stop}>
+        <span class="ring"></span><span class="ring"></span>
+        <${Icon} name="mic" filled />
+      </button>
+      <div class="title-medium">${str(ready ? 'pwa_voice_listening' : 'pwa_voice_starting')}</div>
+      <div class=${`listen-text ${session.text ? 'heard' : ''}`}>${session.text || hint}</div>
+      ${s.voiceEcho && html`<div class="listen-to supporting"><${Icon} name="speaker" />${s.voiceEcho.name}</div>`}
+    </div>`;
 }
 
 function VoiceDialog({ ask }) {
