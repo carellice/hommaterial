@@ -214,6 +214,10 @@ collegati al proprio account Alexa.
   una temperatura o un'umidità, oppure quando un dispositivo si accende o si
   spegne, l'app accende o spegne un dispositivo, esegue un dispositivo
   personalizzato o preme un tasto di un telecomando.
+- Dal menu, **Liste** apre le liste di Alexa, le stesse dell'app Alexa e degli
+  Echo: cose da fare, spesa e quelle create da te. Si aggiungono voci, si
+  spuntano e si cancellano. Passano da un'API di Amazon non ufficiale, che può
+  cambiare o smettere di funzionare senza preavviso.
 - Dal menu si impostano le azioni programmate: accendere o spegnere un
   dispositivo, eseguire un dispositivo personalizzato o premere un tasto di
   un telecomando a una certa ora, una volta sola o nei giorni scelti, oppure

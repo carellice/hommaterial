@@ -33,14 +33,15 @@ private const val VOICE_DEVICE_CATEGORY = "ALEXA_VOICE_ENABLED"
 
 class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
 
-    private suspend fun call(method: String, path: String, body: JSONObject? = null): JSONObject =
+    /** A call to the Alexa web API; [site] is "www" for the lists, which live on the shop's own host. */
+    private suspend fun call(method: String, path: String, body: JSONObject? = null, site: String = "alexa"): JSONObject =
         withContext(Dispatchers.IO) {
             val market = auth.marketplace
             val host = market.alexaHost
             var session = auth.session()
             repeat(2) { attempt ->
                 val request = Request.Builder()
-                    .url("https://$host$path")
+                    .url("https://$site.${market.domain}$path")
                     .header("User-Agent", USER_AGENT)
                     .header("Accept", "application/json; charset=utf-8")
                     .header("Accept-Language", market.locale)
@@ -228,5 +229,110 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
                 },
             )
         }
+    }
+
+    // --- lists ---------------------------------------------------------------------------------
+    // The to-do and shopping lists of Alexa, through the API its own app uses (as alexa-remote
+    // does): undocumented, so the answers are read loosely.
+
+    suspend fun lists(): List<AlexaList> {
+        val answer = if (ServerSync.active) {
+            ServerSync.call("GET", "/api/lists")
+        } else {
+            val body = JSONObject()
+                .put("listAttributesToAggregate", JSONArray().put(JSONObject().put("type", "totalActiveItemsCount")))
+                .put("listOwnershipType", JSONObject.NULL)
+            val raw = call("POST", "$LISTS/fetch", body, site = "www")
+            JSONObject().put("lists", AlexaList.fromAmazon(raw.optJSONArray("listInfoList") ?: JSONArray()))
+        }
+        return (answer.optJSONArray("lists") ?: JSONArray()).mapObjects(AlexaList::fromJson)
+    }
+
+    suspend fun listItems(listId: String): List<ListItem> {
+        if (ServerSync.active) {
+            return (ServerSync.call("GET", "/api/lists/${ServerSync.encode(listId)}/items").optJSONArray("items") ?: JSONArray())
+                .mapObjects(ListItem::fromJson)
+        }
+        val body = JSONObject().put("itemAttributesToProject", JSONArray().put("quantity").put("note"))
+        val raw = call("POST", "$LISTS/${listId.encoded()}/items/fetch?limit=200", body, site = "www")
+        return (raw.optJSONArray("itemInfoList") ?: JSONArray()).mapObjects(ListItem::fromAmazon)
+    }
+
+    suspend fun addListItem(listId: String, name: String) {
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/lists/${ServerSync.encode(listId)}/items", JSONObject().put("name", name))
+            return
+        }
+        val item = JSONObject().put("itemType", "KEYWORD").put("itemName", name)
+        call("POST", "$LISTS/${listId.encoded()}/items", JSONObject().put("items", JSONArray().put(item)), site = "www")
+    }
+
+    /** Ticks an item off, or back on; Amazon wants the version last read. */
+    suspend fun setListItemDone(listId: String, item: ListItem, completed: Boolean) {
+        if (ServerSync.active) {
+            ServerSync.call(
+                "PUT",
+                "/api/lists/${ServerSync.encode(listId)}/items/${ServerSync.encode(item.id)}",
+                JSONObject().put("version", item.version).put("completed", completed),
+            )
+            return
+        }
+        val status = JSONObject().put("type", "itemStatus").put("value", if (completed) "COMPLETE" else "ACTIVE")
+        val body = JSONObject().put("itemAttributesToUpdate", JSONArray().put(status)).put("itemAttributesToRemove", JSONArray())
+        call("PUT", "$LISTS/${listId.encoded()}/items/${item.id.encoded()}?version=${item.version}", body, site = "www")
+    }
+
+    suspend fun deleteListItem(listId: String, item: ListItem) {
+        if (ServerSync.active) {
+            ServerSync.call("DELETE", "/api/lists/${ServerSync.encode(listId)}/items/${ServerSync.encode(item.id)}?version=${item.version}")
+            return
+        }
+        call("DELETE", "$LISTS/${listId.encoded()}/items/${item.id.encoded()}?version=${item.version}", site = "www")
+    }
+
+    private fun String.encoded(): String = java.net.URLEncoder.encode(this, "UTF-8").replace("+", "%20")
+}
+
+private const val LISTS = "/alexashoppinglists/api/v2/lists"
+
+/** A list of Alexa: [type] is TO_DO, SHOPPING_LIST or one the user made; [active] how many items are still to do. */
+data class AlexaList(val id: String, val name: String, val type: String, val active: Int?) {
+    companion object {
+        fun fromJson(o: JSONObject) = AlexaList(
+            o.getString("id"),
+            o.optString("name"),
+            o.optString("type", "CUSTOM"),
+            if (o.isNull("active")) null else o.optInt("active"),
+        )
+
+        /** The lists as Amazon answers, in the format of the home server. */
+        fun fromAmazon(list: JSONArray): JSONArray = JSONArray().also { out ->
+            for (i in 0 until list.length()) {
+                val it = list.optJSONObject(i) ?: continue
+                if (it.optBoolean("archived")) continue
+                val active = runCatching { JSONObject(it.optString("totalActiveItemsCount")).optInt("count") }.getOrNull()
+                out.put(
+                    JSONObject()
+                        .put("id", it.optString("listId"))
+                        .put("name", it.optString("listName"))
+                        .put("type", it.optString("listType", "CUSTOM"))
+                        .put("active", active ?: JSONObject.NULL),
+                )
+            }
+        }
+    }
+}
+
+/** An item of a list; [version] goes with every change, as Amazon wants it. */
+data class ListItem(val id: String, val name: String, val completed: Boolean, val version: Long) {
+    companion object {
+        fun fromJson(o: JSONObject) = ListItem(o.getString("id"), o.optString("name"), o.optBoolean("completed"), o.optLong("version", 1))
+
+        fun fromAmazon(o: JSONObject) = ListItem(
+            o.optString("itemId"),
+            o.optString("itemName"),
+            o.optString("itemStatus") == "COMPLETE",
+            o.optLong("version", 1),
+        )
     }
 }

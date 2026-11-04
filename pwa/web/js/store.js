@@ -597,6 +597,38 @@ export async function clearHistory() {
   if (await guarded(() => del('/api/history'))) say(str('history_cleared'));
 }
 
+// ——— The lists of Alexa, asked every time: they change from the Echo devices and the Alexa app too ———
+
+/** Runs [block] for the lists screen, telling a failure as the rest of the app does; null when it failed. */
+async function onList(block) {
+  let result = null;
+  const ok = await guarded(async () => {
+    result = await block();
+  });
+  return ok ? result ?? true : null;
+}
+
+export const alexaLists = () => onList(async () => (await get('/api/lists')).lists);
+
+export const alexaListItems = (listId) =>
+  onList(async () => (await get(`/api/lists/${encodeURIComponent(listId)}/items`)).items);
+
+export async function addAlexaListItem(listId, name) {
+  navigator.vibrate?.(12);
+  return (await onList(() => post(`/api/lists/${encodeURIComponent(listId)}/items`, { name }))) != null;
+}
+
+export async function setAlexaListItemDone(listId, item, completed) {
+  navigator.vibrate?.(12);
+  const path = `/api/lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(item.id)}`;
+  return (await onList(() => api('PUT', path, { version: item.version, completed }))) != null;
+}
+
+export async function deleteAlexaListItem(listId, item) {
+  const path = `/api/lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(item.id)}?version=${item.version}`;
+  return (await onList(() => del(path))) != null;
+}
+
 // ——— Rooms and groups ———
 
 const omit = (map, key) => {

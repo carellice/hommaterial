@@ -16,6 +16,7 @@ import { RemoteTile } from './remotes.js';
 import { HistoryCharts } from './chart.js';
 import { SchedulesDialog, TimerChoices } from './schedules.js';
 import { AutomationsDialog } from './automations.js';
+import { ListsDialog } from './lists.js';
 
 // By size of the tiles: compact, normal, large.
 const LIST_MIN_WIDTH = 320;
@@ -699,6 +700,8 @@ function OverflowMenu({ s, onSettings, onArrange }) {
     [str('refresh'), store.refresh],
     (s.hidden.length > 0 || s.hiddenRemotes.length > 0) && [str(s.showHidden ? 'hide_hidden' : 'show_hidden'), store.toggleShowHidden],
     [str('check_updates'), () => store.checkForUpdate(true)],
+    // The lists are for everybody at home, as on an Echo: not behind the PIN of the monitor.
+    [str('s_lists'), () => setDialog('lists')],
     [str('arrange'), () => guarded(onArrange)],
     [str('s_automations'), () => guarded(() => setDialog('automations'))],
     [str('s_schedules'), () => guarded(() => setDialog('schedules'))],
@@ -711,6 +714,7 @@ function OverflowMenu({ s, onSettings, onArrange }) {
     ${anchor && html`<${Menu} anchor=${anchor} items=${items} onDismiss=${() => setAnchor(null)} />`}
     ${dialog === 'automations' && html`<${AutomationsDialog} s=${s} onDismiss=${close} />`}
     ${dialog === 'schedules' && html`<${SchedulesDialog} s=${s} onDismiss=${close} />`}
+    ${dialog === 'lists' && html`<${ListsDialog} onDismiss=${close} />`}
     ${dialog === 'signOut' && html`<${SignOutDialog} onDismiss=${close} />`}
     ${behindPin && html`<${PinDialog} title=${str('pin_ask_title')} onDismiss=${() => setBehindPin(null)}
       onSubmit=${async (pin) => {

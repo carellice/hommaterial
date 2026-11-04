@@ -352,7 +352,35 @@ route('GET', '/api/alexa/diagnostics/:id', async (_req, res, [id]) => {
   json(res, 200, { text: await alexa.diagnostics(requireDevice(decodeURIComponent(id))) })
 })
 
-route('GET', '/api/history/:id', (_req, res, [id]) => json(res, 200, { readings: data.readings(decodeURIComponent(id)) }))
+// --- the lists of Alexa: to-do, shopping and those made by the user ---------------------------------
+
+route('GET', '/api/lists', async (_req, res) => json(res, 200, { lists: await alexa.lists() }))
+
+route('GET', '/api/lists/:id/items', async (_req, res, [id]) =>
+  json(res, 200, { items: await alexa.listItems(decodeURIComponent(id)) }))
+
+route('POST', '/api/lists/:id/items', async (req, res, [id]) => {
+  const { name } = await readJson<{ name?: string }>(req)
+  const value = text(name, 500).trim()
+  if (!value) throw new HttpError(400, str('something_wrong'))
+  json(res, 200, { item: await alexa.addListItem(decodeURIComponent(id), value) })
+})
+
+route('PUT', '/api/lists/:id/items/:item', async (req, res, [id, item]) => {
+  const body = await readJson<{ version?: number; name?: string; completed?: boolean }>(req)
+  await alexa.updateListItem(decodeURIComponent(id), decodeURIComponent(item), Number(body.version) || 1, {
+    name: body.name == null ? undefined : text(body.name, 500).trim(),
+    completed: typeof body.completed === 'boolean' ? body.completed : undefined,
+  })
+  ok(res)
+})
+
+route('DELETE', '/api/lists/:id/items/:item', async (_req, res, [id, item], url) => {
+  await alexa.deleteListItem(decodeURIComponent(id), decodeURIComponent(item), Number(url.searchParams.get('version')) || 1)
+  ok(res)
+})
+
+route('GET', '/api/history/:id',(_req, res, [id]) => json(res, 200, { readings: data.readings(decodeURIComponent(id)) }))
 
 route('DELETE', '/api/history', (_req, res) => {
   data.clearHistory()

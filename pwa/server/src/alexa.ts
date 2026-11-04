@@ -291,12 +291,13 @@ export function logout() {
 
 // --- the API -------------------------------------------------------------------------------------
 
-async function api(method: string, path: string, body: unknown = null): Promise<any> {
+/** A call to the Alexa web API; [site] is "www" for the lists, which live on the shop's own host. */
+async function api(method: string, path: string, body: unknown = null, site = 'alexa'): Promise<any> {
   const market = marketplace()
   const host = `alexa.${market.domain}`
   let current = await session()
   for (let attempt = 0; attempt < 2; attempt++) {
-    const response = await call(`https://${host}${path}`, method, {
+    const response = await call(`https://${site}.${market.domain}${path}`, method, {
       'User-Agent': USER_AGENT,
       Accept: 'application/json; charset=utf-8',
       'Accept-Language': market.locale,
@@ -432,3 +433,66 @@ export async function control(device: Device, parameters: Record<string, unknown
 }
 
 export const setPower = (device: Device, on: boolean) => control(device, { action: on ? 'turnOn' : 'turnOff' })
+
+// --- lists -------------------------------------------------------------------------------------
+// The to-do and shopping lists of Alexa, through the API its own app uses (as alexa-remote does):
+// undocumented, so the answers are read loosely and kept as they come.
+
+export type AlexaList = { id: string; name: string; type: string; active: number | null }
+export type ListItem = { id: string; name: string; completed: boolean; version: number; updatedAt: number | null }
+
+const LISTS = '/alexashoppinglists/api/v2/lists'
+
+export async function lists(): Promise<AlexaList[]> {
+  const answer = await api('POST', `${LISTS}/fetch`, {
+    listAttributesToAggregate: [{ type: 'totalActiveItemsCount' }],
+    listOwnershipType: null,
+  }, 'www')
+  return (answer.listInfoList ?? []).filter((it: any) => !it.archived).map((it: any) => {
+    let active: number | null = null
+    try {
+      active = JSON.parse(it.totalActiveItemsCount).count ?? null
+    } catch {
+      active = null
+    }
+    return { id: String(it.listId), name: String(it.listName || ''), type: String(it.listType || 'CUSTOM'), active }
+  })
+}
+
+const toItem = (it: any): ListItem => ({
+  id: String(it.itemId),
+  name: String(it.itemName ?? ''),
+  completed: it.itemStatus === 'COMPLETE',
+  version: Number(it.version ?? 1),
+  updatedAt: Number(it.updateAt ?? it.createAt) || null,
+})
+
+export async function listItems(listId: string): Promise<ListItem[]> {
+  const answer = await api('POST', `${LISTS}/${encodeURIComponent(listId)}/items/fetch?limit=200`, {
+    itemAttributesToProject: ['quantity', 'note'],
+  }, 'www')
+  return (answer.itemInfoList ?? []).map(toItem)
+}
+
+export async function addListItem(listId: string, name: string): Promise<ListItem | null> {
+  const answer = await api('POST', `${LISTS}/${encodeURIComponent(listId)}/items`, {
+    items: [{ itemType: 'KEYWORD', itemName: name }],
+  }, 'www')
+  const created = (answer.itemInfoList ?? [])[0]
+  return created ? toItem(created) : null
+}
+
+/** Renames an item or ticks it off; [version] is the one last read, as Amazon wants it. */
+export async function updateListItem(listId: string, itemId: string, version: number, change: { name?: string; completed?: boolean }) {
+  const itemAttributesToUpdate = []
+  if (change.name != null) itemAttributesToUpdate.push({ type: 'itemName', value: change.name })
+  if (change.completed != null) itemAttributesToUpdate.push({ type: 'itemStatus', value: change.completed ? 'COMPLETE' : 'ACTIVE' })
+  await api('PUT', `${LISTS}/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}?version=${version}`, {
+    itemAttributesToUpdate,
+    itemAttributesToRemove: [],
+  }, 'www')
+}
+
+export async function deleteListItem(listId: string, itemId: string, version: number) {
+  await api('DELETE', `${LISTS}/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}?version=${version}`, null, 'www')
+}

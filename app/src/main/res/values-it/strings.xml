@@ -680,4 +680,15 @@
     <string name="server_error">Errore del server (%1$d)</string>
     <string name="server_tls">Certificato HTTPS non valido: con il certificato locale installalo prima sul telefono</string>
     <string name="server_unreachable">Server non raggiungibile: controlla la connessione (e Tailscale, se lo usi)</string>
+    <string name="s_lists">Liste</string>
+    <string name="lists_text">Le liste di Alexa, le stesse dell\'app Alexa e degli Echo. Si leggono e si scrivono con un\'API di Amazon non ufficiale, che può cambiare senza preavviso.</string>
+    <string name="lists_none">Alexa non ha liste da mostrare.</string>
+    <string name="list_todo">Cose da fare</string>
+    <string name="list_shopping">Spesa</string>
+    <string name="list_add_hint">Aggiungi una voce</string>
+    <string name="list_add">Aggiungi</string>
+    <string name="list_empty">Non c\'è niente da fare</string>
+    <string name="list_delete">Elimina</string>
+    <string name="list_done_show">Mostra le completate (%1$d)</string>
+    <string name="list_done_hide">Nascondi le completate (%1$d)</string>
 </resources>

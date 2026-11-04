@@ -1226,6 +1226,8 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
     if (automating) AutomationsDialog(state, vm, onDismiss = { automating = false })
     var scheduling by remember { mutableStateOf(false) }
     if (scheduling) SchedulesDialog(state, vm, onDismiss = { scheduling = false })
+    var listing by remember { mutableStateOf(false) }
+    if (listing) ListsDialog(vm, onDismiss = { listing = false })
     // What waits for the PIN of the monitor before it happens.
     var behindPin by remember { mutableStateOf<(() -> Unit)?>(null) }
     behindPin?.let { action ->
@@ -1249,6 +1251,8 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
             text = { Text(str(R.string.check_updates)) },
             onClick = { open = false; vm.checkForUpdate(manual = true) },
         )
+        // The lists are for everybody at home, as on an Echo: not behind the PIN of the monitor.
+        DropdownMenuItem(text = { Text(str(R.string.s_lists)) }, onClick = { open = false; listing = true })
         DropdownMenuItem(text = { Text(str(R.string.arrange)) }, onClick = { open = false; guarded(onArrange) })
         DropdownMenuItem(
             text = { Text(str(R.string.s_automations)) },

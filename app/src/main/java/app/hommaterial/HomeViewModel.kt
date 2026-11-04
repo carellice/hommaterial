@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import app.hommaterial.R
 import app.hommaterial.data.AcSetting
 import app.hommaterial.data.Alexa
+import app.hommaterial.data.AlexaList
 import app.hommaterial.data.AssistantCatalog
 import app.hommaterial.data.AssistantException
 import app.hommaterial.data.AssistantNote
@@ -29,6 +30,7 @@ import app.hommaterial.data.LG_PREFIX
 import app.hommaterial.data.LgTv
 import app.hommaterial.data.LgTvException
 import app.hommaterial.data.LgTvs
+import app.hommaterial.data.ListItem
 import app.hommaterial.data.LoginAttempt
 import app.hommaterial.data.Macro
 import app.hommaterial.data.MacroAction
@@ -1567,6 +1569,33 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun readings(device: Device): List<Reading> = history.readings(device.applianceId)
+
+    // --- the lists of Alexa ----------------------------------------------------------------------
+    // Asked to Alexa every time, not kept: they change from the Echo devices and the Alexa app too.
+
+    /** Runs [block] for the lists screen, telling a failure as the rest of the app does; null when it failed. */
+    private suspend fun <T> onList(block: suspend () -> T): T? {
+        var result: T? = null
+        guarded { result = block() }
+        return result
+    }
+
+    suspend fun alexaLists(): List<AlexaList>? = onList { api.lists() }
+
+    suspend fun alexaListItems(listId: String): List<ListItem>? = onList { api.listItems(listId) }
+
+    suspend fun addAlexaListItem(listId: String, name: String): Boolean {
+        _haptics.tryEmit(Haptic.Confirm)
+        return onList { api.addListItem(listId, name) } != null
+    }
+
+    suspend fun setAlexaListItemDone(listId: String, item: ListItem, completed: Boolean): Boolean {
+        _haptics.tryEmit(if (completed) Haptic.On else Haptic.Off)
+        return onList { api.setListItemDone(listId, item, completed) } != null
+    }
+
+    suspend fun deleteAlexaListItem(listId: String, item: ListItem): Boolean =
+        onList { api.deleteListItem(listId, item) } != null
 
     // --- the home server -------------------------------------------------------------------------
 

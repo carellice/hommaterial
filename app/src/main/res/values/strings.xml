@@ -690,4 +690,15 @@
     <string name="server_error">Server error (%1$d)</string>
     <string name="server_tls">Invalid HTTPS certificate: with the local certificate, install it on the phone first</string>
     <string name="server_unreachable">Server unreachable: check the connection (and Tailscale, if you use it)</string>
+    <string name="s_lists">Lists</string>
+    <string name="lists_text">The lists of Alexa, the same as in the Alexa app and on the Echo devices. They are read and written through an unofficial Amazon API, which may change without notice.</string>
+    <string name="lists_none">Alexa has no lists to show.</string>
+    <string name="list_todo">To-do</string>
+    <string name="list_shopping">Shopping</string>
+    <string name="list_add_hint">Add an item</string>
+    <string name="list_add">Add</string>
+    <string name="list_empty">Nothing left to do</string>
+    <string name="list_delete">Delete</string>
+    <string name="list_done_show">Show the completed ones (%1$d)</string>
+    <string name="list_done_hide">Hide the completed ones (%1$d)</string>
 </resources>

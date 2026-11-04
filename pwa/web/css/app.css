@@ -620,3 +620,7 @@ a { color: var(--primary); }
 .account-form .appear { display: flex; flex-direction: column; gap: 8px; animation: appear 250ms cubic-bezier(0.4, 0, 0.2, 1); }
 @keyframes appear { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 .text-btn.danger { color: var(--error); }
+
+/* ——— The lists of Alexa ——— */
+.list-row .icon.primary { color: var(--primary); }
+.list-row .done { text-decoration: line-through; color: var(--on-surface-variant); }
