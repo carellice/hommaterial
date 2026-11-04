@@ -185,7 +185,17 @@ function useAccount(username) {
   cache = new Prefs(`cache.${username.toLowerCase()}`);
   const saved = cache.get('snapshot', null);
   revision = null;
-  if (saved?.data) update(fromServer({ ...EMPTY_DATA, ...saved.data }, { ...EMPTY_STATUS, ...saved.status }));
+  if (saved?.data) update(fromServer({ ...EMPTY_DATA, ...saved.data, favorites: ownFavorites(saved.data.favorites) }, { ...EMPTY_STATUS, ...saved.status }));
+}
+
+/**
+ * The favorites of this browser: each device keeps its own, so they are never sent to the server.
+ * The first time they are those the account had, so that nothing is lost on the way.
+ */
+function ownFavorites(fromAccount) {
+  if (!cache) return [];
+  if (!cache.has('favorites')) cache.set('favorites', Array.isArray(fromAccount) ? fromAccount : []);
+  return cache.get('favorites', []);
 }
 
 // Values written by the app and not yet confirmed by the server keep what the user just chose.
@@ -195,6 +205,7 @@ function applySnapshot(answer) {
   revision = answer.revision;
   const data = { ...EMPTY_DATA, ...answer.data };
   for (const [key, value] of pendingValues) data[key] = value;
+  data.favorites = ownFavorites(answer.data?.favorites);
   const next = fromServer(data, { ...EMPTY_STATUS, ...answer.status });
   // Devices with a command in flight keep their optimistic state.
   const states = { ...next.states };
@@ -496,7 +507,9 @@ export function setTileSpan(key, columns) {
 
 /** Adds to the favorites, or takes away, a device by its applianceId, or a remote or custom device by its key. */
 export function setFavorite(key, favorite) {
-  put({ favorites: favorite ? withItem(state.favorites, key) : without(state.favorites, key) });
+  const favorites = favorite ? withItem(state.favorites, key) : without(state.favorites, key);
+  cache?.set('favorites', favorites);
+  update({ favorites });
 }
 
 export function toggleShowHidden() {
@@ -1090,8 +1103,11 @@ async function restore(backup, selected) {
   const list = (v) => (Array.isArray(v) ? v.map(String) : []);
   const alerts = {};
   for (const [id, a] of Object.entries(backup.alerts || {})) alerts[id] = { above: a.above ?? null, below: a.below ?? null };
+  if (selected.includes('favorites')) {
+    cache?.set('favorites', list(backup.favorites));
+    update({ favorites: list(backup.favorites) });
+  }
   const values = {
-    favorites: list(backup.favorites),
     hidden: list(backup.hidden),
     rooms: backup.rooms || {},
     roomList: list(backup.roomList),

@@ -36,7 +36,8 @@ data class SyncStatus(val syncedAt: Long? = null, val error: String? = null, val
  * changed names only; without a connection it waits and goes with the next sync, and on a
  * conflict the last change to arrive wins. Commands to Alexa, SwitchBot and the TVs go through
  * the server, and the server alone runs timers, schedules, automations and alerts: the phone shows
- * what happened as its own notifications ([notices]).
+ * what happened as its own notifications ([notices]). The favorites and the monitor mode stay on
+ * each device, so that every one of them can have its own.
  */
 object ServerSync {
     private lateinit var app: Context
@@ -148,7 +149,6 @@ object ServerSync {
             val dirty = store.dirty
             fun keep(name: String) = name in dirty
             if (!keep("hidden")) cache.putStringSet("hidden", strings(data.optJSONArray("hidden")))
-            if (!keep("favorites")) cache.putStringSet("favorites", strings(data.optJSONArray("favorites")))
             for (name in listOf("rooms", "order", "tileSpans")) {
                 if (!keep(name)) cache.putString(name, (data.optJSONObject(name) ?: JSONObject()).toString())
             }
@@ -285,7 +285,8 @@ object ServerSync {
         val dirty = store.dirty
         if (dirty.isEmpty() || !active) return
         val values = JSONObject()
-        for (name in dirty) values.put(name, localValue(name))
+        // The favorites noted before they stopped going to the server stay on the phone.
+        for (name in dirty - "favorites") values.put(name, localValue(name))
         try {
             client.request(config, "POST", "/api/data", JSONObject().put("values", values))
             store.dirty = store.dirty - dirty
@@ -317,7 +318,6 @@ object ServerSync {
         fun arrayOf(p: SharedPreferences, key: String) = runCatching { JSONArray(p.getString(key, "[]")!!) }.getOrDefault(JSONArray())
         return when (name) {
             "hidden" -> JSONArray(cache.hidden())
-            "favorites" -> JSONArray(cache.favorites())
             "rooms", "order", "tileSpans" -> objectOf(prefs, name)
             "roomList", "groups", "macros" -> arrayOf(prefs, name)
             "shortcuts" -> prefs.getString("shortcuts", null)?.let { JSONArray(it) } ?: JSONObject.NULL
@@ -381,9 +381,10 @@ object ServerSync {
     private const val PUSH_DELAY_MS = 600L
     private const val HISTORY_EVERY_MS = 10 * 60_000L
 
-    // The names the choices have on the phone, and on the server.
+    // The names the choices have on the phone, and on the server. The favorites and the monitor mode
+    // are not among them: each device keeps its own.
     private val CACHE_KEYS = mapOf(
-        "hidden" to "hidden", "favorites" to "favorites", "rooms" to "rooms", "roomList" to "roomList",
+        "hidden" to "hidden", "rooms" to "rooms", "roomList" to "roomList",
         "groups" to "groups", "order" to "order", "tileSpans" to "tileSpans", "macros" to "macros",
         "shortcuts" to "shortcuts", "widget" to "widget",
     )

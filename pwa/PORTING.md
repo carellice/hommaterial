@@ -36,7 +36,7 @@ Material. Il server porta tutto quello che il telefono faceva fuori dalle scherm
 
 | Android (SharedPreferences) | Server | Stato |
 |---|---|---|
-| `cache`: devices, states, hidden, favorites, rooms, roomList, groups, order, tileSpans, macros, shortcuts, widget, tileDevice* | `kv` per account, stessi nomi e stesso JSON (`server/src/db.ts`) | fatto |
+| `cache`: devices, states, hidden, rooms, roomList, groups, order, tileSpans, macros, shortcuts, widget, tileDevice* | `kv` per account, stessi nomi e stesso JSON (`server/src/db.ts`) | fatto |
 | `Timers`, `Schedules`, `Automations`, `Alerts` | `kv` timers, schedules, automations, alerts; "tripped" in `meta` | fatto |
 | `history` (storico sensori) | tabella `history` per account, una settimana, una lettura ogni 10 minuti al massimo | fatto |
 | `switchbot` (token, secret, remotes, buttons, hidden, ac) | chiavi in `meta`, il resto in `kv` | fatto |
@@ -44,6 +44,7 @@ Material. Il server porta tutto quello che il telefono faceva fuori dalle scherm
 | `assistant` (account, modello, notes, house, taught) | chiavi e modello in `meta`, il resto in `kv` | fatto |
 | `auth` (refresh token, cookie, csrf, marketplace) | `meta` per account | fatto |
 | `settings` (tema, colore principale, layout, lingua, monitor, PIN) | `localStorage` per dispositivo, come per tablet sull'Android | fatto |
+| `cache` favorites (mai inviati al server, ogni dispositivo ha i suoi) | `localStorage` per account e dispositivo (`store.js` `ownFavorites`), la prima volta presi dall'account | fatto |
 | Colori dei temi (`ui/AccentSchemes.kt`) | `shared/accent-schemes.js`, scritti insieme da `tools/accents.mjs` | fatto |
 | Backup JSON v1 (`BackupSelection.kt`) | `shared/backup.js` + `/api/backup/keys` e `/api/backup/restore` | fatto |
 
