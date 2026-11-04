@@ -216,8 +216,8 @@ export function FullDialog({ title, onDismiss, actions, children, closeLabel = s
     </div>`;
 }
 
-/** A list to pick one entry from; each has a label and may have a line under it. */
-export const ListDialog = ({ title, items, onPick, onDismiss, empty }) => html`
+/** A list to pick one entry from; each has a label and may have a line under it. A [note] goes below them. */
+export const ListDialog = ({ title, items, onPick, onDismiss, empty, note }) => html`
   <${Dialog} title=${title} onDismiss=${onDismiss} flush
     actions=${html`<button class="text-btn" onClick=${onDismiss}>${str('cancel')}</button>`}>
     ${!items.length && empty && html`<div class="body-medium" style="padding:0 16px">${empty}</div>`}
@@ -226,6 +226,7 @@ export const ListDialog = ({ title, items, onPick, onDismiss, empty }) => html`
         <span class="texts"><span class="body-large">${label}</span>
           ${hint && html`<span class="supporting">${hint}</span>`}</span>
       </button>`)}
+    ${note && html`<div class="body-medium supporting" style="padding:12px 16px">${note}</div>`}
   <//>`;
 
 /** Asks before doing something that cannot be undone. */

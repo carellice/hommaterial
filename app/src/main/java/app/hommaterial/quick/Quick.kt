@@ -6,6 +6,7 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.glance.appwidget.updateAll
 import app.hommaterial.R
+import app.hommaterial.data.ACTION_ALEXA
 import app.hommaterial.data.ACTION_POWER
 import app.hommaterial.data.ACTION_REMOTE
 import app.hommaterial.data.ACTION_WAIT
@@ -182,6 +183,7 @@ object Quick {
                         cache.putStates(known + (target.applianceId to state))
                     }
                     ACTION_REMOTE -> press(context, action.target, action.value, action.custom)
+                    ACTION_ALEXA -> alexa.api.say(action.target, action.value)
                 }
             }
             Outcome(true, str(R.string.macro_done, macro.name))

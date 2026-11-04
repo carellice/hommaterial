@@ -4,6 +4,8 @@ import { str, plural, number, clock, dateText, degrees, locale } from './i18n.js
 export const ACTION_POWER = 'power';
 export const ACTION_REMOTE = 'remote';
 export const ACTION_WAIT = 'wait';
+/** Telling Alexa something through an Echo: [target] is the Echo, [value] the words. */
+export const ACTION_ALEXA = 'alexa';
 /** Running a custom device: an action only a schedule has, since a custom device does not run another. */
 export const ACTION_MACRO = 'macro';
 
@@ -199,6 +201,8 @@ export function describe(action, s) {
       return str('schedule_run', s.macros.find((m) => m.id === action.target)?.name ?? str('macro_gone'));
     case ACTION_WAIT:
       return plural('macro_wait', Number(action.value) || 0);
+    case ACTION_ALEXA:
+      return str('macro_alexa', action.value);
     case ACTION_POWER: {
       const name = s.devices.find((d) => d.applianceId === action.target)?.name ?? str('macro_gone');
       return str(action.value === 'on' ? 'voice_on' : 'voice_off', name);

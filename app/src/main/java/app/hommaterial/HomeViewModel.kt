@@ -45,6 +45,7 @@ import app.hommaterial.data.Schedule
 import app.hommaterial.data.ServerSync
 import app.hommaterial.data.SwitchBot
 import app.hommaterial.data.Update
+import app.hommaterial.data.Echo
 import app.hommaterial.data.Updater
 import app.hommaterial.data.WidgetConfig
 import app.hommaterial.data.WorkersAi
@@ -74,6 +75,7 @@ import app.hommaterial.voice.ExtraCommand
 import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
 import app.hommaterial.voice.parseExtras
+import app.hommaterial.voice.parsePhrase
 import app.hommaterial.voice.parseVoice
 import java.io.File
 import java.security.MessageDigest
@@ -169,6 +171,10 @@ data class UiState(
     val voice: VoiceResult.Ask? = null,
     /** Whether a spoken command is with the assistant, to have its names put right. */
     val correcting: Boolean = false,
+    /** The Echo that what is said to the microphone goes to, as if said to it; null when the app understands it by itself. */
+    val voiceEcho: Echo? = null,
+    /** The Echo devices of the account, once asked for in the settings; null while they are looked for. */
+    val echos: List<Echo>? = null,
     /** When the states were last fetched from Alexa, in epoch milliseconds. */
     val updatedAt: Long? = null,
     /** A newer release found on GitHub, while it is being offered or downloaded. */
@@ -342,6 +348,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 MonitorConfig.fromJson(JSONObject(settings.getString("monitor", "{}")!!))
             }.getOrDefault(MonitorConfig()),
             pin = settings.contains(PIN_KEY),
+            voiceEcho = settings.getString("voiceEcho", null)?.let { runCatching { Echo.fromJson(JSONObject(it)) }.getOrNull() },
             switchBot = switchBot.connected,
             switchBotRemotes = switchBot.remotes(),
             remoteButtons = switchBot.buttons(),
@@ -375,6 +382,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 tvSearch = s.tvSearch,
                 voice = s.voice,
                 correcting = s.correcting,
+                echos = s.echos,
                 askBackupRestore = s.askBackupRestore,
                 update = s.update,
                 updatePrompt = s.updatePrompt,
@@ -636,10 +644,20 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Acts on what the speech recognizer [heard], its guesses best first. What is not clearly
-     * understood goes to the assistant, when there is one, to have the names put right first.
+     * Acts on what the speech recognizer [heard], its guesses best first. A voice phrase of a custom
+     * device runs it; anything else goes to Alexa, when an Echo was chosen for it. Otherwise what is
+     * not clearly understood goes to the assistant, when there is one, to have the names put right first.
      */
     fun onSpeech(heard: List<String>) {
+        val s = _state.value
+        parsePhrase(heard, s.macros.map { it.id to it.phrases })?.let { id ->
+            val macro = s.macros.first { it.id == id }
+            _messages.tryEmit(str(R.string.schedule_run, macro.name))
+            return runMacro(macro)
+        }
+        val echo = s.voiceEcho
+        val said = heard.firstOrNull { it.isNotBlank() }
+        if (echo != null) return if (said == null) answer(VoiceResult.Unknown("")) else sayToAlexa(echo, said)
         if (act(heard)) return
         val result = parseVoice(heard, voiceDevices())
         if (!assistantStore.configured || heard.all { it.isBlank() }) return answer(result)
@@ -715,6 +733,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     },
                 )
             }
+        }
+    }
+
+    /** Tells Alexa [said] through [echo], which answers aloud. */
+    private fun sayToAlexa(echo: Echo, said: String) {
+        _messages.tryEmit(str(R.string.voice_to_alexa, said))
+        viewModelScope.launch {
+            val done = guarded { api.say(echo.serial, said) }
+            _haptics.tryEmit(if (done) Haptic.Confirm else Haptic.Reject)
         }
     }
 
@@ -993,6 +1020,22 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun setAccent(accent: String) {
         settings.edit().putString("accent", accent).apply()
         _state.update { it.copy(accent = accent) }
+    }
+
+    /** Looks for the Echo devices of the account, for the settings to offer them. */
+    fun loadEchos() {
+        _state.update { it.copy(echos = null) }
+        viewModelScope.launch {
+            var found: List<Echo> = emptyList()
+            guarded { found = api.echos() }
+            _state.update { it.copy(echos = found) }
+        }
+    }
+
+    /** Sends what is said to the microphone to [echo], or, with null, has the app understand it by itself. */
+    fun setVoiceEcho(echo: Echo?) {
+        settings.edit().apply { if (echo == null) remove("voiceEcho") else putString("voiceEcho", echo.toJson().toString()) }.apply()
+        _state.update { it.copy(voiceEcho = echo) }
     }
 
     fun setMonitor(config: MonitorConfig) {

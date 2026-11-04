@@ -1222,7 +1222,10 @@ private fun VoiceButton(vm: HomeViewModel, correcting: Boolean) {
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE, str(R.string.voice_language))
                 .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-                .putExtra(RecognizerIntent.EXTRA_PROMPT, str(R.string.voice_prompt))
+                .putExtra(
+                    RecognizerIntent.EXTRA_PROMPT,
+                    str(if (vm.state.value.voiceEcho != null) R.string.voice_prompt_alexa else R.string.voice_prompt),
+                )
             try {
                 speech.launch(intent)
             } catch (e: ActivityNotFoundException) {

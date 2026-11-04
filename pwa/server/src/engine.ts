@@ -1,5 +1,5 @@
 import { str, clock, degrees } from '../../shared/i18n.js'
-import { ACTION_MACRO, ACTION_POWER, ACTION_REMOTE, ACTION_WAIT, holds, cleared, nextTime } from '../../shared/model.js'
+import { ACTION_ALEXA, ACTION_MACRO, ACTION_POWER, ACTION_REMOTE, ACTION_WAIT, holds, cleared, nextTime } from '../../shared/model.js'
 import { userIds } from './accounts.ts'
 import * as alexa from './alexa.ts'
 import { type Device, type DeviceState, emptyState } from './alexa.ts'
@@ -29,7 +29,7 @@ const HYSTERESIS = 0.3
 type Action = { type: string; target: string; value: string; custom?: boolean }
 type Schedule = { id: string; action: Action; label: string; at: number; hour: number; minute: number; days: number[]; enabled: boolean }
 type Automation = { id: string; device: string; trigger: string; threshold: number; action: Action; title: string; label: string; enabled: boolean }
-type Macro = { id: string; name: string; condition: string | null; steps: Action[]; otherwise: Action[] }
+type Macro = { id: string; name: string; condition: string | null; steps: Action[]; otherwise: Action[]; phrases?: string[] }
 export type Outcome = { ok: boolean; message: string; noConnection?: boolean; loginExpired?: boolean }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -203,6 +203,8 @@ export async function runMacro(macroId: string): Promise<Outcome> {
         const target = remote(action.target)
         if (!target) throw new HttpError(404, str('macro_gone'))
         await sendRemote(target, action.value, 'default', action.custom === true)
+      } else if (action.type === ACTION_ALEXA) {
+        await alexa.say(action.target, action.value)
       }
     }
     return { ok: true, message: str('macro_done', macro.name) }

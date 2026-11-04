@@ -34,6 +34,7 @@ export function parseBackup(text) {
     if (a.type === 'remote' && a.target && a.value) return;
     if (a.type === 'macro' && allowMacro && a.target) return;
     if (a.type === 'wait' && /^\d+$/.test(a.value) && Number(a.value) <= 300) return;
+    if (a.type === 'alexa' && a.target && a.value) return;
     throw new Error('Invalid action');
   };
   for (const s of backup.schedules || []) {

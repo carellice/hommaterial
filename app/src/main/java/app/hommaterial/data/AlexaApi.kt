@@ -234,6 +234,60 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
         }
     }
 
+    // --- the Echo devices, to say things to Alexa -------------------------------------------------
+    // What is said goes to Alexa as text, as if spoken to an Echo, which answers aloud: the command
+    // of the routines of the Alexa app ("Custom" / "Tell Alexa"), as alexa-remote sends it. Undocumented.
+
+    private var knownEchos: List<Echo> = emptyList()
+
+    /** The devices Alexa can be spoken to through, those with a speaker of their own. */
+    suspend fun echos(): List<Echo> {
+        if (ServerSync.active) {
+            return (ServerSync.call("GET", "/api/alexa/echos").optJSONArray("echos") ?: JSONArray()).mapObjects(Echo::fromJson)
+        }
+        val answer = call("GET", "/api/devices-v2/device?cached=true")
+        knownEchos = (answer.optJSONArray("devices") ?: JSONArray()).mapObjects { o ->
+            val capabilities = o.optJSONArray("capabilities")?.let { list -> (0 until list.length()).map { list.optString(it) } }.orEmpty()
+            val serial = o.optString("serialNumber")
+            if (serial.isEmpty() || o.optString("deviceFamily") == "WHA" || "VOLUME_SETTING" !in capabilities) return@mapObjects null
+            Echo(
+                serial = serial,
+                name = o.optString("accountName").ifEmpty { serial },
+                type = o.optString("deviceType"),
+                customer = o.optString("deviceOwnerCustomerId"),
+                online = o.optBoolean("online", true),
+            )
+        }.filterNotNull().sortedBy { it.name.lowercase() }
+        return knownEchos
+    }
+
+    /** Tells Alexa [text] through the Echo [serial], as if it had been said to it. */
+    suspend fun say(serial: String, text: String) {
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/alexa/say", JSONObject().put("echo", serial).put("text", text))
+            return
+        }
+        val echo = knownEchos.find { it.serial == serial } ?: echos().find { it.serial == serial }
+            ?: throw Exception(str(R.string.echo_gone))
+        val payload = JSONObject()
+            .put("deviceType", echo.type)
+            .put("deviceSerialNumber", echo.serial)
+            .put("locale", auth.marketplace.locale)
+            .put("customerId", echo.customer)
+            .put("text", text.trim().lowercase())
+        val node = JSONObject()
+            .put("@type", "com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode")
+            .put("type", "Alexa.TextCommand")
+            .put("skillId", "amzn1.ask.1p.tellalexa")
+            .put("operationPayload", payload)
+        val sequence = JSONObject().put("@type", "com.amazon.alexa.behaviors.model.Sequence").put("startNode", node)
+        call(
+            "POST",
+            "/api/behaviors/preview",
+            JSONObject().put("behaviorId", "PREVIEW").put("sequenceJson", sequence.toString()).put("status", "ENABLED"),
+        )
+    }
+
     // --- lists ---------------------------------------------------------------------------------
     // The to-do and shopping lists of Alexa, through the API its own app uses (as alexa-remote
     // does): undocumented, so the answers are read loosely.
@@ -337,6 +391,22 @@ data class AlexaList(val id: String, val name: String, val type: String, val act
                 )
             }
         }
+    }
+}
+
+/** An Echo, or another device with Alexa and a speaker: what is said to Alexa goes through one. */
+data class Echo(val serial: String, val name: String, val type: String, val customer: String, val online: Boolean) {
+    fun toJson(): JSONObject = JSONObject().put("serial", serial).put("name", name).put("type", type)
+        .put("customer", customer).put("online", online)
+
+    companion object {
+        fun fromJson(o: JSONObject) = Echo(
+            o.getString("serial"),
+            o.optString("name"),
+            o.optString("type"),
+            o.optString("customer"),
+            o.optBoolean("online", true),
+        )
     }
 }
 

@@ -94,6 +94,29 @@ fun parseExtras(
 }
 
 /**
+ * Looks in what was [heard] for one of the voice phrases of the custom devices, given as the id of
+ * the device and its phrases. A phrase must be said whole and nothing else, give or take the small
+ * words and "Alexa": "buonanotte" is not "buonanotte a tutti".
+ */
+fun parsePhrase(heard: List<String>, phrases: List<Pair<String, List<String>>>): String? {
+    fun meaningful(text: String) = words(text).filter { it !in FILLER_WORDS && it != "alexa" }
+    for (sentence in heard) {
+        val said = meaningful(sentence)
+        if (said.isEmpty()) continue
+        for ((id, list) in phrases) {
+            if (list.any { phrase ->
+                    val wanted = meaningful(phrase)
+                    wanted.size == said.size && wanted.zip(said).all { (w, it) -> alike(it, w) }
+                }
+            ) {
+                return id
+            }
+        }
+    }
+    return null
+}
+
+/**
  * Turns what the speech recognizer [heard], its guesses best first, into a command for one of the
  * [devices] or for a whole room. Only switching on and off is understood.
  */

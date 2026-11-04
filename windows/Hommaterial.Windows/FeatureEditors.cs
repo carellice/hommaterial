@@ -106,7 +106,8 @@ public sealed partial class MainWindow
     string Describe(HomeAction action) => action.Type switch {
         "power" => (action.Value == "on" ? "Accendi " : "Spegni ") + (home.Devices.FirstOrDefault(d => d.ApplianceId == action.Target)?.Name ?? "dispositivo mancante"),
         "macro" => "Esegui " + (home.Macros.FirstOrDefault(m => m.Id == action.Target)?.Name ?? "personalizzato mancante"),
-        "wait" => "Aspetta " + action.Value + " secondi", _ => (home.Remotes.FirstOrDefault(r => r.Id == action.Target)?.Name ?? "telecomando mancante") + " · " + ButtonLabel(action.Target, action.Value) };
+        "wait" => "Aspetta " + action.Value + " secondi",
+        "alexa" => "Di' ad Alexa “" + action.Value + "”", _ => (home.Remotes.FirstOrDefault(r => r.Id == action.Target)?.Name ?? "telecomando mancante") + " · " + ButtonLabel(action.Target, action.Value) };
     void RenderAutomations()
     {
         page.Children.Add(Text("Automazioni", 32, true));
@@ -270,7 +271,7 @@ public sealed partial class MainWindow
             var actions = steps.Select(s => s.Build()).ToList(); var alternatives = otherwise.Select(s => s.Build()).ToList();
             if (actions.Count == 0) throw new InvalidOperationException("Aggiungi almeno un'azione.");
             var depends = (condition.SelectedItem as ComboBoxItem)?.Tag?.ToString();
-            var result = new HomeMacro(macro?.Id ?? Guid.NewGuid().ToString(), name.Text.Trim(), string.IsNullOrEmpty(depends) ? null : depends, actions, alternatives);
+            var result = new HomeMacro(macro?.Id ?? Guid.NewGuid().ToString(), name.Text.Trim(), string.IsNullOrEmpty(depends) ? null : depends, actions, alternatives, macro?.Phrases);
             home.Macros.RemoveAll(m => m.Id == result.Id); home.Macros.Add(result); Save(); return Task.CompletedTask;
         });
     }

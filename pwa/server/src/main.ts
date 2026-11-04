@@ -348,6 +348,16 @@ route('POST', '/api/alexa/control', async (req, res) => {
   json(res, 200, { revision: data.revision() })
 })
 
+route('GET', '/api/alexa/echos', async (_req, res) => json(res, 200, { echos: await alexa.echos() }))
+
+route('POST', '/api/alexa/say', async (req, res) => {
+  const body = await readJson<{ echo?: string; text?: string }>(req)
+  const said = text(body.text, 300).trim()
+  if (!said) throw new HttpError(400, str('something_wrong'))
+  await alexa.say(text(body.echo, 200), said)
+  ok(res)
+})
+
 route('GET', '/api/alexa/diagnostics/:id', async (_req, res, [id]) => {
   json(res, 200, { text: await alexa.diagnostics(requireDevice(decodeURIComponent(id))) })
 })

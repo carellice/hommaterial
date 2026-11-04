@@ -102,6 +102,17 @@ class VoiceParserTest {
     }
 
     @Test
+    fun voicePhrasesAreUnderstoodWholeAndAlone() {
+        val phrases = listOf("m1" to listOf("Buonanotte", "vado a letto"), "m2" to listOf("Esco di casa"))
+        assertEquals("m1", parsePhrase(listOf("buonanotte!"), phrases))
+        assertEquals("m1", parsePhrase(listOf("Alexa, vado a letto"), phrases))
+        assertEquals("m2", parsePhrase(listOf("esco casa", "esco di casa"), phrases))
+        // A longer sentence is a command of its own, and goes on to Alexa.
+        assertEquals(null, parsePhrase(listOf("buonanotte a tutti quanti"), phrases))
+        assertEquals(null, parsePhrase(listOf(""), phrases))
+    }
+
+    @Test
     fun englishIsUnderstoodToo() {
         val command = ran(run("turn off the Lampada, please"))
         assertEquals("Lampada", command.devices.single().name)

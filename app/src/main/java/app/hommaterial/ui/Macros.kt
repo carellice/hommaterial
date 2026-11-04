@@ -16,11 +16,14 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -34,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,16 +45,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.UiState
+import app.hommaterial.data.ACTION_ALEXA
 import app.hommaterial.data.ACTION_MACRO
 import app.hommaterial.data.ACTION_POWER
 import app.hommaterial.data.ACTION_REMOTE
 import app.hommaterial.data.ACTION_WAIT
+import app.hommaterial.data.Echo
 import app.hommaterial.data.Macro
 import app.hommaterial.data.MacroAction
 import app.hommaterial.data.Remote
@@ -106,6 +114,7 @@ internal fun describe(action: MacroAction, state: UiState): String = when (actio
         state.macros.find { it.id == action.target }?.name ?: str(R.string.macro_gone),
     )
     ACTION_WAIT -> plural(R.plurals.macro_wait, action.value.toIntOrNull() ?: 0)
+    ACTION_ALEXA -> str(R.string.macro_alexa, action.value)
     ACTION_POWER -> {
         val name = state.devices.find { it.applianceId == action.target }?.name ?: str(R.string.macro_gone)
         str(if (action.value == "on") R.string.voice_on else R.string.voice_off, name)
@@ -162,6 +171,7 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
     var condition by remember { mutableStateOf(macro?.condition) }
     var steps by remember { mutableStateOf(macro?.steps.orEmpty()) }
     var otherwise by remember { mutableStateOf(macro?.otherwise.orEmpty()) }
+    var phrases by remember { mutableStateOf(macro?.phrases.orEmpty()) }
     var choosingCondition by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf(false) }
     val askNotifications = rememberNotificationRequest()
@@ -208,7 +218,10 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
                         TextButton(
                             onClick = {
                                 // Without the device it depended on, what was done when it was off is dropped.
-                                val saved = Macro(macro?.id.orEmpty(), name.trim(), watched?.applianceId, steps)
+                                val saved = Macro(
+                                    macro?.id.orEmpty(), name.trim(), watched?.applianceId, steps,
+                                    phrases = phrases.map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
+                                )
                                 vm.saveMacro(if (watched == null) saved else saved.copy(otherwise = otherwise))
                                 onDismiss()
                             },
@@ -234,6 +247,7 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    PhraseList(phrases) { phrases = it }
                     SectionCard {
                         ListItem(
                             headlineContent = { Text(str(R.string.macro_condition)) },
@@ -318,13 +332,66 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
                         }
                     }
                     if (watched == null) {
-                        ActionList(str(R.string.macro_steps), steps, state) { steps = it }
+                        ActionList(str(R.string.macro_steps), steps, state, vm) { steps = it }
                     } else {
-                        ActionList(str(R.string.macro_when_on, watched.name), steps, state) { steps = it }
-                        ActionList(str(R.string.macro_when_off, watched.name), otherwise, state) { otherwise = it }
+                        ActionList(str(R.string.macro_when_on, watched.name), steps, state, vm) { steps = it }
+                        ActionList(str(R.string.macro_when_off, watched.name), otherwise, state, vm) { otherwise = it }
                     }
                 }
             }
+        }
+    }
+}
+
+/** The phrases that, said to the microphone of the app, run the custom device; one is added by typing it. */
+@Composable
+private fun PhraseList(phrases: List<String>, onChange: (List<String>) -> Unit) {
+    var typed by remember { mutableStateOf("") }
+    fun add() {
+        val phrase = typed.trim()
+        if (phrase.isNotEmpty() && phrases.none { it.equals(phrase, ignoreCase = true) }) onChange(phrases + phrase)
+        typed = ""
+    }
+    SectionCard {
+        Column(Modifier.padding(bottom = 12.dp)) {
+            Text(
+                str(R.string.macro_phrases),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
+            )
+            Text(
+                str(R.string.macro_phrases_text),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
+            )
+            for (phrase in phrases) {
+                ListItem(
+                    leadingContent = { Icon(Icons.Outlined.RecordVoiceOver, contentDescription = null) },
+                    headlineContent = { Text("“$phrase”") },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    trailingContent = {
+                        IconButton(onClick = { onChange(phrases - phrase) }) {
+                            Icon(Icons.Outlined.Close, contentDescription = str(R.string.macro_phrase_remove))
+                        }
+                    },
+                )
+            }
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it },
+                label = { Text(str(R.string.macro_phrase_add)) },
+                placeholder = { Text(str(R.string.macro_phrase_hint)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { add() }),
+                trailingIcon = {
+                    IconButton(onClick = { add() }, enabled = typed.isNotBlank()) {
+                        Icon(Icons.Outlined.Add, contentDescription = str(R.string.macro_phrase_add))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            )
         }
     }
 }
@@ -340,10 +407,11 @@ private fun ActionList(
     title: String,
     actions: List<MacroAction>,
     state: UiState,
+    vm: HomeViewModel,
     onChange: (List<MacroAction>) -> Unit,
 ) {
     var adding by remember { mutableStateOf(false) }
-    if (adding) ActionPicker(state, onPick = { onChange(actions + it); adding = false }, onDismiss = { adding = false })
+    if (adding) ActionPicker(state, vm = vm, onPick = { onChange(actions + it); adding = false }, onDismiss = { adding = false })
     SectionCard {
         Column(Modifier.padding(bottom = 8.dp)) {
             Text(
@@ -385,11 +453,15 @@ private fun ActionList(
     }
 }
 
-/** Builds an action of one of the [kinds], one question at a time: what kind, on what, and what exactly. */
+/**
+ * Builds an action of one of the [kinds], one question at a time: what kind, on what, and what
+ * exactly. Telling Alexa is offered only with [vm], which looks for the Echo devices.
+ */
 @Composable
 internal fun ActionPicker(
     state: UiState,
-    kinds: List<String> = listOf(ACTION_POWER, ACTION_REMOTE, ACTION_WAIT),
+    kinds: List<String> = listOf(ACTION_POWER, ACTION_REMOTE, ACTION_ALEXA, ACTION_WAIT),
+    vm: HomeViewModel? = null,
     onPick: (MacroAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -404,6 +476,7 @@ internal fun ActionPicker(
                 ACTION_POWER to R.string.macro_kind_power,
                 (ACTION_MACRO to R.string.schedule_kind_macro).takeIf { state.macros.isNotEmpty() },
                 (ACTION_REMOTE to R.string.macro_kind_remote).takeIf { state.remotes.isNotEmpty() },
+                (ACTION_ALEXA to R.string.macro_kind_alexa).takeIf { vm != null },
                 ACTION_WAIT to R.string.macro_kind_wait,
             ).filter { it.first in kinds }
             ListDialog(str(R.string.macro_add_action), offered.map { str(it.second) to null }, onDismiss) {
@@ -415,6 +488,18 @@ internal fun ActionPicker(
             items = state.macros.map { it.name to macroStatus(it, state) },
             onDismiss = onDismiss,
         ) { onPick(MacroAction(ACTION_MACRO, state.macros[it].id)) }
+        kind == ACTION_ALEXA && vm != null && target == null -> EchoDialog(
+            title = str(R.string.macro_pick_echo),
+            state = state,
+            vm = vm,
+            none = null,
+            onPick = { target = it?.serial },
+            onDismiss = onDismiss,
+        )
+        kind == ACTION_ALEXA -> AlexaTextDialog(
+            onDone = { onPick(MacroAction(ACTION_ALEXA, target.orEmpty(), it)) },
+            onDismiss = onDismiss,
+        )
         kind == ACTION_WAIT -> ListDialog(
             title = str(R.string.macro_kind_wait),
             items = WAIT_SECONDS.map { plural(R.plurals.macro_wait, it) to null },
@@ -453,13 +538,70 @@ internal fun ActionPicker(
     }
 }
 
-/** A list to pick one entry from; each has a label and may have a line under it. */
+/**
+ * The Echo devices of the account to pick one from, looked for as the dialog opens; with [none],
+ * the first entry stands for no Echo and is picked as null.
+ */
+@Composable
+internal fun EchoDialog(
+    title: String,
+    state: UiState,
+    vm: HomeViewModel,
+    none: String?,
+    onPick: (Echo?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    LaunchedEffect(Unit) { vm.loadEchos() }
+    val echos = state.echos.orEmpty()
+    val first = if (none == null) 0 else 1
+    ListDialog(
+        title = title,
+        items = listOfNotNull(none?.let { it to null }) +
+            echos.map { (if (it.online) it.name else str(R.string.echo_offline, it.name)) to null },
+        note = when {
+            state.echos == null -> str(R.string.echo_loading)
+            echos.isEmpty() -> str(R.string.echo_none_found)
+            else -> null
+        },
+        onDismiss = onDismiss,
+    ) { index -> onPick(if (index < first) null else echos[index - first]) }
+}
+
+/** Asks for the words to tell Alexa, as they would be said to her. */
+@Composable
+private fun AlexaTextDialog(onDone: (String) -> Unit, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.macro_alexa_text)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(str(R.string.macro_alexa_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (text.isNotBlank()) onDone(text.trim()) }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onDone(text.trim()) }, enabled = text.isNotBlank()) { Text(str(R.string.save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
+    )
+}
+
+/** A list to pick one entry from; each has a label and may have a line under it. A [note] goes below them. */
 @Composable
 internal fun ListDialog(
     title: String,
     items: List<Pair<String, String?>>,
     onDismiss: () -> Unit,
     empty: String? = null,
+    note: String? = null,
     onPick: (Int) -> Unit,
 ) {
     AlertDialog(
@@ -474,6 +616,13 @@ internal fun ListDialog(
                         supportingContent = hint?.let { { Text(it) } },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         modifier = Modifier.clickable { onPick(index) },
+                    )
+                }
+                if (note != null) {
+                    Text(
+                        note,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     )
                 }
             }

@@ -68,6 +68,7 @@ Material. Il server porta tutto quello che il telefono faceva fuori dalle scherm
 | `data/LgTv.kt` (OkHttp WebSocket, pin del certificato) | `server/src/lgtv.ts` + `websocket.ts` scritto a mano | fatto (TV finto); TV vero da verificare |
 | `data/Assistant.kt` (Workers AI) | `server/src/assistant.ts` | fatto; con Cloudflare vero da verificare |
 | `voice/VoiceParser.kt` | `web/js/voice.js`, correzione con `/api/assistant/correct` | fatto |
+| frasi vocali dei dispositivi personalizzati (`parsePhrase`), voce passata ad Alexa (`AlexaApi.say`, Echo scelto per dispositivo), azione `alexa` | `voice.js` `parsePhrase`, `store.js` `onSpeech`, `server/src/alexa.ts` `echos`/`say`, `/api/alexa/echos`, `/api/alexa/say` | fatto; con Amazon vero da verificare |
 
 ## Non portabili
 

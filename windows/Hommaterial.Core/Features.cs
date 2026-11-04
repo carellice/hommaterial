@@ -5,7 +5,7 @@ namespace Hommaterial.Core;
 
 public sealed record HomeGroup(string Id, string Name, List<string> Devices);
 public sealed record HomeAction(string Type, string Target = "", string Value = "", bool Custom = false);
-public sealed record HomeMacro(string Id, string Name, string? Condition = null, List<HomeAction>? Steps = null, List<HomeAction>? Otherwise = null);
+public sealed record HomeMacro(string Id, string Name, string? Condition = null, List<HomeAction>? Steps = null, List<HomeAction>? Otherwise = null, List<string>? Phrases = null);
 public sealed record RemoteDevice(string Id, string Name, string Type)
 {
     public string Kind => Type.Replace("DIY ", "").ToLowerInvariant() switch
@@ -177,6 +177,7 @@ public static class BackupCodec
             "power" => action.Target.Length > 0 && action.Value is "on" or "off",
             "remote" => action.Target.Length > 0 && action.Value.Length > 0,
             "macro" => allowMacro && action.Target.Length > 0,
+            "alexa" => action.Target.Length > 0 && action.Value.Length > 0,
             "wait" => int.TryParse(action.Value, out var seconds) && seconds is >= 0 and <= 300, _ => false })) throw new JsonException("Azione non valida.");
     }
     public static void Apply(HomeData target, HomeData imported, bool restoreMonitor, IReadOnlySet<string>? selected = null)

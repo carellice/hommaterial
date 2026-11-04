@@ -1,10 +1,10 @@
 // Custom devices: tiles that run a series of actions, and their editor.
-import { html, useState } from '../lib.js';
-import { Icon, IconButton, FullDialog, ListDialog, ConfirmDialog, Card, Field, Setting, usePress } from './common.js';
+import { html, useState, useEffect } from '../lib.js';
+import { Icon, IconButton, Dialog, FullDialog, ListDialog, ConfirmDialog, Card, Field, Setting, usePress } from './common.js';
 import * as store from '../store.js';
 import { str, plural } from '/shared/i18n.js';
 import {
-  ACTION_MACRO, ACTION_POWER, ACTION_REMOTE, ACTION_WAIT, macroKey, macroStatus, describe, placed, placeOf,
+  ACTION_ALEXA, ACTION_MACRO, ACTION_POWER, ACTION_REMOTE, ACTION_WAIT, macroKey, macroStatus, describe, placed, placeOf,
   allRooms, standardCommands, commandLabel, commandName,
 } from '/shared/model.js';
 import { TileFace, HINTS } from './home.js';
@@ -32,6 +32,7 @@ export function MacroEditor({ macro, s, onDismiss }) {
   const [condition, setCondition] = useState(macro?.condition ?? null);
   const [steps, setSteps] = useState(macro?.steps ?? []);
   const [otherwise, setOtherwise] = useState(macro?.otherwise ?? []);
+  const [phrases, setPhrases] = useState(macro?.phrases ?? []);
   const [choosingCondition, setChoosingCondition] = useState(false);
   const [moving, setMoving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -45,6 +46,7 @@ export function MacroEditor({ macro, s, onDismiss }) {
       condition: watched?.applianceId ?? null,
       steps,
       otherwise: watched ? otherwise : [],
+      phrases: [...new Set(phrases.map((it) => it.trim()).filter(Boolean))],
     });
     onDismiss();
   };
@@ -56,6 +58,7 @@ export function MacroEditor({ macro, s, onDismiss }) {
         ${macro && html`<button class="text-btn" onClick=${() => setConfirmDelete(true)}>${str('delete')}</button>`}
         <button class="text-btn" disabled=${!name.trim() || (!steps.length && !otherwise.length)} onClick=${save}>${str('save')}</button>`}>
       <${Field} label=${str('room_name')} value=${name} onInput=${setName} />
+      <${PhraseList} phrases=${phrases} onChange=${setPhrases} />
       <${Card}><${Setting} title=${str('macro_condition')} text=${watched?.name ?? str('macro_condition_none')}
         onClick=${() => setChoosingCondition(true)} /><//>
       ${/* Only once it exists: a timer runs what is saved. */ ''}
@@ -95,6 +98,28 @@ export function MacroEditor({ macro, s, onDismiss }) {
     <//>`;
 }
 
+/** The phrases that, said to the microphone of the app, run the custom device; one is added by typing it. */
+function PhraseList({ phrases, onChange }) {
+  const [typed, setTyped] = useState('');
+  const add = () => {
+    const phrase = typed.trim();
+    if (phrase && !phrases.some((it) => it.toLowerCase() === phrase.toLowerCase())) onChange([...phrases, phrase]);
+    setTyped('');
+  };
+  return html`
+    <${Card}>
+      <div class="card-title title-medium">${str('macro_phrases')}</div>
+      <div class="body-medium supporting" style="padding:0 16px 4px">${str('macro_phrases_text')}</div>
+      ${phrases.map((phrase) => html`
+        <${Setting} key=${phrase} lead=${html`<${Icon} name="record_voice_over" />`} title=${`“${phrase}”`} trailing=${html`
+          <${IconButton} icon="close" label=${str('macro_phrase_remove')} onClick=${() => onChange(phrases.filter((it) => it !== phrase))} />`} />`)}
+      <div class="phrase-add">
+        <${Field} label=${str('macro_phrase_add')} support=${str('macro_phrase_hint')} value=${typed} onInput=${setTyped} onEnter=${add} />
+        <${IconButton} icon="add" label=${str('macro_phrase_add')} disabled=${!typed.trim()} onClick=${add} />
+      </div>
+    <//>`;
+}
+
 /** The actions of one branch, in the order they run, with what moves one up, removes it or adds one. */
 function ActionList({ title, actions, s, onChange }) {
   const [adding, setAdding] = useState(false);
@@ -119,8 +144,37 @@ function ActionList({ title, actions, s, onChange }) {
     }} />`}`;
 }
 
+/**
+ * The Echo devices of the account to pick one from, looked for as the dialog opens; with [none],
+ * the first entry stands for no Echo and is picked as null.
+ */
+export function EchoDialog({ title, s, none, onPick, onDismiss }) {
+  useEffect(() => {
+    store.loadEchos();
+  }, []);
+  const echos = s.echos ?? [];
+  const first = none ? 1 : 0;
+  const note = s.echos == null ? str('echo_loading') : !echos.length ? str('echo_none_found') : null;
+  return html`<${ListDialog} title=${title} note=${note} onDismiss=${onDismiss}
+    items=${[...(none ? [[none]] : []), ...echos.map((e) => [e.online ? e.name : str('echo_offline', e.name)])]}
+    onPick=${(i) => onPick(i < first ? null : { serial: echos[i - first].serial, name: echos[i - first].name })} />`;
+}
+
+/** Asks for the words to tell Alexa, as they would be said to her. */
+function AlexaTextDialog({ onDone, onDismiss }) {
+  const [text, setText] = useState('');
+  const done = () => text.trim() && onDone(text.trim());
+  return html`
+    <${Dialog} title=${str('macro_alexa_text')} onDismiss=${onDismiss} actions=${html`
+      <button class="text-btn" onClick=${onDismiss}>${str('cancel')}</button>
+      <button class="text-btn" disabled=${!text.trim()} onClick=${done}>${str('save')}</button>`}>
+      <p class="body-medium supporting">${str('macro_alexa_hint')}</p>
+      <${Field} label=${str('macro_alexa_text')} value=${text} onInput=${setText} onEnter=${done} autofocus />
+    <//>`;
+}
+
 /** Builds an action of one of the [kinds], one question at a time: what kind, on what, and what exactly. */
-export function ActionPicker({ s, kinds = [ACTION_POWER, ACTION_REMOTE, ACTION_WAIT], onPick, onDismiss }) {
+export function ActionPicker({ s, kinds = [ACTION_POWER, ACTION_REMOTE, ACTION_ALEXA, ACTION_WAIT], onPick, onDismiss }) {
   const [kind, setKind] = useState(null);
   const [target, setTarget] = useState(null);
   const switchable = placed(s).filter((d) => d.hasPower);
@@ -132,6 +186,7 @@ export function ActionPicker({ s, kinds = [ACTION_POWER, ACTION_REMOTE, ACTION_W
       [ACTION_POWER, 'macro_kind_power'],
       s.macros.length > 0 && [ACTION_MACRO, 'schedule_kind_macro'],
       s.remotes.length > 0 && [ACTION_REMOTE, 'macro_kind_remote'],
+      [ACTION_ALEXA, 'macro_kind_alexa'],
       [ACTION_WAIT, 'macro_kind_wait'],
     ].filter((it) => it && kinds.includes(it[0]));
     return html`<${ListDialog} title=${str('macro_add_action')} items=${offered.map(([, label]) => [str(label)])}
@@ -140,6 +195,12 @@ export function ActionPicker({ s, kinds = [ACTION_POWER, ACTION_REMOTE, ACTION_W
   if (kind === ACTION_MACRO) {
     return html`<${ListDialog} title=${str('schedule_pick_macro')} items=${s.macros.map((m) => [m.name, macroStatus(m, s)])}
       onDismiss=${onDismiss} onPick=${(i) => onPick(action(ACTION_MACRO, s.macros[i].id))} />`;
+  }
+  if (kind === ACTION_ALEXA && target == null) {
+    return html`<${EchoDialog} title=${str('macro_pick_echo')} s=${s} onDismiss=${onDismiss} onPick=${(echo) => setTarget(echo.serial)} />`;
+  }
+  if (kind === ACTION_ALEXA) {
+    return html`<${AlexaTextDialog} onDismiss=${onDismiss} onDone=${(text) => onPick(action(ACTION_ALEXA, target, text))} />`;
   }
   if (kind === ACTION_WAIT) {
     return html`<${ListDialog} title=${str('macro_kind_wait')} items=${WAIT_SECONDS.map((n) => [plural('macro_wait', n)])}

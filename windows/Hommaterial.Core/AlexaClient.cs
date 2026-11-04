@@ -190,5 +190,28 @@ public sealed class AlexaClient : IDisposable
         var state = await CallAsync(HttpMethod.Post, "/api/phoenix/state", new { stateRequests = new[] { new { entityId = device.ApplianceId, entityType = "APPLIANCE" } } });
         return new JsonObject { ["device"] = description?.DeepClone(), ["state"] = state.DeepClone() }.ToJsonString(HomeData.JsonOptions);
     }
+    /// <summary>Tells Alexa [text] through the Echo [serial], as the routines of the Alexa app do ("Tell Alexa"). Undocumented.</summary>
+    public async Task SayAsync(string serial, string text)
+    {
+        var devices = await CallAsync(HttpMethod.Get, "/api/devices-v2/device?cached=true");
+        var echo = devices["devices"]?.AsArray().FirstOrDefault(d => d?["serialNumber"]?.ToString() == serial)
+            ?? throw new InvalidOperationException("Echo non trovato: sceglilo di nuovo.");
+        var sequence = new JsonObject
+        {
+            ["@type"] = "com.amazon.alexa.behaviors.model.Sequence",
+            ["startNode"] = new JsonObject
+            {
+                ["@type"] = "com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode",
+                ["type"] = "Alexa.TextCommand",
+                ["skillId"] = "amzn1.ask.1p.tellalexa",
+                ["operationPayload"] = new JsonObject
+                {
+                    ["deviceType"] = echo["deviceType"]?.ToString(), ["deviceSerialNumber"] = serial, ["locale"] = Market.Locale,
+                    ["customerId"] = echo["deviceOwnerCustomerId"]?.ToString(), ["text"] = text.Trim().ToLowerInvariant(),
+                },
+            },
+        };
+        await CallAsync(HttpMethod.Post, "/api/behaviors/preview", new { behaviorId = "PREVIEW", sequenceJson = sequence.ToJsonString(), status = "ENABLED" });
+    }
     public void Dispose() { http.Dispose(); sessionLock.Dispose(); }
 }

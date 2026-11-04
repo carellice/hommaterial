@@ -2,6 +2,7 @@ package app.hommaterial.ui
 
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.SettingsRemote
@@ -510,6 +511,31 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 Setting(title = str(R.string.lgtv_add), text = str(R.string.lgtv_add_text), onClick = vm::searchLgTvs)
             }
 
+            Section(R.string.s_voice, R.string.voice_settings_text) {
+                var picking by remember { mutableStateOf(false) }
+                if (picking) {
+                    EchoDialog(
+                        title = str(R.string.voice_echo_pick),
+                        state = state,
+                        vm = vm,
+                        none = str(R.string.voice_echo_off),
+                        onPick = { vm.setVoiceEcho(it); picking = false },
+                        onDismiss = { picking = false },
+                    )
+                }
+                Setting(
+                    title = str(R.string.voice_echo),
+                    text = state.voiceEcho?.name ?: str(R.string.voice_echo_off),
+                    onClick = { picking = true },
+                )
+                Text(
+                    str(R.string.voice_echo_text),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+
             Section(R.string.s_assistant, R.string.assistant_text) { AssistantSettings(state, vm) }
 
             Section(R.string.s_updates) {
@@ -792,6 +818,7 @@ private fun sectionIcon(@StringRes title: Int): ImageVector? = when (title) {
     R.string.s_switchbot -> Icons.Outlined.SettingsRemote
     R.string.s_lgtv -> Icons.Outlined.Tv
     R.string.s_assistant -> Icons.Outlined.AutoAwesome
+    R.string.s_voice -> Icons.Outlined.RecordVoiceOver
     R.string.s_updates -> Icons.Outlined.SystemUpdate
     R.string.s_rooms -> Icons.Outlined.MeetingRoom
     R.string.s_devices -> Icons.Outlined.DevicesOther

@@ -4,7 +4,7 @@
 import { Prefs } from './prefs.js';
 import { api, get, post, del, onSessionLost, NotLoggedInError, OfflineError, SessionError } from './net.js';
 import { str, plural, lang, setLanguage as applyLanguage } from '/shared/i18n.js';
-import { parseVoice, parseExtras } from './voice.js';
+import { parseVoice, parseExtras, parsePhrase } from './voice.js';
 import {
   LAYOUT_GRID, REST_ITEMS, emptyState, macroKey, remoteKey, placed, placeOf, shownRemotes, remoteKind, isLg,
   standardCommands, commandLabel,
@@ -139,6 +139,10 @@ function initialState() {
     refreshing: false,
     voice: null,
     correcting: false,
+    // The Echo that what is said to the microphone goes to, as if said to it: this browser only.
+    voiceEcho: settings.get('voiceEcho', null),
+    // The Echo devices of the account, once asked for in the settings; null while they are looked for.
+    echos: null,
     update: null,
     updatePrompt: false,
     push: pushState(),
@@ -763,11 +767,42 @@ function answer(result) {
   else if (result.type !== 'run') say(result.heard.trim() ? str('voice_not_understood', result.heard) : str('voice_nothing_heard'));
 }
 
+/** Looks for the Echo devices of the account, for the settings to offer them. */
+export async function loadEchos() {
+  update({ echos: null });
+  let echos = [];
+  await guarded(async () => {
+    ({ echos } = await get('/api/alexa/echos'));
+  });
+  update({ echos: echos ?? [] });
+}
+
+/** Sends what is said to the microphone to [echo], or, with null, has the app understand it by itself. */
+export function setVoiceEcho(echo) {
+  settings.set('voiceEcho', echo);
+  update({ voiceEcho: echo });
+}
+
+/** Tells Alexa [said] through [echo], which answers aloud. */
+async function sayToAlexa(echo, said) {
+  say(str('voice_to_alexa', said));
+  await guarded(() => post('/api/alexa/say', { echo: echo.serial, text: said }));
+}
+
 /**
- * Acts on what the speech recognizer [heard], its guesses best first. What is not clearly
- * understood goes to the assistant, when there is one, to have the names put right first.
+ * Acts on what the speech recognizer [heard], its guesses best first. A voice phrase of a custom
+ * device runs it; anything else goes to Alexa, when an Echo was chosen for it. Otherwise what is
+ * not clearly understood goes to the assistant, when there is one, to have the names put right first.
  */
 export async function onSpeech(heard) {
+  const phrase = parsePhrase(heard, state.macros.map((m) => [m.id, m.phrases ?? []]));
+  if (phrase) {
+    const macro = state.macros.find((m) => m.id === phrase);
+    say(str('schedule_run', macro.name));
+    return runMacro(macro);
+  }
+  const said = heard.find((it) => it.trim());
+  if (state.voiceEcho) return said ? sayToAlexa(state.voiceEcho, said) : answer({ type: 'unknown', heard: '' });
   if (act(heard)) return;
   const result = parseVoice(heard, voiceDevices());
   if (!state.assistant.configured || heard.every((it) => !it.trim())) return answer(result);
@@ -1114,6 +1149,7 @@ async function restore(backup, selected) {
     groups: (backup.groups || []).map((g) => ({ id: g.id, name: g.name, devices: list(g.devices) })),
     macros: (backup.macros || []).map((m) => ({
       id: m.id, name: m.name, condition: m.condition ?? null, steps: m.steps || [], otherwise: m.otherwise || [],
+      phrases: Array.isArray(m.phrases) ? m.phrases.map(String) : [],
     })),
     order: backup.order || {},
     tileSpans: backup.tileSpans || {},

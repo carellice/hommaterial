@@ -11,7 +11,7 @@ process.env.DATA_DIR = (await import('node:fs')).mkdtempSync((await import('node
 const { setLanguage } = await import('../shared/i18n.js');
 setLanguage('it');
 const { switchBotSign } = await import('../server/src/switchbot.ts');
-const { parseVoice, parseExtras } = await import('../web/js/voice.js');
+const { parseVoice, parseExtras, parsePhrase } = await import('../web/js/voice.js');
 const model = await import('../shared/model.js');
 const { remoteKind } = model;
 
@@ -98,6 +98,14 @@ await test('custom devices and remotes are understood by their whole name', () =
   assert.deepEqual(parseExtras(['turn on the tv salotto'], macros, remotes), { type: 'remote', remoteId: 'r1', on: true });
   assert.equal(parseExtras(['spegni postazione'], macros, remotes), null);
   assert.equal(parseExtras(['accendi la tv'], macros, remotes), null);
+});
+await test('voice phrases are understood whole and alone', () => {
+  const phrases = [['m1', ['Buonanotte', 'vado a letto']], ['m2', ['Esco di casa']]];
+  assert.equal(parsePhrase(['buonanotte!'], phrases), 'm1');
+  assert.equal(parsePhrase(['Alexa, vado a letto'], phrases), 'm1');
+  assert.equal(parsePhrase(['esco casa', 'esco di casa'], phrases), 'm2');
+  assert.equal(parsePhrase(['buonanotte a tutti quanti'], phrases), null);
+  assert.equal(parsePhrase([''], phrases), null);
 });
 await test('english is understood too', () => {
   const command = ran(run('turn off the Lampada, please'));

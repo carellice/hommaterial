@@ -363,6 +363,10 @@ public sealed partial class MainWindow
             if (!home.Remotes.Any(r => r.Id == action.Target)) throw new InvalidOperationException("Telecomando non trovato.");
             if (!demo) await SendRemoteAsync(action.Target, action.Value, custom: action.Custom, cancellation: cancellation);
         }
+        else if (action.Type == "alexa")
+        {
+            if (!demo) await client.SayAsync(action.Target, action.Value);
+        }
         else throw new InvalidOperationException("Azione non supportata.");
     }
     async Task RunMacroAsync(HomeMacro macro)

@@ -455,6 +455,44 @@ export async function control(device: Device, parameters: Record<string, unknown
 
 export const setPower = (device: Device, on: boolean) => control(device, { action: on ? 'turnOn' : 'turnOff' })
 
+// --- the Echo devices, to say things to Alexa ---------------------------------------------------
+// What is said goes to Alexa as text, as if spoken to an Echo, which answers aloud: the command of
+// the routines of the Alexa app ("Custom" / "Tell Alexa"), as alexa-remote sends it. Undocumented.
+
+export type Echo = { serial: string; name: string; type: string; customer: string; online: boolean }
+
+let knownEchos: Echo[] = []
+
+/** The devices Alexa can be spoken to through, those with a speaker of their own. */
+export async function echos(): Promise<Echo[]> {
+  const answer = await api('GET', '/api/devices-v2/device?cached=true')
+  knownEchos = (Array.isArray(answer.devices) ? answer.devices : [])
+    .filter((it: any) => it?.serialNumber && it.deviceFamily !== 'WHA' && (it.capabilities ?? []).includes('VOLUME_SETTING'))
+    .map((it: any) => ({
+      serial: String(it.serialNumber), name: String(it.accountName ?? it.serialNumber), type: String(it.deviceType ?? ''),
+      customer: String(it.deviceOwnerCustomerId ?? ''), online: it.online !== false,
+    }))
+    .sort((a: Echo, b: Echo) => a.name.localeCompare(b.name))
+  return knownEchos
+}
+
+/** Tells Alexa [text] through the Echo [serial], as if it had been said to it. */
+export async function say(serial: string, text: string) {
+  const echo = knownEchos.find((it) => it.serial === serial) ?? (await echos()).find((it) => it.serial === serial)
+  if (!echo) throw new HttpError(404, str('echo_gone'))
+  const node = {
+    '@type': 'com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode',
+    type: 'Alexa.TextCommand',
+    skillId: 'amzn1.ask.1p.tellalexa',
+    operationPayload: {
+      deviceType: echo.type, deviceSerialNumber: echo.serial, locale: marketplace().locale, customerId: echo.customer,
+      text: text.trim().toLowerCase(),
+    },
+  }
+  const sequence = { '@type': 'com.amazon.alexa.behaviors.model.Sequence', startNode: node }
+  await api('POST', '/api/behaviors/preview', { behaviorId: 'PREVIEW', sequenceJson: JSON.stringify(sequence), status: 'ENABLED' })
+}
+
 // --- lists -------------------------------------------------------------------------------------
 // The to-do and shopping lists of Alexa, through the API its own app uses (as alexa-remote does):
 // undocumented, so the answers are read loosely and kept as they come.

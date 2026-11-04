@@ -709,4 +709,26 @@
     <string name="accent_red">Rosso</string>
     <string name="accent_pink">Rosa</string>
     <string name="accent_purple">Viola</string>
+    <string name="macro_kind_alexa">Di\' ad Alexa</string>
+    <string name="macro_alexa">Di\' ad Alexa “%1$s”</string>
+    <string name="macro_pick_echo">Quale Echo risponde?</string>
+    <string name="macro_alexa_text">Cosa dire ad Alexa</string>
+    <string name="macro_alexa_hint">Come lo diresti, senza “Alexa”: “accendi la luce del salotto a metà”</string>
+    <string name="macro_phrases">Frasi vocali</string>
+    <string name="macro_phrases_text">Dilla al microfono dell\'app e questo dispositivo personalizzato parte. Conta solo la frase intera.</string>
+    <string name="macro_phrase_add">Aggiungi una frase</string>
+    <string name="macro_phrase_hint">Per esempio: buonanotte</string>
+    <string name="macro_phrase_remove">Togli la frase</string>
+    <string name="echo_gone">Echo non trovato: sceglilo di nuovo</string>
+    <string name="echo_offline">%1$s · non in linea</string>
+    <string name="echo_loading">Cerco i dispositivi Echo…</string>
+    <string name="echo_none_found">Nessun Echo trovato sull\'account Amazon</string>
+    <string name="s_voice">Comandi vocali</string>
+    <string name="voice_settings_text">Il microfono dell\'app. Le frasi vocali dei dispositivi personalizzati hanno sempre la precedenza. Queste scelte valgono solo per questo dispositivo.</string>
+    <string name="voice_echo">Passa i comandi ad Alexa</string>
+    <string name="voice_echo_text">Quello che dici arriva ad Alexa come se lo dicessi a questo Echo, che risponde a voce: funziona tutto quello che Alexa capisce, dalle luci alle routine.</string>
+    <string name="voice_echo_off">No: l\'app capisce da sola accendi e spegni</string>
+    <string name="voice_echo_pick">Quale Echo?</string>
+    <string name="voice_to_alexa">Ad Alexa: “%1$s”</string>
+    <string name="voice_prompt_alexa">Dillo ad Alexa…</string>
 </resources>

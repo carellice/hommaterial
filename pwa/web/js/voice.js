@@ -67,6 +67,26 @@ export function parseExtras(heard, macros, remotes) {
 }
 
 /**
+ * Looks in what was [heard] for one of the voice phrases of the custom devices, given as [id,
+ * phrases]. A phrase must be said whole and nothing else, give or take the small words and "Alexa":
+ * "buonanotte" is not "buonanotte a tutti".
+ */
+export function parsePhrase(heard, phrases) {
+  const meaningful = (text) => words(text).filter((it) => !FILLER_WORDS.has(it) && it !== 'alexa');
+  for (const sentence of heard) {
+    const said = meaningful(sentence);
+    if (!said.length) continue;
+    for (const [id, list] of phrases) {
+      if (list.some((phrase) => {
+        const wanted = meaningful(phrase);
+        return wanted.length === said.length && wanted.every((w, i) => alike(said[i], w));
+      })) return id;
+    }
+  }
+  return null;
+}
+
+/**
  * Turns what the speech recognizer [heard], its guesses best first, into a command for one of the
  * [devices] or for a whole room: {type: 'run', command}, {type: 'ask', heard, options} or
  * {type: 'unknown', heard}. A command is {on, devices, room}. Only switching on and off is understood.

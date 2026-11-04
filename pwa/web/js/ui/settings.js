@@ -13,7 +13,7 @@ import {
   macroKey, remoteKey, placed, placeOf, allRooms, macroStatus, availablePages, shownPages, pageLabel, pagePicks,
 } from '/shared/model.js';
 import { RoomPicker, MembersDialog, PicksDialog } from './rooms.js';
-import { MacroEditor } from './macros.js';
+import { MacroEditor, EchoDialog } from './macros.js';
 import { SwitchBotDialog } from './remotes.js';
 import { LgTvDialog, LgRenameDialog } from './lgtv.js';
 import { AssistantSettings } from './assistant.js';
@@ -24,7 +24,7 @@ const SOURCE_URL = 'https://github.com/carellice/hommaterial';
 
 /** A section of the settings that opens and closes on a tap of its title. */
 // The icon at the head of each section, so that a long list of them is quick to scan.
-const SECTION_ICONS = { appearance: 'palette', notifications: 'notifications', switchbot: 'settings_remote', lgtv: 'tv', assistant: 'auto_awesome', updates: 'system_update', rooms: 'meeting_room', devices: 'devices_other', groups: 'layers', macros: 'extension', monitor: 'tablet_android', timers: 'timer', alerts: 'warning', backup: 'backup', data: 'storage', account: 'account_circle', server: 'dns', hints: 'tips_and_updates', about: 'info' };
+const SECTION_ICONS = { appearance: 'palette', notifications: 'notifications', switchbot: 'settings_remote', lgtv: 'tv', assistant: 'auto_awesome', voice: 'record_voice_over', updates: 'system_update', rooms: 'meeting_room', devices: 'devices_other', groups: 'layers', macros: 'extension', monitor: 'tablet_android', timers: 'timer', alerts: 'warning', backup: 'backup', data: 'storage', account: 'account_circle', server: 'dns', hints: 'tips_and_updates', about: 'info' };
 
 function Section({ title, text, icon, open, onToggle, children }) {
   return html`
@@ -176,6 +176,7 @@ export function SettingsScreen({ onBack }) {
               <${IconButton} icon="close" cls="faint" label=${str('lgtv_remove')} onClick=${() => setDialog({ type: 'lgRemove', tv })} />`} />`)}
           <${Setting} title=${str('lgtv_add')} text=${str('lgtv_add_text')} onClick=${() => setDialog({ type: 'lgSearch' })} />`)}
 
+        ${section('voice', 's_voice', 'voice_settings_text', html`<${VoiceSettings} s=${s} />`)}
         ${section('assistant', 's_assistant', 'srv_assistant_text', html`<${AssistantSettings} s=${s} />`)}
 
         ${section('updates', 's_updates', null, html`
@@ -436,4 +437,17 @@ function light(hex) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
     .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5;
+}
+
+/** Where what is said to the microphone goes: to Alexa through an Echo, or to the app itself (ui/SettingsScreen.kt). */
+function VoiceSettings({ s }) {
+  const [picking, setPicking] = useState(false);
+  return html`
+    <${Setting} title=${str('voice_echo')} text=${s.voiceEcho?.name ?? str('voice_echo_off')} onClick=${() => setPicking(true)} />
+    <p class="body-medium supporting" style="padding:8px 16px">${str('voice_echo_text')}</p>
+    ${picking && html`<${EchoDialog} title=${str('voice_echo_pick')} s=${s} none=${str('voice_echo_off')}
+      onDismiss=${() => setPicking(false)} onPick=${(echo) => {
+        store.setVoiceEcho(echo);
+        setPicking(false);
+      }} />`}`;
 }
