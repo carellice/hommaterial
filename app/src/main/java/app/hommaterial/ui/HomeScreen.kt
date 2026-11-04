@@ -117,6 +117,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -142,6 +143,7 @@ import androidx.compose.ui.window.DialogProperties
 import app.hommaterial.HomeViewModel
 import app.hommaterial.LAYOUT_LIST
 import app.hommaterial.R
+import app.hommaterial.data.Offline
 import app.hommaterial.UiState
 import app.hommaterial.data.ACTION_POWER
 import app.hommaterial.data.COLOR_CHOICES
@@ -215,6 +217,14 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf(TAB_HOME) }
     val lists = rememberListsModel(vm)
     val calendar = rememberCalendarModel(vm)
+    // What was changed without internet went: the lists and the calendar are read again, as they are now.
+    val latest = rememberUpdatedState(state)
+    LaunchedEffect(Unit) {
+        Offline.sent.collect {
+            if (lists.lists != null) lists.reload()
+            calendar.reload(latest.value)
+        }
+    }
     BackHandler(enabled = tab != TAB_HOME && query == null) { tab = TAB_HOME }
     val typing = WindowInsets.isImeVisible
     val found = query?.let { search(it, homeSections(PAGE_ALL, state)) }.orEmpty()

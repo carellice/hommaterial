@@ -47,6 +47,8 @@ data class CalendarEvent(
     val end: Long,
     val recurring: Boolean,
     val editable: Boolean,
+    /** While a change made without internet is not yet sent. */
+    val waiting: Boolean = false,
 ) {
     /** Tells one repetition from another of the same event. */
     val key: String get() = "$calendar|$id|$start"

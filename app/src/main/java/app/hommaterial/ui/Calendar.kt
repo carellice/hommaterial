@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Place
@@ -172,6 +173,7 @@ internal class CalendarModel(private val vm: HomeViewModel, private val scope: C
         scope.launch {
             if (vm.saveEvent(event, calendar, input)) {
                 done()
+                showKept(state)
                 reload(state)
             }
         }
@@ -183,9 +185,17 @@ internal class CalendarModel(private val vm: HomeViewModel, private val scope: C
                 // Gone at once; the reading after confirms it.
                 events = events?.filter { it.key != event.key }
                 done()
+                showKept(state)
                 reload(state)
             }
         }
+    }
+
+    /** The events as kept on the phone, with the change just made, before the reading after it. */
+    private fun showKept(state: UiState) {
+        val today = LocalDate.now(zone)
+        val shown = visible(state).map { it.id }.toSet()
+        vm.keptEvents(midnight(today), midnight(today.plusDays(days.toLong())))?.let { kept -> events = kept.filter { it.calendar in shown } }
     }
 }
 
@@ -233,6 +243,8 @@ internal fun CalendarPage(model: CalendarModel, state: UiState, vm: HomeViewMode
         CalendarSetupCard(state, vm, onSettings, Modifier.fillMaxSize())
         return
     }
+    Column(Modifier.fillMaxSize()) {
+    if (ServerSync.active) OfflineBanner()
     Box(Modifier.fillMaxSize()) {
         PullToRefreshBox(isRefreshing = model.loading && model.events != null, onRefresh = { model.reload(state) }, modifier = Modifier.fillMaxSize()) {
             val events = model.events
@@ -255,6 +267,7 @@ internal fun CalendarPage(model: CalendarModel, state: UiState, vm: HomeViewMode
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = BOTTOM_BAR_SPACE + 8.dp),
             )
         }
+    }
     }
 }
 
@@ -316,12 +329,24 @@ private fun EventRow(event: CalendarEvent, calendar: CalendarInfo?, modifier: Mo
         Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(5.dp).fillMaxHeight().clip(CircleShape).background(colorOf(calendar)))
             Column(Modifier.padding(start = 14.dp).weight(1f)) {
-                Text(
-                    event.title.ifBlank { str(R.string.calendar_untitled) },
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        event.title.ifBlank { str(R.string.calendar_untitled) },
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    // Changed here and not yet sent: it goes as soon as there is internet.
+                    if (event.waiting) {
+                        Icon(
+                            Icons.Outlined.CloudUpload,
+                            contentDescription = str(R.string.offline_waiting),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 6.dp).size(16.dp),
+                        )
+                    }
+                }
                 Text(whenText(event), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (event.location.isNotBlank()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

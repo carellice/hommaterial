@@ -410,8 +410,8 @@ data class Echo(val serial: String, val name: String, val type: String, val cust
     }
 }
 
-/** An item of a list; [version] goes with every change, as Amazon wants it. */
-data class ListItem(val id: String, val name: String, val completed: Boolean, val version: Long) {
+/** An item of a list; [version] goes with every change, as Amazon wants it. [waiting] while a change made without internet is not yet sent. */
+data class ListItem(val id: String, val name: String, val completed: Boolean, val version: Long, val waiting: Boolean = false) {
     companion object {
         fun fromJson(o: JSONObject) = ListItem(o.getString("id"), o.optString("name"), o.optBoolean("completed"), o.optLong("version", 1))
 

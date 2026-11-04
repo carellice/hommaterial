@@ -3,6 +3,7 @@ package app.hommaterial
 import android.app.Application
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
+import app.hommaterial.data.Offline
 import app.hommaterial.data.ServerSync
 
 class App : Application() {
@@ -10,6 +11,7 @@ class App : Application() {
         super.onCreate()
         instance = this
         ServerSync.init(this)
+        Offline.init(this)
     }
 
     companion object {

@@ -807,4 +807,11 @@
     <string name="gcal_paste">Indirizzo della pagina finale</string>
     <string name="gcal_link">Collega</string>
     <string name="calendar_code_used">Questo indirizzo è già stato usato o è troppo vecchio: accedi di nuovo con Google e incolla quello nuovo</string>
+    <string name="offline_banner">Senza internet: questa è la copia salvata sul telefono</string>
+    <string name="offline_pending_one">1 modifica in attesa</string>
+    <string name="offline_pending_many">%1$d modifiche in attesa</string>
+    <string name="offline_sending">Invio in corso: %1$s</string>
+    <string name="offline_waiting">In attesa di internet</string>
+    <string name="offline_saved">Salvato sul telefono: parte quando torna internet</string>
+    <string name="offline_refused">Non applicata, “%1$s”: %2$s</string>
 </resources>

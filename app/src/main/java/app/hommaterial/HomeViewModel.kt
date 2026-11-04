@@ -50,6 +50,7 @@ import app.hommaterial.data.CalendarInfo
 import app.hommaterial.data.CalendarSource
 import app.hommaterial.data.Echo
 import app.hommaterial.data.EventInput
+import app.hommaterial.data.Offline
 import app.hommaterial.data.Updater
 import app.hommaterial.data.WidgetConfig
 import app.hommaterial.data.WorkersAi
@@ -1661,45 +1662,98 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         return result
     }
 
-    suspend fun alexaLists(): List<AlexaList>? = onList { api.lists() }
+    /**
+     * Reads [fresh] from Alexa or Google, sending first what waits and keeping what comes for later.
+     * Without internet it is what was kept; null only when nothing was, with the reason told.
+     */
+    private suspend fun <T> readKept(kept: () -> T?, keep: (T) -> Unit, fresh: suspend () -> T): T? = try {
+        runCatching { Offline.flush() }
+        fresh().also(keep)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: java.io.IOException) {
+        kept() ?: null.also { _messages.tryEmit(str(R.string.no_connection)) }
+    } catch (e: NotLoggedInException) {
+        _state.update { it.copy(loggedIn = false, loginMessage = e.message) }
+        kept()
+    } catch (e: Exception) {
+        _messages.tryEmit(e.message ?: str(R.string.something_wrong))
+        kept()
+    }
 
-    suspend fun alexaListItems(listId: String): List<ListItem>? = onList { api.listItems(listId) }
+    /** Sends what was changed without internet, if any and if it can. */
+    fun syncOffline() {
+        viewModelScope.launch { runCatching { Offline.flush() } }
+    }
 
-    suspend fun addAlexaListItem(listId: String, name: String): Boolean {
+    suspend fun alexaLists(): List<AlexaList>? = readKept(Offline::lists, Offline::putLists) { api.lists() }
+
+    /** The items of a list as Alexa has them, with what was changed here and waits to be sent. */
+    suspend fun alexaListItems(listId: String): List<ListItem>? =
+        readKept({ Offline.items(listId) }, { Offline.putItems(listId, it) }) { api.listItems(listId) }
+            ?.let { Offline.withPending(listId, it) }
+
+    /** The items as last read, with what waits: shown at once after a change. */
+    fun keptListItems(listId: String): List<ListItem>? = Offline.items(listId)?.let { Offline.withPending(listId, it) }
+
+    // A change to a list waits in order and goes when it can: at once, or when internet comes back.
+    fun addAlexaListItem(listId: String, name: String) {
         _haptics.tryEmit(Haptic.Confirm)
-        return onList { api.addListItem(listId, name) } != null
+        Offline.addItem(listId, name)
     }
 
-    suspend fun setAlexaListItemDone(listId: String, item: ListItem, completed: Boolean): Boolean {
+    fun setAlexaListItemDone(listId: String, item: ListItem, completed: Boolean) {
         _haptics.tryEmit(if (completed) Haptic.On else Haptic.Off)
-        return onList { api.setListItemDone(listId, item, completed) } != null
+        Offline.setItemDone(listId, item, completed)
     }
 
-    suspend fun deleteAlexaListItem(listId: String, item: ListItem): Boolean =
-        onList { api.deleteListItem(listId, item) } != null
+    fun deleteAlexaListItem(listId: String, item: ListItem) = Offline.deleteItem(listId, item)
 
     // --- the calendar ----------------------------------------------------------------------------
 
     private val calendar: CalendarSource get() = CalendarSource.of(getApplication())
 
-    suspend fun calendars(): List<CalendarInfo>? = onList { calendar.calendars() }
+    // The calendars of the phone are there without internet already; Google Calendar is kept here.
+    private val keptCalendar: Boolean get() = ServerSync.active
 
-    suspend fun calendarEvents(calendars: List<String>, from: Long, to: Long): List<CalendarEvent>? =
-        onList { calendar.events(calendars, from, to) }
+    suspend fun calendars(): List<CalendarInfo>? =
+        if (keptCalendar) readKept(Offline::calendars, Offline::putCalendars) { calendar.calendars() } else onList { calendar.calendars() }
 
-    /** Creates an event in [calendarId], when [event] is null, or changes it, moving it there if it was elsewhere. */
+    suspend fun calendarEvents(calendars: List<String>, from: Long, to: Long): List<CalendarEvent>? {
+        if (!keptCalendar) return onList { calendar.events(calendars, from, to) }
+        return readKept({ Offline.events(from, to)?.filter { it.calendar in calendars } }, { Offline.putEvents(from, to, it) }) {
+            calendar.events(calendars, from, to)
+        }?.let(Offline::withPending)
+    }
+
+    /** The events as last read, with what waits: shown at once after a change. */
+    fun keptEvents(from: Long, to: Long): List<CalendarEvent>? =
+        if (keptCalendar) Offline.events(from, to)?.let(Offline::withPending) else null
+
+    /**
+     * Creates an event in [calendarId], when [event] is null, or changes it, moving it there if it
+     * was elsewhere. With Google it waits in order and goes when it can, internet or not.
+     */
     suspend fun saveEvent(event: CalendarEvent?, calendarId: String, input: EventInput): Boolean {
-        val done = onList {
-            if (event == null) calendar.create(calendarId, input) else calendar.update(event, input, calendarId)
-        } != null
+        val done = if (keptCalendar) {
+            if (event == null) Offline.createEvent(calendarId, input) else Offline.updateEvent(event, input, calendarId)
+            true
+        } else {
+            onList { if (event == null) calendar.create(calendarId, input) else calendar.update(event, input, calendarId) } != null
+        }
         _haptics.tryEmit(if (done) Haptic.Confirm else Haptic.Reject)
-        if (done) _messages.tryEmit(str(R.string.calendar_saved))
+        if (done) _messages.tryEmit(str(if (Offline.online.value || !keptCalendar) R.string.calendar_saved else R.string.offline_saved))
         return done
     }
 
     suspend fun deleteEvent(event: CalendarEvent): Boolean {
-        val done = onList { calendar.delete(event) } != null
-        if (done) _messages.tryEmit(str(R.string.calendar_deleted))
+        val done = if (keptCalendar) {
+            Offline.deleteEvent(event)
+            true
+        } else {
+            onList { calendar.delete(event) } != null
+        }
+        if (done) _messages.tryEmit(str(if (Offline.online.value || !keptCalendar) R.string.calendar_deleted else R.string.offline_saved))
         return done
     }
 

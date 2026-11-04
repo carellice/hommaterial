@@ -783,6 +783,13 @@ export const STRINGS = {
 "gcal_paste": "Address of the final page",
 "gcal_link": "Link",
 "calendar_code_used": "This address was already used or is too old: sign in with Google again and paste the new one",
+"offline_banner": "No internet: this is the copy kept on the phone",
+"offline_pending_one": "1 change waiting",
+"offline_pending_many": "%1$d changes waiting",
+"offline_sending": "Sending: %1$s",
+"offline_waiting": "Waiting for internet",
+"offline_saved": "Saved on the phone: it goes when internet is back",
+"offline_refused": "Not applied, “%1$s”: %2$s",
 "devices": {
 "one": "%d device",
 "other": "%d devices"
@@ -1591,6 +1598,13 @@ export const STRINGS = {
 "gcal_paste": "Indirizzo della pagina finale",
 "gcal_link": "Collega",
 "calendar_code_used": "Questo indirizzo è già stato usato o è troppo vecchio: accedi di nuovo con Google e incolla quello nuovo",
+"offline_banner": "Senza internet: questa è la copia salvata sul telefono",
+"offline_pending_one": "1 modifica in attesa",
+"offline_pending_many": "%1$d modifiche in attesa",
+"offline_sending": "Invio in corso: %1$s",
+"offline_waiting": "In attesa di internet",
+"offline_saved": "Salvato sul telefono: parte quando torna internet",
+"offline_refused": "Non applicata, “%1$s”: %2$s",
 "devices": {
 "one": "%d dispositivo",
 "other": "%d dispositivi"

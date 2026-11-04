@@ -42,6 +42,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.CircularProgressIndicator
@@ -104,9 +105,6 @@ internal fun listName(list: AlexaList): String = when {
     else -> list.name
 }
 
-// Items added and not yet confirmed by Alexa carry an id of their own until the list is read again.
-private const val ADDING = "adding:"
-
 /**
  * The lists of Alexa and their items, kept while the app is open so that moving between the pages
  * shows them at once: read from Alexa when the page first opens, on a pull and after every change.
@@ -121,12 +119,6 @@ internal class ListsModel(private val vm: HomeViewModel, private val scope: Coro
     /** Whether the last reading of the lists failed: the reason was shown in the snackbar. */
     var failed by mutableStateOf(false)
         private set
-    /** Items being ticked, shown at once as they will be, and those being deleted, gone at once. */
-    var pending by mutableStateOf(emptySet<String>())
-        private set
-    var removing by mutableStateOf(emptySet<String>())
-        private set
-    private var added = 0
 
     fun reload() {
         if (loading) return
@@ -148,35 +140,18 @@ internal class ListsModel(private val vm: HomeViewModel, private val scope: Coro
         vm.alexaListItems(listId)?.let { items[listId] = it }
     }
 
-    fun add(listId: String, name: String) {
-        val item = AlexaItem("$ADDING${added++}", name, completed = false, version = 0)
-        items[listId] = listOf(item) + items[listId].orEmpty()
-        scope.launch {
-            vm.addAlexaListItem(listId, name)
-            refresh(listId)
-            // What Alexa did not take goes away with the list read again; if that failed too, now.
-            items[listId] = items[listId].orEmpty().filter { it.id != item.id }
-        }
-    }
+    // A change is kept on the phone and shows at once; it goes to Alexa with the reading after it,
+    // or, without internet, when the connection comes back.
+    fun add(listId: String, name: String) = changed(listId) { vm.addAlexaListItem(listId, name) }
 
-    fun toggle(listId: String, item: AlexaItem) {
-        if (item.id.startsWith(ADDING) || item.id in pending) return
-        pending = pending + item.id
-        scope.launch {
-            vm.setAlexaListItemDone(listId, item, !item.completed)
-            refresh(listId)
-            pending = pending - item.id
-        }
-    }
+    fun toggle(listId: String, item: AlexaItem) = changed(listId) { vm.setAlexaListItemDone(listId, item, !item.completed) }
 
-    fun delete(listId: String, item: AlexaItem) {
-        if (item.id.startsWith(ADDING)) return
-        removing = removing + item.id
-        scope.launch {
-            vm.deleteAlexaListItem(listId, item)
-            refresh(listId)
-            removing = removing - item.id
-        }
+    fun delete(listId: String, item: AlexaItem) = changed(listId) { vm.deleteAlexaListItem(listId, item) }
+
+    private fun changed(listId: String, change: () -> Unit) {
+        change()
+        vm.keptListItems(listId)?.let { items[listId] = it }
+        scope.launch { refresh(listId) }
     }
 
     /** How many items are still to do: counted from those read, or as Alexa last said. */
@@ -231,6 +206,7 @@ internal fun ListsPage(model: ListsModel, bottomSpace: Int) {
     }
 
     Column(Modifier.fillMaxSize()) {
+        OfflineBanner()
         Segments(
             all.map { listName(it) to model.active(it) },
             position = { pager.currentPage + pager.currentPageOffsetFraction },
@@ -355,11 +331,8 @@ private fun Segments(
 private fun ListContent(model: ListsModel, list: AlexaList, bottomSpace: Int) {
     val items = model.items[list.id]
     var showDone by rememberSaveable(list.id) { mutableStateOf(false) }
-    val kept = items.orEmpty().filter { it.id !in model.removing }
-    // An item being ticked already sits where it will be.
-    fun done(item: AlexaItem) = if (item.id in model.pending) !item.completed else item.completed
-    val todo = kept.filter { !done(it) }
-    val finished = kept.filter { done(it) }
+    val todo = items.orEmpty().filter { !it.completed }
+    val finished = items.orEmpty().filter { it.completed }
 
     LazyColumn(
         Modifier.fillMaxSize().wrapContentWidth().widthIn(max = 720.dp),
@@ -489,13 +462,11 @@ private fun AddField(onAdd: (String) -> Unit) {
 @Composable
 private fun ItemRow(item: AlexaItem, model: ListsModel, list: AlexaList, shape: RoundedCornerShape) {
     val colors = MaterialTheme.colorScheme
-    val adding = item.id.startsWith(ADDING)
-    val busy = item.id in model.pending || adding
-    val completed = if (item.id in model.pending) !item.completed else item.completed
+    val completed = item.completed
     Surface(
         shape = shape,
         color = colors.surfaceContainer,
-        modifier = Modifier.fillMaxWidth().clip(shape).clickable(enabled = !busy) { model.toggle(list.id, item) },
+        modifier = Modifier.fillMaxWidth().clip(shape).clickable { model.toggle(list.id, item) },
     ) {
         Row(
             Modifier.heightIn(min = 60.dp).padding(start = 16.dp, end = 4.dp),
@@ -506,12 +477,20 @@ private fun ItemRow(item: AlexaItem, model: ListsModel, list: AlexaList, shape: 
                 item.name,
                 style = MaterialTheme.typography.bodyLarge,
                 textDecoration = if (completed) TextDecoration.LineThrough else null,
-                color = if (completed || adding) colors.onSurfaceVariant else colors.onSurface,
+                color = if (completed) colors.onSurfaceVariant else colors.onSurface,
                 modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 12.dp),
             )
+            // Changed here and not yet sent: it goes as soon as there is internet.
+            if (item.waiting) {
+                Icon(
+                    Icons.Outlined.CloudUpload,
+                    contentDescription = str(R.string.offline_waiting),
+                    tint = colors.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
             IconButton(
                 onClick = { model.delete(list.id, item) },
-                enabled = !busy,
                 colors = IconButtonDefaults.iconButtonColors(contentColor = colors.onSurfaceVariant),
             ) {
                 Icon(Icons.Outlined.Close, contentDescription = str(R.string.list_delete))

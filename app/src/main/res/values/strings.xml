@@ -817,4 +817,11 @@
     <string name="gcal_paste">Address of the final page</string>
     <string name="gcal_link">Link</string>
     <string name="calendar_code_used">This address was already used or is too old: sign in with Google again and paste the new one</string>
+    <string name="offline_banner">No internet: this is the copy kept on the phone</string>
+    <string name="offline_pending_one">1 change waiting</string>
+    <string name="offline_pending_many">%1$d changes waiting</string>
+    <string name="offline_sending">Sending: %1$s</string>
+    <string name="offline_waiting">Waiting for internet</string>
+    <string name="offline_saved">Saved on the phone: it goes when internet is back</string>
+    <string name="offline_refused">Not applied, “%1$s”: %2$s</string>
 </resources>

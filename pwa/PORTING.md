@@ -24,6 +24,7 @@ Material. Il server porta tutto quello che il telefono faceva fuori dalle scherm
 | `ui/Assistant.kt` | `web/js/ui/assistant.js` | fatto |
 | `ui/Macros.kt` | `web/js/ui/macros.js` | fatto |
 | `ui/Calendar.kt`, `data/Calendar.kt` (Google tramite server, o calendari del telefono senza server) | `web/js/ui/calendar.js`, `server/src/calendar.ts`, `/api/calendar/*` | fatto; con Google vero da verificare |
+| `data/Offline.kt` (liste e Google Calendar senza internet: copia salvata e modifiche in coda, inviate da WorkManager) | — | solo Android, per scelta: la PWA dipende comunque dal server di casa |
 | `ui/Schedules.kt` | `web/js/ui/schedules.js` | fatto |
 | `ui/Automations.kt` | `web/js/ui/automations.js` | fatto |
 | `ui/RoomDialogs.kt` | `web/js/ui/rooms.js` | fatto |
