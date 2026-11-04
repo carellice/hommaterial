@@ -798,21 +798,21 @@
     <string name="calendar_change_keys">Change the keys of Google Cloud</string>
     <string name="calendar_permission">Calendars of the phone</string>
     <string name="calendar_permission_off">Not allowed: tap to allow</string>
-    <string name="gcal_intro">Five steps, once: about ten minutes. Google Cloud is free and wants no card. Open the links from a computer if it is easier.</string>
+    <string name="gcal_intro">Six steps, once: about ten minutes. Google Cloud is free and wants no card. Open the links from a computer if it is easier.</string>
     <string name="gcal_open">Open</string>
     <string name="gcal_step1_title">1 · Create a project</string>
     <string name="gcal_step1_text">Sign in to Google Cloud with your Google account and create a project called Hommaterial.</string>
     <string name="gcal_step2_title">2 · Turn on the Calendar API</string>
     <string name="gcal_step2_text">Check at the top that the project is Hommaterial and tap Enable.</string>
     <string name="gcal_step3_title">3 · Set up the consent screen</string>
-    <string name="gcal_step3_text">Tap Get started: Hommaterial as name, your email, then External as audience. Then, in Audience, tap Publish app: otherwise the access expires every 7 days.</string>
-    <string name="gcal_step4_title">4 · Create the keys</string>
-    <string name="gcal_step4_text">In Clients tap Create client, choose Desktop app as type and tap Create. Copy here the Client ID and the Client secret.</string>
+    <string name="gcal_step3_text">Tap Get started: Hommaterial as name, your email for support and as contact, External as audience. In Branding leave the logo and the domains empty.</string>
+    <string name="gcal_step4_title">4 · Let your account in</string>
+    <string name="gcal_step4_text">In Audience tap Publish app and confirm: the access will not expire. If the button is grey, tap Add users under Test users and add your email: it works at once, but the access has to be linked again every 7 days.</string>
     <string name="gcal_client_id">Client ID</string>
     <string name="gcal_client_secret">Client secret</string>
     <string name="gcal_save_keys">Save the keys</string>
-    <string name="gcal_step5_title">5 · Link your account</string>
-    <string name="gcal_step5_text">Sign in with Google and allow the calendar. Where Google says the app is not verified, tap Advanced and Go to Hommaterial: it is yours. At the end the page does not open: copy its whole address and paste it here.</string>
+    <string name="gcal_step5_title">5 · Create the keys</string>
+    <string name="gcal_step5_text">In Clients tap Create client, choose Desktop app as type and tap Create. Copy here the Client ID and the Client secret.</string>
     <string name="gcal_sign_in">Sign in with Google</string>
     <string name="gcal_paste">Address of the final page</string>
     <string name="gcal_link">Link</string>
@@ -824,4 +824,6 @@
     <string name="offline_waiting">Waiting for internet</string>
     <string name="offline_saved">Saved on the phone: it goes when internet is back</string>
     <string name="offline_refused">Not applied, “%1$s”: %2$s</string>
+    <string name="gcal_step6_title">6 · Link your account</string>
+    <string name="gcal_step6_text">Tap Sign in with Google and choose your account. At “Google hasn’t verified this app” tap Advanced, then Go to Hommaterial (unsafe): the app is yours. Tick every box and tap Continue. At the end a page opens that does not load, its address starting with http://localhost: copy the whole address and paste it here. If Google says “Error 403: access_denied”, go back to step 4.</string>
 </resources>

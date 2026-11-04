@@ -352,6 +352,7 @@ function EventEditor({ s, event, onDismiss }) {
 const GOOGLE_PROJECT = 'https://console.cloud.google.com/projectcreate';
 const GOOGLE_API = 'https://console.cloud.google.com/apis/library/calendar-json.googleapis.com';
 const GOOGLE_CONSENT = 'https://console.cloud.google.com/auth/overview';
+const GOOGLE_AUDIENCE = 'https://console.cloud.google.com/auth/audience';
 const GOOGLE_CLIENTS = 'https://console.cloud.google.com/auth/clients';
 
 /** The calendar in the settings: Google linked step by step, then which calendars to show and where new events go. */
@@ -383,7 +384,7 @@ export function CalendarSettings({ s }) {
       }} />`}`;
 }
 
-/** Google Calendar on the home server: five steps, each with the page of Google Cloud it happens on. */
+/** Google Calendar on the home server: six steps, each with the page of Google Cloud it happens on. */
 function GoogleSetup({ s }) {
   const [changingKeys, setChangingKeys] = useState(false);
   const [clientId, setClientId] = useState('');
@@ -402,7 +403,8 @@ function GoogleSetup({ s }) {
       ${step(1, GOOGLE_PROJECT)}
       ${step(2, GOOGLE_API)}
       ${step(3, GOOGLE_CONSENT)}
-      ${step(4, GOOGLE_CLIENTS, !keys)}
+      ${step(4, GOOGLE_AUDIENCE)}
+      ${step(5, GOOGLE_CLIENTS, !keys)}
       ${keys && html`
         <${Field} label=${str('gcal_client_id')} value=${clientId} onInput=${(v) => setClientId(v.trim())} />
         <${Field} label=${str('gcal_client_secret')} type="password" value=${secret} onInput=${(v) => setSecret(v.trim())} />
@@ -412,8 +414,8 @@ function GoogleSetup({ s }) {
           setBusy(false);
         }}>${str('gcal_save_keys')}</button>`}
       ${!keys && html`
-        <div class="title-small">${str('gcal_step5_title')}</div>
-        <div class="body-medium supporting">${str('gcal_step5_text')}</div>
+        <div class="title-small">${str('gcal_step6_title')}</div>
+        <div class="body-medium supporting">${str('gcal_step6_text')}</div>
         <button class="tonal-btn" onClick=${async () => {
           // Opened at once, before the address arrives: a window opened later is blocked as a pop-up.
           const opened = window.open('', '_blank');

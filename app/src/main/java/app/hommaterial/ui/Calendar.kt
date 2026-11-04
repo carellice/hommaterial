@@ -702,6 +702,7 @@ private fun TimeDialog(at: Long, onDismiss: () -> Unit, onPick: (Long) -> Unit) 
 private const val GOOGLE_PROJECT = "https://console.cloud.google.com/projectcreate"
 private const val GOOGLE_API = "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com"
 private const val GOOGLE_CONSENT = "https://console.cloud.google.com/auth/overview"
+private const val GOOGLE_AUDIENCE = "https://console.cloud.google.com/auth/audience"
 private const val GOOGLE_CLIENTS = "https://console.cloud.google.com/auth/clients"
 
 /**
@@ -775,7 +776,7 @@ internal fun CalendarSettings(state: UiState, vm: HomeViewModel) {
     }
 }
 
-/** Google Calendar on the home server, five steps with the links to follow; once linked, nothing of it shows. */
+/** Google Calendar on the home server, six steps with the links to follow; once linked, nothing of it shows. */
 @Composable
 private fun GoogleSetup(state: UiState, vm: HomeViewModel) {
     val scope = rememberCoroutineScope()
@@ -792,7 +793,8 @@ private fun GoogleSetup(state: UiState, vm: HomeViewModel) {
         Step(R.string.gcal_step1_title, R.string.gcal_step1_text) { uri.openUri(GOOGLE_PROJECT) }
         Step(R.string.gcal_step2_title, R.string.gcal_step2_text) { uri.openUri(GOOGLE_API) }
         Step(R.string.gcal_step3_title, R.string.gcal_step3_text) { uri.openUri(GOOGLE_CONSENT) }
-        Step(R.string.gcal_step4_title, R.string.gcal_step4_text, done = state.calendarClient && !changingKeys) { uri.openUri(GOOGLE_CLIENTS) }
+        Step(R.string.gcal_step4_title, R.string.gcal_step4_text) { uri.openUri(GOOGLE_AUDIENCE) }
+        Step(R.string.gcal_step5_title, R.string.gcal_step5_text, done = state.calendarClient && !changingKeys) { uri.openUri(GOOGLE_CLIENTS) }
         if (!state.calendarClient || changingKeys) {
             OutlinedTextField(clientId, { clientId = it.trim() }, label = { Text(str(R.string.gcal_client_id)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(
@@ -814,8 +816,8 @@ private fun GoogleSetup(state: UiState, vm: HomeViewModel) {
             ) { Text(str(R.string.gcal_save_keys)) }
         }
         if (state.calendarClient && !changingKeys) {
-            Text(str(R.string.gcal_step5_title), style = MaterialTheme.typography.titleSmall)
-            Text(str(R.string.gcal_step5_text), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(str(R.string.gcal_step6_title), style = MaterialTheme.typography.titleSmall)
+            Text(str(R.string.gcal_step6_text), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             FilledTonalButton(onClick = { scope.launch { vm.googleAuthUrl()?.let(uri::openUri) } }) {
                 Icon(Icons.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
