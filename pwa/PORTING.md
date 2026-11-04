@@ -28,7 +28,8 @@ Material. Il server porta tutto quello che il telefono faceva fuori dalle scherm
 | `ui/RoomDialogs.kt` | `web/js/ui/rooms.js` | fatto |
 | `ui/HistoryChart.kt` | `web/js/ui/chart.js` (dati da `/api/history`) | fatto |
 | `ui/UpdateDialog.kt` | `web/js/ui/app.js` `UpdateDialog` | fatto |
-| `ui/Lists.kt` (liste di Alexa) | `web/js/ui/lists.js`, `/api/lists` | fatto (con Alexa simulata); da verificare con Amazon |
+| `ui/BottomNav.kt` (barra in basso: Casa e Liste) | `home.js` `BottomBar` | fatto |
+| `ui/Lists.kt` (pagina delle liste di Alexa) | `web/js/ui/lists.js` `ListsPage`, `/api/lists` | verificato con Amazon |
 | `ui/NfcTag.kt` | — | non portabile |
 
 ## Dati

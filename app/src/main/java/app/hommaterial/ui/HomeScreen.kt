@@ -11,7 +11,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.fadeIn
@@ -32,6 +38,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -120,6 +127,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -180,7 +188,7 @@ private fun switchingOn(device: Device, state: UiState): List<Schedule> = state.
         it.action.target == device.applianceId && it.action.value == "on"
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
@@ -204,6 +212,13 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     BackHandler(enabled = query != null) { query = null }
     // The tile asked to open its panel, by its id, until it does.
     val opening = remember { mutableStateOf<String?>(null) }
+    // The page of the bottom bar, and whether the bar shows: it hides while the page scrolls down.
+    var tab by rememberSaveable { mutableStateOf(TAB_HOME) }
+    var barShown by remember { mutableStateOf(true) }
+    val barScroll = rememberBarScroll { barShown = it }
+    val lists = rememberListsModel(vm)
+    BackHandler(enabled = tab != TAB_HOME && query == null) { tab = TAB_HOME }
+    val typing = WindowInsets.isImeVisible
     val found = query?.let { search(it, homeSections(PAGE_ALL, state)) }.orEmpty()
 
     /** What a touch on the tile of [entry] does: the search runs it for the one it found first. */
@@ -230,13 +245,20 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
             TopAppBar(
                 title = {
                     val typed = query
-                    if (typed == null) {
+                    if (tab == TAB_LISTS) {
+                        Text(str(R.string.s_lists))
+                    } else if (typed == null) {
                         Title(state.updatedAt)
                     } else {
                         SearchField(typed, onChange = { query = it }) { found.firstOrNull()?.let(::activate) }
                     }
                 },
                 actions = {
+                    if (tab == TAB_LISTS) {
+                        VoiceButton(vm, correcting = state.correcting)
+                        OverflowMenu(state, vm, onSettings, onArrange = { arranging = true })
+                        return@TopAppBar
+                    }
                     if (query != null) {
                         IconButton(onClick = { query = null }) {
                             Icon(Icons.Outlined.Close, contentDescription = str(R.string.search_close))
@@ -260,9 +282,25 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbar) },
+        // Over the bottom bar, not on it.
+        snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = if (query == null) BOTTOM_BAR_SPACE else 0.dp)) },
     ) { padding ->
-        Row(Modifier.padding(padding).fillMaxSize()) {
+        Box(Modifier.padding(padding).fillMaxSize().nestedScroll(barScroll)) {
+        AnimatedContent(
+            tab,
+            transitionSpec = {
+                // The lists come in from the right, the home from the left, as their place in the bar.
+                val sign = if (targetState == TAB_LISTS) 1 else -1
+                (slideInHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { sign * it / 5 } + fadeIn())
+                    .togetherWith(slideOutHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { -sign * it / 5 } + fadeOut())
+            },
+            label = "tab",
+        ) { shown ->
+        if (shown == TAB_LISTS) {
+            ListsPage(lists, bottomSpace = BOTTOM_BAR_SPACE.value.toInt())
+            return@AnimatedContent
+        }
+        Row(Modifier.fillMaxSize()) {
             if (pages.size > 1 && query == null) {
                 SideBar(pages, current, expanded = width >= SIDE_BAR_DP, clock) { page = it }
             }
@@ -286,6 +324,17 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                     }
                 }
             }
+        }
+        }
+        FloatingBottomBar(
+            current = tab,
+            visible = query == null && !typing && barShown,
+            onSelect = {
+                tab = it
+                barShown = true
+            },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+        )
         }
     }
 }
@@ -350,7 +399,7 @@ private fun SearchResults(query: String, found: List<Entry>, state: UiState, vm:
     LazyVerticalGrid(
         columns = GridCells.Adaptive(LocalHomeLook.current.tileMinWidth),
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp + BOTTOM_BAR_SPACE),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -578,7 +627,7 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(LocalHomeLook.current.tileMinWidth),
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp + BOTTOM_BAR_SPACE),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(LocalHomeLook.current.gap),
     ) {
@@ -1226,8 +1275,6 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
     if (automating) AutomationsDialog(state, vm, onDismiss = { automating = false })
     var scheduling by remember { mutableStateOf(false) }
     if (scheduling) SchedulesDialog(state, vm, onDismiss = { scheduling = false })
-    var listing by remember { mutableStateOf(false) }
-    if (listing) ListsDialog(vm, onDismiss = { listing = false })
     // What waits for the PIN of the monitor before it happens.
     var behindPin by remember { mutableStateOf<(() -> Unit)?>(null) }
     behindPin?.let { action ->
@@ -1251,8 +1298,6 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
             text = { Text(str(R.string.check_updates)) },
             onClick = { open = false; vm.checkForUpdate(manual = true) },
         )
-        // The lists are for everybody at home, as on an Echo: not behind the PIN of the monitor.
-        DropdownMenuItem(text = { Text(str(R.string.s_lists)) }, onClick = { open = false; listing = true })
         DropdownMenuItem(text = { Text(str(R.string.arrange)) }, onClick = { open = false; guarded(onArrange) })
         DropdownMenuItem(
             text = { Text(str(R.string.s_automations)) },

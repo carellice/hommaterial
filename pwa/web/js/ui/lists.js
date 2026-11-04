@@ -1,7 +1,7 @@
-// The lists of Alexa, as in its app and on the Echo devices: asked to Alexa through the server as
-// the screen opens and after every change, never kept (ui/Lists.kt).
-import { html, useState, useEffect } from '../lib.js';
-import { Icon, IconButton, FullDialog, Field, Spinner, Chips } from './common.js';
+// The page of the lists of Alexa, as in its app and on the Echo devices (ui/Lists.kt): a segmented
+// control to choose the list, the list under it, and a swipe sideways to move to the next one.
+import { html, useState, useEffect, useRef } from '../lib.js';
+import { Icon, IconButton, Spinner } from './common.js';
 import * as store from '../store.js';
 import { str } from '/shared/i18n.js';
 
@@ -12,96 +12,254 @@ function listName(list) {
   return list.name || list.type;
 }
 
-export function ListsDialog({ onDismiss }) {
-  const [lists, setLists] = useState(null);
-  const [chosen, setChosen] = useState(null);
-  const [items, setItems] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [typed, setTyped] = useState('');
-  const [showDone, setShowDone] = useState(false);
-  // Items being ticked, shown at once as they will be, and those being deleted, gone at once.
-  const [pending, setPending] = useState([]);
-  const [removing, setRemoving] = useState([]);
+// Items added and not yet confirmed by Alexa carry an id of their own until the list is read again.
+const ADDING = 'adding:';
+let added = 0;
 
-  const reload = async (keep = chosen) => {
-    setLoading(true);
-    const found = await store.alexaLists();
-    if (found) {
-      setLists(found);
-      const current = found.find((l) => l.id === keep) ?? found.find((l) => l.type === 'TO_DO') ?? found[0];
-      setChosen(current?.id ?? null);
-      setItems(current ? (await store.alexaListItems(current.id)) ?? [] : []);
-    }
-    setLoading(false);
-  };
+/**
+ * The lists and their items, kept while the app is open so that moving between the pages shows
+ * them at once: read from Alexa when the page first opens, on a pull and after every change.
+ */
+const model = { lists: null, items: {}, loading: false, failed: false, pending: [], removing: [] };
+const listeners = new Set();
+const changed = () => listeners.forEach((l) => l());
+const set = (change) => {
+  Object.assign(model, change);
+  changed();
+};
+
+function useModel() {
+  const [, tick] = useState(0);
   useEffect(() => {
-    reload(null);
+    const listener = () => tick((n) => n + 1);
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  }, []);
+  return model;
+}
+
+export async function reloadLists() {
+  if (model.loading) return;
+  set({ loading: true });
+  const found = await store.alexaLists();
+  if (found) {
+    // Every list at once, so that moving to the next one has nothing to wait for.
+    const read = await Promise.all(found.map((l) => store.alexaListItems(l.id)));
+    const items = { ...model.items };
+    found.forEach((l, i) => read[i] && (items[l.id] = read[i]));
+    set({ lists: found, items });
+  }
+  set({ loading: false, failed: !found });
+}
+
+async function refresh(listId) {
+  const read = await store.alexaListItems(listId);
+  if (read) set({ items: { ...model.items, [listId]: read } });
+}
+
+function add(listId, name) {
+  const item = { id: `${ADDING}${added++}`, name, completed: false, version: 0 };
+  set({ items: { ...model.items, [listId]: [item, ...(model.items[listId] ?? [])] } });
+  store.addAlexaListItem(listId, name).then(async () => {
+    await refresh(listId);
+    // What Alexa did not take goes away with the list read again; if that failed too, now.
+    set({ items: { ...model.items, [listId]: (model.items[listId] ?? []).filter((it) => it.id !== item.id) } });
+  });
+}
+
+async function toggle(listId, item) {
+  if (item.id.startsWith(ADDING) || model.pending.includes(item.id)) return;
+  set({ pending: [...model.pending, item.id] });
+  await store.setAlexaListItemDone(listId, item, !item.completed);
+  await refresh(listId);
+  set({ pending: model.pending.filter((id) => id !== item.id) });
+}
+
+async function remove(listId, item) {
+  if (item.id.startsWith(ADDING)) return;
+  set({ removing: [...model.removing, item.id] });
+  await store.deleteAlexaListItem(listId, item);
+  await refresh(listId);
+  set({ removing: model.removing.filter((id) => id !== item.id) });
+}
+
+/** How many items are still to do: counted from those read, or as Alexa last said. */
+const active = (list) => model.items[list.id]?.filter((it) => !it.completed).length ?? list.active;
+
+export function ListsPage() {
+  const m = useModel();
+  const [chosen, setChosen] = useState(null);
+  // Which way the last change of list went, for the new one to come in from that side.
+  const [direction, setDirection] = useState(0);
+  useEffect(() => {
+    if (!m.lists) reloadLists();
   }, []);
 
-  const choose = async (id) => {
-    if (id === chosen) return;
-    setChosen(id);
-    setItems(null);
-    setLoading(true);
-    setItems((await store.alexaListItems(id)) ?? []);
-    setLoading(false);
-  };
+  if (!m.lists) {
+    return html`<div class="lists-center">${m.failed && !m.loading
+      ? html`<div class="body-large faint">${str('lists_failed')}</div>
+        <button class="tonal-btn" style="margin-top:16px" onClick=${reloadLists}>${str('lists_retry')}</button>`
+      : html`<${Spinner} />`}</div>`;
+  }
+  if (!m.lists.length) return html`<div class="lists-page"><${EmptyState} title=${str('lists_none')} /></div>`;
 
-  const add = async () => {
-    const name = typed.trim();
-    if (!name || !chosen) return;
-    setTyped('');
-    if (await store.addAlexaListItem(chosen, name)) setItems((await store.alexaListItems(chosen)) ?? items);
+  const index = Math.max(0, m.lists.findIndex((l) => l.id === chosen) >= 0
+    ? m.lists.findIndex((l) => l.id === chosen)
+    : m.lists.findIndex((l) => l.type === 'TO_DO'));
+  const list = m.lists[index];
+  const go = (to) => {
+    if (to < 0 || to >= m.lists.length || to === index) return;
+    setDirection(to > index ? 1 : -1);
+    setChosen(m.lists[to].id);
   };
-
-  const change = async (item, remove) => {
-    if (remove) setRemoving((r) => [...r, item.id]);
-    else setPending((p) => [...p, item.id]);
-    if (remove) await store.deleteAlexaListItem(chosen, item);
-    else await store.setAlexaListItemDone(chosen, item, !item.completed);
-    const fresh = await store.alexaListItems(chosen);
-    if (fresh) setItems(fresh);
-    setPending((p) => p.filter((id) => id !== item.id));
-    setRemoving((r) => r.filter((id) => id !== item.id));
-  };
-
-  const row = (item) => {
-    const busy = pending.includes(item.id);
-    const completed = busy ? !item.completed : item.completed;
-    return html`
-      <div key=${item.id} class="list-item clickable list-row" role="button" tabindex="0" onClick=${() => !busy && change(item, false)}>
-        <span class="lead"><${Icon} name=${completed ? 'check_box' : 'check_box_outline_blank'} cls=${completed ? 'primary' : ''} /></span>
-        <span class="texts"><span class=${`body-large ${completed ? 'done' : ''}`}>${item.name}</span></span>
-        <span class="trail" onClick=${(e) => e.stopPropagation()}>
-          <${IconButton} icon="close" cls="faint" label=${str('list_delete')} disabled=${busy} onClick=${() => change(item, true)} />
-        </span>
-      </div>`;
-  };
-
-  const kept = (items ?? []).filter((it) => !removing.includes(it.id));
-  const todo = kept.filter((it) => !it.completed);
-  const done = kept.filter((it) => it.completed);
   return html`
-    <${FullDialog} title=${str('s_lists')} onDismiss=${onDismiss} actions=${loading
-      ? html`<span style="padding:12px"><${Spinner} /></span>`
-      : html`<${IconButton} icon="refresh" label=${str('refresh')} onClick=${() => reload()} />`}>
-      <div class="body-small faint" style="margin-bottom:12px">${str('lists_text')}</div>
-      ${lists && !lists.length && html`<div class="body-medium">${str('lists_none')}</div>`}
-      ${lists?.length > 0 && html`
-        <${Chips} choices=${lists.map((l) => [l.id, listName(l) + (l.active != null ? ` · ${l.active}` : '')])}
-          selected=${chosen} onSelect=${choose} />
-        <div class="row gap" style="align-items:flex-end;margin:8px 0 12px">
-          <div class="grow"><${Field} label=${str('list_add_hint')} value=${typed} onInput=${setTyped} onEnter=${add} /></div>
-          <${IconButton} icon="add" cls="tonal" label=${str('list_add')} disabled=${!typed.trim() || !chosen} onClick=${add} />
-        </div>`}
-      ${items && html`
-        <div class="card">
-          ${!todo.length && html`<div class="body-medium faint" style="padding:16px">${str('list_empty')}</div>`}
-          ${todo.map(row)}
+    <div class="lists-page">
+      <${Segments} names=${m.lists.map((l) => [listName(l), active(l)])} selected=${index} onSelect=${go} />
+      <${Swipe} onNext=${() => go(index + 1)} onPrevious=${() => go(index - 1)} onPull=${reloadLists} loading=${m.loading}>
+        <div class=${`list-content ${direction > 0 ? 'from-right' : direction < 0 ? 'from-left' : ''}`} key=${list.id}>
+          <${ListContent} m=${m} list=${list} />
         </div>
-        ${done.length > 0 && html`
-          <button class="text-btn" style="margin-top:8px" onClick=${() => setShowDone(!showDone)}>
-            ${str(showDone ? 'list_done_hide' : 'list_done_show', done.length)}</button>
-          ${showDone && html`<div class="card">${done.map(row)}</div>`}`}`}
-    <//>`;
+      <//>
+    </div>`;
+}
+
+/** A segmented control with a pill that slides under the chosen segment. */
+function Segments({ names, selected, onSelect }) {
+  const track = useRef(null);
+  const [pill, setPill] = useState(null);
+  useEffect(() => {
+    const measure = () => {
+      const node = track.current?.children[selected + 1];
+      if (node) setPill({ left: node.offsetLeft, width: node.offsetWidth });
+      node?.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (track.current) observer.observe(track.current);
+    return () => observer.disconnect();
+  }, [selected, names.map((n) => n.join()).join('|')]);
+  // A few lists share the width; more scroll sideways.
+  return html`
+    <div class="segments-wrap">
+      <div class=${`segments ${names.length <= 3 ? 'fit' : ''}`} ref=${track} role="tablist">
+        <span class="segment-pill" style=${pill ? `transform:translateX(${pill.left}px);width:${pill.width}px` : 'opacity:0'}></span>
+        ${names.map(([name, count], i) => html`
+          <button key=${i} class=${`segment ${i === selected ? 'selected' : ''}`} role="tab" aria-selected=${i === selected} onClick=${() => onSelect(i)}>
+            <span class="ellipsis">${name}</span>
+            ${count > 0 && html`<span class="segment-count">${count}</span>`}
+          </button>`)}
+      </div>
+    </div>`;
+}
+
+/** The list scrolls up and down; a swipe sideways moves to the next list, a pull from the top reads them again. */
+function Swipe({ onNext, onPrevious, onPull, loading, children }) {
+  const ref = useRef(null);
+  const start = useRef(null);
+  const [pull, setPull] = useState(0);
+  const onTouchStart = (e) => {
+    const t = e.touches[0];
+    start.current = { x: t.clientX, y: t.clientY, top: ref.current.scrollTop <= 0, axis: null };
+  };
+  const onTouchMove = (e) => {
+    const s = start.current;
+    if (!s) return;
+    const t = e.touches[0];
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    if (!s.axis && Math.hypot(dx, dy) > 10) s.axis = Math.abs(dx) > Math.abs(dy) * 1.4 ? 'x' : 'y';
+    if (s.axis === 'y' && s.top) setPull(Math.max(0, Math.min(120, dy)));
+    s.dx = dx;
+  };
+  const onTouchEnd = () => {
+    const s = start.current;
+    start.current = null;
+    if (s?.axis === 'x' && Math.abs(s.dx) > 60) (s.dx < 0 ? onNext : onPrevious)();
+    if (pull > 70) onPull();
+    setPull(0);
+  };
+  const shown = loading || pull > 10;
+  return html`
+    <div class="scroll lists-scroll" ref=${ref} onTouchStart=${onTouchStart} onTouchMove=${onTouchMove} onTouchEnd=${onTouchEnd}>
+      ${shown && html`<div class="pull"><div class="ball" style=${`transform:translateY(${loading ? 0 : pull / 2 - 20}px) rotate(${pull * 3}deg)`}>
+        ${loading ? html`<${Spinner} />` : html`<${Icon} name="refresh" />`}</div></div>`}
+      ${children}
+    </div>`;
+}
+
+/** One list: how far along it is, the field to add to it, the items to do, then those done. */
+function ListContent({ m, list }) {
+  const [showDone, setShowDone] = useState(false);
+  const items = m.items[list.id];
+  const kept = (items ?? []).filter((it) => !m.removing.includes(it.id));
+  // An item being ticked already sits where it will be.
+  const done = (it) => (m.pending.includes(it.id) ? !it.completed : it.completed);
+  const todo = kept.filter((it) => !done(it));
+  const finished = kept.filter(done);
+  const total = todo.length + finished.length;
+  return html`
+    <div class="list-header">
+      <div class="headline-medium">${listName(list)}</div>
+      ${items && html`
+        <div class="body-medium faint" style="margin-top:2px">${str('list_summary', todo.length, finished.length)}</div>
+        ${total > 0 && html`<div class="list-progress"><span style=${`width:${(finished.length / total) * 100}%`}></span></div>`}`}
+    </div>
+    <${AddField} onAdd=${(name) => add(list.id, name)} />
+    ${items && !todo.length && html`<${EmptyState} title=${str('list_empty')} text=${str('list_empty_text')} />`}
+    <div class="item-group">${todo.map((it) => html`<${ItemRow} key=${it.id} item=${it} m=${m} list=${list} />`)}</div>
+    ${finished.length > 0 && html`
+      <button class=${`done-header ${showDone ? 'open' : ''}`} onClick=${() => setShowDone(!showDone)}
+        aria-label=${str(showDone ? 'list_done_hide' : 'list_done_show', finished.length)}>
+        <span class="title-small primary-text">${str('list_done')}</span>
+        <span class="title-small faint grow" style="white-space:pre">${` · ${finished.length}`}</span>
+        <${Icon} name="expand_more" cls="chevron faint" />
+      </button>
+      ${showDone && html`<div class="item-group appear-down">${finished.map((it) => html`<${ItemRow} key=${it.id} item=${it} m=${m} list=${list} />`)}</div>`}`}
+    <div class="body-small faint lists-footnote">${str('lists_text')}</div>`;
+}
+
+/** The field at the top of a list, with its button that comes up once there is something to add. */
+function AddField({ onAdd }) {
+  const [typed, setTyped] = useState('');
+  const ready = typed.trim().length > 0;
+  const submit = () => {
+    if (!ready) return;
+    onAdd(typed.trim());
+    setTyped('');
+  };
+  return html`
+    <div class="add-field">
+      <${Icon} name="add" cls="faint" />
+      <input type="text" enterkeyhint="done" autocomplete="off" placeholder=${str('list_add_hint')} value=${typed}
+        onInput=${(e) => setTyped(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && (e.preventDefault(), submit())} />
+      <button class=${`add-send ${ready ? 'ready' : ''}`} aria-label=${str('list_add')} tabindex=${ready ? 0 : -1} onClick=${submit}>
+        <${Icon} name="check" />
+      </button>
+    </div>`;
+}
+
+/** An item: a touch ticks it, the cross deletes it. Swiping sideways moves to the next list. */
+function ItemRow({ item, m, list }) {
+  const adding = item.id.startsWith(ADDING);
+  const busy = m.pending.includes(item.id) || adding;
+  const completed = m.pending.includes(item.id) ? !item.completed : item.completed;
+  return html`
+    <div class=${`item-row ${completed ? 'checked' : ''} ${adding ? 'adding' : ''}`}
+      role="button" tabindex="0" onClick=${() => !busy && toggle(list.id, item)}
+      onKeyDown=${(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), !busy && toggle(list.id, item))}>
+      <span class="check-circle"><${Icon} name="check" /></span>
+      <span class="item-name body-large">${item.name}</span>
+      <span onClick=${(e) => e.stopPropagation()}>
+        <${IconButton} icon="close" cls="faint" label=${str('list_delete')} disabled=${busy} onClick=${() => remove(list.id, item)} />
+      </span>
+    </div>`;
+}
+
+function EmptyState({ title, text }) {
+  return html`
+    <div class="list-empty">
+      <span class="list-empty-icon"><${Icon} name="task_alt" /></span>
+      <div class="title-medium" style="margin-top:16px">${title}</div>
+      ${text && html`<div class="body-medium faint" style="margin-top:4px">${text}</div>`}
+    </div>`;
 }

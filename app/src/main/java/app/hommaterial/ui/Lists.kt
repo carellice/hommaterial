@@ -1,59 +1,99 @@
 package app.hommaterial.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.Checkbox
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.util.lerp
 import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.data.AlexaList
 import app.hommaterial.data.ListItem as AlexaItem
 import app.hommaterial.str
+import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 
 /** What a list is called: the two of Alexa by their name in the app, the others by the one the user gave them. */
@@ -64,159 +104,242 @@ internal fun listName(list: AlexaList): String = when {
     else -> list.name
 }
 
+// Items added and not yet confirmed by Alexa carry an id of their own until the list is read again.
+private const val ADDING = "adding:"
+
 /**
- * The lists of Alexa, as in its app and on the Echo devices: one at a time, the items still to do
- * first, then those done. Asked to Alexa as the screen opens and after every change.
+ * The lists of Alexa and their items, kept while the app is open so that moving between the pages
+ * shows them at once: read from Alexa when the page first opens, on a pull and after every change.
  */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun ListsDialog(vm: HomeViewModel, onDismiss: () -> Unit) {
-    val scope = rememberCoroutineScope()
-    var lists by remember { mutableStateOf<List<AlexaList>?>(null) }
-    var chosen by rememberSaveable { mutableStateOf<String?>(null) }
-    var items by remember { mutableStateOf<List<AlexaItem>?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    var typed by rememberSaveable { mutableStateOf("") }
-    var showDone by rememberSaveable { mutableStateOf(false) }
-    // Items being ticked, shown at once as they will be, and those being deleted, gone at once.
-    var pending by remember { mutableStateOf(emptySet<String>()) }
-    var removing by remember { mutableStateOf(emptySet<String>()) }
+@Stable
+internal class ListsModel(private val vm: HomeViewModel, private val scope: CoroutineScope) {
+    var lists by mutableStateOf<List<AlexaList>?>(null)
+        private set
+    val items = mutableStateMapOf<String, List<AlexaItem>>()
+    var loading by mutableStateOf(false)
+        private set
+    /** Whether the last reading of the lists failed: the reason was shown in the snackbar. */
+    var failed by mutableStateOf(false)
+        private set
+    /** Items being ticked, shown at once as they will be, and those being deleted, gone at once. */
+    var pending by mutableStateOf(emptySet<String>())
+        private set
+    var removing by mutableStateOf(emptySet<String>())
+        private set
+    private var added = 0
 
-    suspend fun reload() {
-        loading = true
-        val found = vm.alexaLists()
-        if (found != null) {
-            lists = found
-            val current = found.find { it.id == chosen } ?: found.find { it.type == "TO_DO" } ?: found.firstOrNull()
-            chosen = current?.id
-            items = current?.let { vm.alexaListItems(it.id) } ?: emptyList()
-        }
-        loading = false
-    }
-
-    LaunchedEffect(Unit) { reload() }
-
-    fun choose(list: AlexaList) {
-        if (list.id == chosen) return
-        chosen = list.id
-        items = null
+    fun reload() {
+        if (loading) return
         scope.launch {
             loading = true
-            items = vm.alexaListItems(list.id) ?: emptyList()
+            val found = vm.alexaLists()
+            failed = found == null
+            if (found != null) {
+                lists = found
+                // Every list at once, so that swiping to the next one has nothing to wait for.
+                found.map { list -> async { list.id to vm.alexaListItems(list.id) } }.awaitAll()
+                    .forEach { (id, read) -> if (read != null) items[id] = read }
+            }
             loading = false
         }
     }
 
-    fun add() {
-        val listId = chosen ?: return
-        val name = typed.trim()
-        if (name.isEmpty()) return
-        typed = ""
+    private suspend fun refresh(listId: String) {
+        vm.alexaListItems(listId)?.let { items[listId] = it }
+    }
+
+    fun add(listId: String, name: String) {
+        val item = AlexaItem("$ADDING${added++}", name, completed = false, version = 0)
+        items[listId] = listOf(item) + items[listId].orEmpty()
         scope.launch {
-            if (vm.addAlexaListItem(listId, name)) items = vm.alexaListItems(listId) ?: items
+            vm.addAlexaListItem(listId, name)
+            refresh(listId)
+            // What Alexa did not take goes away with the list read again; if that failed too, now.
+            items[listId] = items[listId].orEmpty().filter { it.id != item.id }
         }
     }
 
-    fun change(item: AlexaItem, delete: Boolean) {
-        val listId = chosen ?: return
-        if (delete) removing = removing + item.id else pending = pending + item.id
+    fun toggle(listId: String, item: AlexaItem) {
+        if (item.id.startsWith(ADDING) || item.id in pending) return
+        pending = pending + item.id
         scope.launch {
-            if (delete) vm.deleteAlexaListItem(listId, item) else vm.setAlexaListItemDone(listId, item, !item.completed)
-            items = vm.alexaListItems(listId) ?: items
+            vm.setAlexaListItemDone(listId, item, !item.completed)
+            refresh(listId)
             pending = pending - item.id
+        }
+    }
+
+    fun delete(listId: String, item: AlexaItem) {
+        if (item.id.startsWith(ADDING)) return
+        removing = removing + item.id
+        scope.launch {
+            vm.deleteAlexaListItem(listId, item)
+            refresh(listId)
             removing = removing - item.id
         }
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column {
-                TopAppBar(
-                    title = { Text(str(R.string.s_lists)) },
-                    navigationIcon = {
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Outlined.Close, contentDescription = str(R.string.back))
-                        }
-                    },
-                    actions = {
-                        if (loading) {
-                            CircularProgressIndicator(Modifier.padding(12.dp).size(24.dp), strokeWidth = 2.dp)
-                        } else {
-                            IconButton(onClick = { scope.launch { reload() } }) {
-                                Icon(Icons.Outlined.Refresh, contentDescription = str(R.string.refresh))
-                            }
-                        }
-                    },
-                )
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .wrapContentWidth()
-                        .widthIn(max = 640.dp)
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
+    /** How many items are still to do: counted from those read, or as Alexa last said. */
+    fun active(list: AlexaList): Int? = items[list.id]?.count { !it.completed } ?: list.active
+}
+
+@Composable
+internal fun rememberListsModel(vm: HomeViewModel): ListsModel {
+    val scope = rememberCoroutineScope()
+    return remember(vm) { ListsModel(vm, scope) }
+}
+
+/**
+ * The page of the lists of Alexa: a segmented control to choose the list, and under it the list
+ * itself, a page each, to swipe between. The items still to do come first, then those done.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ListsPage(model: ListsModel, bottomSpace: Int) {
+    LaunchedEffect(Unit) { if (model.lists == null) model.reload() }
+    val all = model.lists
+    if (all == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (model.failed && !model.loading) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        str(R.string.lists_text),
-                        style = MaterialTheme.typography.bodySmall,
+                        str(R.string.lists_failed),
+                        style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    val all = lists
-                    if (all != null && all.isEmpty()) {
-                        Text(str(R.string.lists_none), style = MaterialTheme.typography.bodyMedium)
+                    FilledTonalButton(onClick = model::reload, modifier = Modifier.padding(top = 16.dp)) {
+                        Text(str(R.string.lists_retry))
                     }
-                    if (!all.isNullOrEmpty()) {
-                        Row(
-                            Modifier.horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            for (list in all) {
-                                val count = list.active?.let { " · $it" }.orEmpty()
-                                FilterChip(
-                                    selected = list.id == chosen,
-                                    onClick = { choose(list) },
-                                    label = { Text(listName(list) + count) },
-                                )
-                            }
+                }
+            } else {
+                CircularProgressIndicator()
+            }
+        }
+        return
+    }
+    if (all.isEmpty()) {
+        EmptyState(str(R.string.lists_none), null)
+        return
+    }
+    var chosen by rememberSaveable { mutableStateOf<String?>(null) }
+    val start = all.indexOfFirst { it.id == chosen }.takeIf { it >= 0 }
+        ?: all.indexOfFirst { it.type == "TO_DO" }.coerceAtLeast(0)
+    val pager = rememberPagerState(initialPage = start) { all.size }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(pager, all) {
+        snapshotFlow { pager.settledPage }.collect { chosen = all.getOrNull(it)?.id }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Segments(
+            all.map { listName(it) to model.active(it) },
+            position = { pager.currentPage + pager.currentPageOffsetFraction },
+            onSelect = { scope.launch { pager.animateScrollToPage(it) } },
+            modifier = Modifier.wrapContentWidth().widthIn(max = 720.dp).padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        PullToRefreshBox(
+            isRefreshing = model.loading,
+            onRefresh = model::reload,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            HorizontalPager(pager, Modifier.fillMaxSize(), key = { all[it].id }, beyondViewportPageCount = 1) { page ->
+                ListContent(model, all[page], bottomSpace)
+            }
+        }
+    }
+}
+
+/**
+ * A segmented control with a pill that slides under the chosen segment, following the finger
+ * while the lists are swiped. [position] is the page shown, with the fraction of the swipe.
+ */
+@Composable
+private fun Segments(
+    segments: List<Pair<String, Int?>>,
+    position: () -> Float,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    val density = LocalDensity.current
+    // Where each segment sits in the track, in pixels, once measured.
+    val lefts = remember { mutableStateMapOf<Int, Int>() }
+    val widths = remember { mutableStateMapOf<Int, Int>() }
+    // A few lists share the width; more scroll sideways.
+    val fits = segments.size <= 3
+    Surface(shape = CircleShape, color = colors.surfaceContainerHigh, modifier = modifier.fillMaxWidth()) {
+        Box(
+            (if (fits) Modifier.fillMaxWidth() else Modifier.horizontalScroll(rememberScrollState()))
+                .padding(4.dp),
+        ) {
+            if (widths.size == segments.size) {
+                Box(
+                    Modifier
+                        .offset {
+                            val at = position().coerceIn(0f, (segments.size - 1).toFloat())
+                            val from = at.toInt()
+                            val to = (from + 1).coerceAtMost(segments.size - 1)
+                            IntOffset(lerp(lefts[from]!!.toFloat(), lefts[to]!!.toFloat(), at - from).roundToInt(), 0)
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedTextField(
-                                value = typed,
-                                onValueChange = { typed = it },
-                                label = { Text(str(R.string.list_add_hint)) },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                keyboardActions = KeyboardActions(onDone = { add() }),
-                                modifier = Modifier.weight(1f),
-                            )
-                            IconButton(onClick = ::add, enabled = typed.isNotBlank() && chosen != null) {
-                                Icon(Icons.Outlined.Add, contentDescription = str(R.string.list_add))
+                        .width(
+                            with(density) {
+                                val at = position().coerceIn(0f, (segments.size - 1).toFloat())
+                                val from = at.toInt()
+                                val to = (from + 1).coerceAtMost(segments.size - 1)
+                                lerp(widths[from]!!.toFloat(), widths[to]!!.toFloat(), at - from).toDp()
+                            },
+                        )
+                        .height(44.dp)
+                        .clip(CircleShape)
+                        .background(colors.primary),
+                )
+            }
+            Row(if (fits) Modifier.fillMaxWidth() else Modifier) {
+                val shown = position().roundToInt()
+                segments.forEachIndexed { index, (name, count) ->
+                    val selected = index == shown
+                    val content by animateColorAsState(
+                        if (selected) colors.onPrimary else colors.onSurfaceVariant,
+                        label = "segment",
+                    )
+                    Row(
+                        // Sharing the width, a longer name takes more of it.
+                        (if (fits) Modifier.weight(name.length + (if (count != null && count > 0) 4f else 0f) + 6f) else Modifier)
+                            .height(44.dp)
+                            .clip(CircleShape)
+                            .clickable { onSelect(index) }
+                            .onGloballyPositioned {
+                                lefts[index] = it.positionInParent().x.roundToInt()
+                                widths[index] = it.size.width
                             }
-                        }
-                    }
-                    val shown = items
-                    if (shown != null) {
-                        val kept = shown.filter { it.id !in removing }
-                        val todo = kept.filter { !it.completed }
-                        val done = kept.filter { it.completed }
-                        SectionCard { Column(Modifier.fillMaxWidth()) {
-                            if (todo.isEmpty()) {
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            name,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = content,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (count != null && count > 0) {
+                            Box(
+                                Modifier
+                                    .padding(start = 8.dp)
+                                    .heightIn(min = 20.dp)
+                                    .widthIn(min = 20.dp)
+                                    .clip(CircleShape)
+                                    .background(if (selected) colors.onPrimary.copy(alpha = 0.2f) else colors.secondaryContainer)
+                                    .padding(horizontal = 6.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
                                 Text(
-                                    str(R.string.list_empty),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(16.dp),
+                                    count.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (selected) colors.onPrimary else colors.onSecondaryContainer,
                                 )
-                            }
-                            for (item in todo) ItemRow(item, item.id in pending, ::change)
-                        } }
-                        if (done.isNotEmpty()) {
-                            TextButton(onClick = { showDone = !showDone }) {
-                                Text(str(if (showDone) R.string.list_done_hide else R.string.list_done_show, done.size))
-                            }
-                            if (showDone) {
-                                SectionCard { Column(Modifier.fillMaxWidth()) { for (item in done) ItemRow(item, item.id in pending, ::change) } }
                             }
                         }
                     }
@@ -226,27 +349,267 @@ internal fun ListsDialog(vm: HomeViewModel, onDismiss: () -> Unit) {
     }
 }
 
+/** One list: how far along it is, the field to add to it, the items to do, then those done. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ItemRow(item: AlexaItem, busy: Boolean, change: (AlexaItem, Boolean) -> Unit) {
-    // What it will be once Alexa has taken the change.
-    val completed = if (busy) !item.completed else item.completed
-    ListItem(
-        headlineContent = {
+private fun ListContent(model: ListsModel, list: AlexaList, bottomSpace: Int) {
+    val items = model.items[list.id]
+    var showDone by rememberSaveable(list.id) { mutableStateOf(false) }
+    val kept = items.orEmpty().filter { it.id !in model.removing }
+    // An item being ticked already sits where it will be.
+    fun done(item: AlexaItem) = if (item.id in model.pending) !item.completed else item.completed
+    val todo = kept.filter { !done(it) }
+    val finished = kept.filter { done(it) }
+
+    LazyColumn(
+        Modifier.fillMaxSize().wrapContentWidth().widthIn(max = 720.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp + bottomSpace.dp),
+    ) {
+        item(key = "header") {
+            Header(listName(list), todo.size, finished.size, loaded = items != null)
+        }
+        item(key = "add") {
+            AddField { model.add(list.id, it) }
+            Spacer(Modifier.height(16.dp))
+        }
+        if (items != null && todo.isEmpty()) {
+            item(key = "empty") {
+                EmptyState(str(R.string.list_empty), str(R.string.list_empty_text), Modifier.animateItem())
+            }
+        }
+        itemsGrouped(todo, model, list)
+        if (finished.isNotEmpty()) {
+            item(key = "done header") {
+                DoneHeader(finished.size, showDone, Modifier.animateItem()) { showDone = !showDone }
+            }
+            if (showDone) itemsGrouped(finished, model, list)
+        }
+        item(key = "footnote") {
             Text(
-                item.name,
-                textDecoration = if (completed) TextDecoration.LineThrough else null,
-                color = if (completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                str(R.string.lists_text),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 24.dp, start = 8.dp, end = 8.dp).animateItem(),
             )
-        },
-        leadingContent = {
-            Checkbox(checked = completed, onCheckedChange = { change(item, false) }, enabled = !busy)
-        },
-        trailingContent = {
-            IconButton(onClick = { change(item, true) }, enabled = !busy) {
-                Icon(Icons.Outlined.Close, contentDescription = str(R.string.list_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** The items as one card cut in rows: the first and the last rounded, those between nearly square. */
+private fun androidx.compose.foundation.lazy.LazyListScope.itemsGrouped(
+    shown: List<AlexaItem>,
+    model: ListsModel,
+    list: AlexaList,
+) {
+    items(shown, key = { it.id }) { item ->
+        val index = shown.indexOf(item)
+        val big = 20.dp
+        val small = 6.dp
+        val shape = RoundedCornerShape(
+            topStart = if (index == 0) big else small,
+            topEnd = if (index == 0) big else small,
+            bottomStart = if (index == shown.lastIndex) big else small,
+            bottomEnd = if (index == shown.lastIndex) big else small,
+        )
+        Box(Modifier.animateItem().padding(bottom = 2.dp)) {
+            ItemRow(item, model, list, shape)
+        }
+    }
+}
+
+@Composable
+private fun Header(name: String, todo: Int, done: Int, loaded: Boolean) {
+    val total = todo + done
+    val progress by animateFloatAsState(
+        if (total == 0) 0f else done.toFloat() / total,
+        spring(stiffness = Spring.StiffnessLow),
+        label = "progress",
+    )
+    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp)) {
+        Text(name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Medium)
+        if (loaded) {
+            Text(
+                str(R.string.list_summary, todo, done),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+            if (total > 0) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    strokeCap = StrokeCap.Round,
+                    gapSize = 4.dp,
+                    drawStopIndicator = {},
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(6.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+/** The field at the top of a list, with its button that lights up once there is something to add. */
+@Composable
+private fun AddField(onAdd: (String) -> Unit) {
+    var typed by rememberSaveable { mutableStateOf("") }
+    val ready = typed.isNotBlank()
+    fun add() {
+        if (!ready) return
+        onAdd(typed.trim())
+        typed = ""
+    }
+    TextField(
+        value = typed,
+        onValueChange = { typed = it },
+        placeholder = { Text(str(R.string.list_add_hint)) },
+        leadingIcon = { Icon(Icons.Outlined.Add, contentDescription = null) },
+        trailingIcon = {
+            AnimatedVisibility(visible = ready, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut()) {
+                FilledIconButton(onClick = ::add, modifier = Modifier.padding(end = 6.dp)) {
+                    Icon(Icons.Outlined.Check, contentDescription = str(R.string.list_add))
+                }
             }
         },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = Modifier.clickable(enabled = !busy) { change(item, false) },
+        singleLine = true,
+        shape = CircleShape,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { add() }),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+        ),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
     )
+}
+
+/** An item: a touch ticks it, the cross deletes it. Swiping sideways moves to the next list. */
+@Composable
+private fun ItemRow(item: AlexaItem, model: ListsModel, list: AlexaList, shape: RoundedCornerShape) {
+    val colors = MaterialTheme.colorScheme
+    val adding = item.id.startsWith(ADDING)
+    val busy = item.id in model.pending || adding
+    val completed = if (item.id in model.pending) !item.completed else item.completed
+    Surface(
+        shape = shape,
+        color = colors.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().clip(shape).clickable(enabled = !busy) { model.toggle(list.id, item) },
+    ) {
+        Row(
+            Modifier.heightIn(min = 60.dp).padding(start = 16.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CheckCircle(completed)
+            Text(
+                item.name,
+                style = MaterialTheme.typography.bodyLarge,
+                textDecoration = if (completed) TextDecoration.LineThrough else null,
+                color = if (completed || adding) colors.onSurfaceVariant else colors.onSurface,
+                modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+            IconButton(
+                onClick = { model.delete(list.id, item) },
+                enabled = !busy,
+                colors = IconButtonDefaults.iconButtonColors(contentColor = colors.onSurfaceVariant),
+            ) {
+                Icon(Icons.Outlined.Close, contentDescription = str(R.string.list_delete))
+            }
+        }
+    }
+}
+
+/** The round tick of an item, which fills with a little bounce when it is done. */
+@Composable
+private fun CheckCircle(checked: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    val fill by animateColorAsState(if (checked) colors.primary else colors.primary.copy(alpha = 0f), label = "tick")
+    val scale by animateFloatAsState(
+        if (checked) 1f else 0.4f,
+        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "tick scale",
+    )
+    Box(
+        Modifier
+            .size(26.dp)
+            .clip(CircleShape)
+            .background(fill)
+            .border(2.dp, if (checked) colors.primary else colors.outline, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (checked || scale > 0.45f) {
+            Icon(
+                Icons.Outlined.Check,
+                contentDescription = null,
+                tint = colors.onPrimary,
+                modifier = Modifier.size((18 * scale).dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DoneHeader(count: Int, open: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val turn by animateFloatAsState(if (open) 180f else 0f, label = "chevron")
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 8.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            str(R.string.list_done),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            " · $count",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            Icons.Outlined.ExpandMore,
+            contentDescription = str(if (open) R.string.list_done_hide else R.string.list_done_show, count),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.rotate(turn),
+        )
+    }
+}
+
+@Composable
+private fun EmptyState(title: String, text: String?, modifier: Modifier = Modifier) {
+    Column(
+        modifier.fillMaxWidth().padding(vertical = 32.dp, horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier.size(72.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.TaskAlt,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(36.dp),
+            )
+        }
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 16.dp),
+        )
+        if (text != null) {
+            Text(
+                text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
 }

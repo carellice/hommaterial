@@ -701,4 +701,10 @@
     <string name="list_delete">Delete</string>
     <string name="list_done_show">Show the completed ones (%1$d)</string>
     <string name="list_done_hide">Hide the completed ones (%1$d)</string>
+    <string name="nav_home">Home</string>
+    <string name="list_summary">%1$d to do · %2$d done</string>
+    <string name="list_done">Completed</string>
+    <string name="list_empty_text">Add what needs doing above, or ask Alexa.</string>
+    <string name="lists_failed">Could not read the lists.</string>
+    <string name="lists_retry">Try again</string>
 </resources>

@@ -16,7 +16,7 @@ import { RemoteTile } from './remotes.js';
 import { HistoryCharts } from './chart.js';
 import { SchedulesDialog, TimerChoices } from './schedules.js';
 import { AutomationsDialog } from './automations.js';
-import { ListsDialog } from './lists.js';
+import { ListsPage } from './lists.js';
 
 // By size of the tiles: compact, normal, large.
 const LIST_MIN_WIDTH = 320;
@@ -111,6 +111,25 @@ export function HomeScreen({ onSettings }) {
   }, []);
   const found = query != null ? search(query, homeSections(PAGE_ALL, s)) : [];
   const look = homeLook(s, wide);
+  // The page of the bottom bar, and whether the bar shows: it hides while the page scrolls down.
+  const [tab, setTab] = useState(TAB_HOME);
+  useBack(() => setTab(TAB_HOME), tab !== TAB_HOME && query == null);
+  const [barShown, setBarShown] = useState(true);
+  const typing = useKeyboard();
+  const scrolled = useRef(new WeakMap());
+  const onScroll = (e) => {
+    const node = e.target;
+    if (!(node instanceof Element)) return;
+    const before = scrolled.current.get(node) ?? 0;
+    const delta = node.scrollTop - before;
+    scrolled.current.set(node, node.scrollTop);
+    if (delta > 6 && node.scrollTop > 24) setBarShown(false);
+    else if (delta < -6 || node.scrollTop <= 0) setBarShown(true);
+  };
+  const choose = (next) => {
+    setTab(next);
+    setBarShown(true);
+  };
 
   /** What a touch on the tile of [entry] does: the search runs it for the one it found first. */
   function activate(entry) {
@@ -131,12 +150,16 @@ export function HomeScreen({ onSettings }) {
   }
 
   return html`
-    <div class="screen">
+    <div class="screen" onScrollCapture=${onScroll}>
       <div class="top-bar">
-        ${query == null
+        ${tab === TAB_LISTS
+          ? html`<div class="title"><div class="title-large">${str('s_lists')}</div></div>`
+          : query == null
           ? html`<${Title} updatedAt=${s.updatedAt} />`
           : html`<${SearchField} query=${query} onChange=${setQuery} onEnter=${() => found[0] && activate(found[0])} />`}
-        ${query != null
+        ${tab === TAB_LISTS
+          ? html`<${VoiceButton} /><${OverflowMenu} s=${s} onSettings=${onSettings} onArrange=${() => setArranging(true)} />`
+          : query != null
           ? html`<${IconButton} icon="close" label=${str('search_close')} onClick=${() => setQuery(null)} />`
           : html`
             ${showClock && pages.length === 1 && html`<${ClockText} cls="title-large" style="padding:0 12px" />`}
@@ -144,7 +167,8 @@ export function HomeScreen({ onSettings }) {
             <${VoiceButton} />
             <${OverflowMenu} s=${s} onSettings=${onSettings} onArrange=${() => setArranging(true)} />`}
       </div>
-      <div class="body-row">
+      ${tab === TAB_LISTS ? html`<div class="body-row tab-page from-right" key="lists"><${ListsPage} /></div>` : html`
+      <div class="body-row tab-page from-left" key="home">
         ${pages.length > 1 && query == null && html`
           <${SideBar} pages=${pages} current=${current} expanded=${width >= SIDE_BAR} clock=${showClock} onSelect=${setPage} />`}
         <${PullToRefresh} refreshing=${s.refreshing} onRefresh=${store.refresh} key=${current}>
@@ -154,10 +178,44 @@ export function HomeScreen({ onSettings }) {
               : html`<${PageGrid} page=${current} s=${s} look=${look} />`}
           </div>
         <//>
-      </div>
+      </div>`}
+      <${BottomBar} current=${tab} visible=${query == null && !typing && barShown} onSelect=${choose} />
       ${arranging && html`<${ArrangeDialog} s=${s} onDismiss=${() => setArranging(false)} />`}
       ${s.voice && html`<${VoiceDialog} ask=${s.voice} />`}
     </div>`;
+}
+
+const TAB_HOME = 'home';
+const TAB_LISTS = 'lists';
+const TABS = [[TAB_HOME, 'nav_home', 'home'], [TAB_LISTS, 's_lists', 'checklist']];
+
+/**
+ * The floating bar at the bottom of the app: a pill over the page, where the chosen tab grows to
+ * show its name on a tinted background and the other keeps only its icon (ui/BottomNav.kt).
+ */
+function BottomBar({ current, visible, onSelect }) {
+  return html`
+    <nav class=${`bottom-bar ${visible ? '' : 'hidden'}`} role="tablist" aria-hidden=${!visible}>
+      ${TABS.map(([key, label, icon]) => html`
+        <button key=${key} class=${`tab-pill ${key === current ? 'selected' : ''}`} role="tab" aria-selected=${key === current}
+          aria-label=${str(label)} tabindex=${visible ? 0 : -1} onClick=${() => onSelect(key)}>
+          <${Icon} name=${icon} filled=${key === current} />
+          <span class="tab-label label-large">${str(label)}</span>
+        </button>`)}
+    </nav>`;
+}
+
+/** Whether the keyboard of a phone is open: the bar makes room for what is being typed. */
+function useKeyboard() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return undefined;
+    const check = () => setOpen(viewport.height < window.innerHeight * 0.8);
+    viewport.addEventListener('resize', check);
+    return () => viewport.removeEventListener('resize', check);
+  }, []);
+  return open;
 }
 
 function ClockText({ cls, style }) {
@@ -700,8 +758,6 @@ function OverflowMenu({ s, onSettings, onArrange }) {
     [str('refresh'), store.refresh],
     (s.hidden.length > 0 || s.hiddenRemotes.length > 0) && [str(s.showHidden ? 'hide_hidden' : 'show_hidden'), store.toggleShowHidden],
     [str('check_updates'), () => store.checkForUpdate(true)],
-    // The lists are for everybody at home, as on an Echo: not behind the PIN of the monitor.
-    [str('s_lists'), () => setDialog('lists')],
     [str('arrange'), () => guarded(onArrange)],
     [str('s_automations'), () => guarded(() => setDialog('automations'))],
     [str('s_schedules'), () => guarded(() => setDialog('schedules'))],
@@ -714,7 +770,6 @@ function OverflowMenu({ s, onSettings, onArrange }) {
     ${anchor && html`<${Menu} anchor=${anchor} items=${items} onDismiss=${() => setAnchor(null)} />`}
     ${dialog === 'automations' && html`<${AutomationsDialog} s=${s} onDismiss=${close} />`}
     ${dialog === 'schedules' && html`<${SchedulesDialog} s=${s} onDismiss=${close} />`}
-    ${dialog === 'lists' && html`<${ListsDialog} onDismiss=${close} />`}
     ${dialog === 'signOut' && html`<${SignOutDialog} onDismiss=${close} />`}
     ${behindPin && html`<${PinDialog} title=${str('pin_ask_title')} onDismiss=${() => setBehindPin(null)}
       onSubmit=${async (pin) => {

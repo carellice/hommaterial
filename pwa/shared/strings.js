@@ -667,6 +667,12 @@ export const STRINGS = {
 "list_delete": "Delete",
 "list_done_show": "Show the completed ones (%1$d)",
 "list_done_hide": "Hide the completed ones (%1$d)",
+"nav_home": "Home",
+"list_summary": "%1$d to do · %2$d done",
+"list_done": "Completed",
+"list_empty_text": "Add what needs doing above, or ask Alexa.",
+"lists_failed": "Could not read the lists.",
+"lists_retry": "Try again",
 "devices": {
 "one": "%d device",
 "other": "%d devices"
@@ -1359,6 +1365,12 @@ export const STRINGS = {
 "list_delete": "Elimina",
 "list_done_show": "Mostra le completate (%1$d)",
 "list_done_hide": "Nascondi le completate (%1$d)",
+"nav_home": "Casa",
+"list_summary": "%1$d da fare · %2$d completate",
+"list_done": "Completate",
+"list_empty_text": "Aggiungi qui sopra quello che c'è da fare, o chiedilo ad Alexa.",
+"lists_failed": "Non è stato possibile leggere le liste.",
+"lists_retry": "Riprova",
 "devices": {
 "one": "%d dispositivo",
 "other": "%d dispositivi"
