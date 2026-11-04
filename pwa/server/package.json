@@ -1,0 +1,17 @@
+{
+  "name": "hommaterial-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Server di Hommaterial: account, sessione Alexa, SwitchBot, TV LG, assistente, lavori in sottofondo e notifiche push.",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/main.ts",
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/main.ts"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "web-push": "3.6.7"
+  }
+}

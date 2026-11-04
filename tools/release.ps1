@@ -30,7 +30,7 @@ try {
         if (-not (Get-Command $command -ErrorAction SilentlyContinue)) { throw "Installa $command prima di pubblicare. Vedi RELEASING.md." }
     }
     $gradlePath = Join-Path $root 'app\build.gradle.kts'
-    $webPath = Join-Path $root 'pwa\js\version.js'
+    $webPath = Join-Path $root 'pwa\web\js\version.js'
     $gradle = [IO.File]::ReadAllText($gradlePath)
     $current = [regex]::Match($gradle, 'versionName = "([0-9.]+)"').Groups[1].Value
     $code = [int][regex]::Match($gradle, 'versionCode = ([0-9]+)').Groups[1].Value
@@ -153,7 +153,7 @@ try {
             return
         }
         if (-not $AttachWindowsToCurrent) {
-            Invoke-Checked 'git' @('add', '--', 'app/build.gradle.kts', 'pwa/js/version.js')
+            Invoke-Checked 'git' @('add', '--', 'app/build.gradle.kts', 'pwa/web/js/version.js')
             Invoke-Checked 'git' @('commit', '-m', "Versione $next")
             $versionCommitted = $true
         }

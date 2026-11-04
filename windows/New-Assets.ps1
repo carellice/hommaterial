@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $assets = Join-Path $PSScriptRoot 'Hommaterial.Windows\Assets'
 New-Item -ItemType Directory -Force -Path $assets | Out-Null
-$source = [System.Drawing.Image]::FromFile((Join-Path $PSScriptRoot '..\pwa\icons\icon-512.png'))
+$source = [System.Drawing.Image]::FromFile((Join-Path $PSScriptRoot '..\pwa\web\icons\icon-512.png'))
 try {
     foreach ($entry in @(@('Logo.png', 256), @('Square44x44Logo.png', 44), @('Square150x150Logo.png', 150), @('StoreLogo.png', 50))) {
         $bitmap = New-Object System.Drawing.Bitmap ([int]$entry[1]), ([int]$entry[1])

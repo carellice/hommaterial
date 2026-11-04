@@ -7,8 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RES = ROOT / "app/src/main/res"
-OUT = ROOT / "pwa/js/strings.js"
-VERSION = ROOT / "pwa/js/version.js"
+OUT = ROOT / "pwa/shared/strings.js"
+VERSION = ROOT / "pwa/web/js/version.js"
 GRADLE = ROOT / "app/build.gradle.kts"
 
 

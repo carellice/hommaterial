@@ -1,16 +1,19 @@
-// The tests of the Android app that apply to the web app, run with: node tools/test.mjs
+// The tests of the Android app that apply to the web app and its server, run with: node tools/test.mjs
 import assert from 'node:assert/strict';
 
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
 Object.defineProperty(globalThis, 'navigator', { value: { language: 'it-IT' }, configurable: true });
 globalThis.document = { documentElement: {} };
 process.env.TZ = 'Europe/Rome';
+// The server modules open their data folder on import: a throwaway one.
+process.env.DATA_DIR = (await import('node:fs')).mkdtempSync((await import('node:path')).join((await import('node:os')).tmpdir(), 'hommaterial-test-'));
 
-const { setLanguage } = await import('../js/i18n.js');
+const { setLanguage } = await import('../shared/i18n.js');
 setLanguage('it');
-const { switchBotSign, remoteKind } = await import('../js/switchbot.js');
-const { parseVoice, parseExtras } = await import('../js/voice.js');
-const model = await import('../js/model.js');
+const { switchBotSign } = await import('../server/src/switchbot.ts');
+const { parseVoice, parseExtras } = await import('../web/js/voice.js');
+const model = await import('../shared/model.js');
+const { remoteKind } = model;
 
 let failures = 0;
 async function test(name, body) {
@@ -147,7 +150,7 @@ await test('what is not known says nothing', () => {
   assert.equal(model.holds(automation(model.TRIGGER_ON), state({})), null);
 });
 await test('strings are formatted as on Android', async () => {
-  const { str, plural } = await import('../js/i18n.js');
+  const { str, plural } = await import('../shared/i18n.js');
   assert.equal(str('on_brightness', 40), 'Acceso · 40%');
   assert.equal(plural('devices', 1), '1 dispositivo');
   assert.equal(plural('devices', 3), '3 dispositivi');
@@ -155,7 +158,7 @@ await test('strings are formatted as on Android', async () => {
   assert.equal(model.statusText({ isSensor: true }, state({ temperature: 21.46, humidity: 50 })), '21,5° · 50%');
 });
 
-const { createBackup, parseBackup } = await import('../js/backup.js');
+const { createBackup, parseBackup } = await import('../shared/backup.js');
 await test('portable backup carries automations and schedules without account or PIN', () => {
   const action = { type: 'power', target: '1', value: 'off', custom: false };
   const s = { favorites: ['1'], schedules: [{ id: 's', action, at: at(20, 18, 0), hour: 18, minute: 0, days: [2, 4], enabled: true }],
@@ -185,7 +188,7 @@ await test('the LG TVs of an Android backup come back out of the web unchanged',
   assert.throws(() => parseBackup('{"app":"hommaterial","version":1,"lgTvs":[{"id":"abc","host":"x"}]}'));
 });
 
-const { selectBackup, BACKUP_SECTIONS, tileSpan } = await import('../js/backup.js');
+const { selectBackup, BACKUP_SECTIONS, tileSpan } = await import('../shared/backup.js');
 await test('import custom devices and groups without changing favorites, credentials or runtime choices', () => {
   const local = createBackup({ favorites: ['local'], groups: [], macros: [], tileSpans: { local: 2 }, schedules: [], monitor: { enabled: false } }, { token: 'local' });
   const incoming = createBackup({ favorites: ['group:g'], groups: [{ id: 'g', name: 'Luci', devices: ['1'] }], macros: [{ id: 'm', steps: [] }], monitor: { enabled: true } }, { token: 'incoming' });
@@ -216,26 +219,68 @@ await test('portable tile widths default to one and shrink to fit a single colum
   assert.equal(tileSpan({ bad: 999 }, 'bad', 4), 1);
 });
 
-await test('the import flow waits for confirmation and persists only selected data', async () => {
-  const memory = new Map();
-  globalThis.localStorage = { getItem: (key) => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value) };
-  memory.set('hommaterial.cache', JSON.stringify({ favorites: ['local'], groups: [], schedules: [], automations: [], alertsTripped: ['local|above'], automationsTripped: ['local-auto'] }));
-  const store = await import('../js/store.js');
-  const file = { text: async () => JSON.stringify(createBackup({ favorites: ['incoming'], groups: [{ id: 'g', name: 'Luci', devices: ['1'] }] })) };
-  await store.importBackup(file);
-  assert.equal(store.getState().askBackupRestore, true);
-  assert.deepEqual(store.getState().groups, []);
-  store.finishImport(null);
-  assert.deepEqual(store.getState().favorites, ['local']);
-  await store.importBackup(file); store.finishImport(['groups']);
-  assert.equal(store.getState().groups[0].id, 'g');
-  assert.deepEqual(store.getState().favorites, ['local']);
-  const saved = JSON.parse(memory.get('hommaterial.cache'));
-  assert.deepEqual(saved.favorites, ['local']);
-  assert.deepEqual(saved.alertsTripped, ['local|above']);
-  assert.deepEqual(saved.automationsTripped, ['local-auto']);
-  store.setTileSpan('group:g', 2);
-  assert.equal(JSON.parse(memory.get('hommaterial.cache')).tileSpans['group:g'], 2);
+
+const lg = await import('../server/src/lgtv.ts');
+
+await test('the commands of the app become those of webOS', () => {
+  assert.deepEqual(lg.webOsAction('turnOn'), { wake: true });
+  assert.deepEqual(lg.webOsAction('volumeAdd'), { call: 'ssap://audio/volumeUp' });
+  assert.deepEqual(lg.webOsAction('setMute'), { key: 'MUTE' });
+  assert.deepEqual(lg.webOsAction('SetChannel', '12'), { call: 'ssap://tv/openChannel', payload: { channelNumber: '12' } });
+  assert.equal(lg.webOsAction('SetChannel', 'x'), null);
+  assert.equal(lg.webOsAction('setVolume', '101'), null);
+  assert.deepEqual(lg.webOsAction('app:netflix'), { call: 'ssap://system.launcher/launch', payload: { id: 'netflix' } });
+  assert.deepEqual(lg.webOsAction('input:HDMI_1'), { call: 'ssap://tv/switchInput', payload: { inputId: 'HDMI_1' } });
+  assert.deepEqual(lg.webOsAction('key:RED'), { key: 'RED' });
+  assert.equal(lg.webOsAction('key:red'), null);
+  assert.equal(lg.webOsAction('bogus'), null);
+});
+
+await test('only the difference of the text goes to the TV', () => {
+  assert.deepEqual(lg.webOsTyping('', 'ciao'), [{ call: 'ssap://com.webos.service.ime/insertText', payload: { text: 'ciao', replace: 0 } }]);
+  assert.deepEqual(lg.webOsTyping('ciao', 'cia mondo').map((c) => c.payload), [{ count: 1 }, { text: ' mondo', replace: 0 }]);
+  assert.deepEqual(lg.webOsTyping('a😀', 'a'), [{ call: 'ssap://com.webos.service.ime/deleteCharacters', payload: { count: 1 } }]);
+  assert.deepEqual(lg.webOsTyping('same', 'same'), []);
+});
+
+await test('the search finds LG TVs and their names', () => {
+  const answer = 'HTTP/1.1 200 OK\r\nST: urn:lge-com:service:webos-second-screen:1\r\nDLNADeviceName.lge.com: TV%20Sala\r\n\r\n';
+  assert.deepEqual(lg.parseSsdp(answer, '192.168.1.5'), { host: '192.168.1.5', name: 'TV Sala' });
+  assert.equal(lg.parseSsdp('HTTP/1.1 200 OK\r\nST: other\r\n\r\n', 'x'), null);
+  assert.equal(lg.parseSsdp('NOTIFY * HTTP/1.1\r\n', 'x'), null);
+});
+
+await test('the magic packet wakes the right address', () => {
+  const packet = lg.wakeOnLanPacket('aa:bb:cc:dd:ee:ff');
+  assert.equal(packet.length, 102);
+  assert.deepEqual([...packet.subarray(0, 6)], [255, 255, 255, 255, 255, 255]);
+  assert.deepEqual([...packet.subarray(96)], [0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]);
+  assert.throws(() => lg.wakeOnLanPacket('nope'));
+});
+
+const ai = await import('../server/src/assistant.ts');
+
+await test('the answer of the model is found in its words', () => {
+  assert.deepEqual(ai.extractJson('<think>hmm {"no":1}</think>Ecco: {"text":"accendi TV Flavio"} fine'), { text: 'accendi TV Flavio' });
+  assert.equal(ai.extractJson('nothing'), null);
+});
+
+const { withUser } = await import('../server/src/db.ts');
+
+await test('the assistant knows the home by short ids and asks only about what exists', () => {
+  withUser(1, () => {
+    const catalog = new ai.Catalog({
+      devices: [device('1', 'TV Flavio', 'Camera'), device('2', 'Sensore', 'Salotto', false)],
+      groups: [{ id: 'g', name: 'Tutto', devices: ['1'] }],
+      macros: [{ key: 'macro:m', name: 'Postazione', room: null }],
+      remotes: [{ id: 'lg:x', key: 'remote:lg:x', name: 'TV Sala', type: 'LG webOS', room: 'Sala', keys: [{ command: 'key:RED', label: 'Rosso' }] }],
+    });
+    assert.match(catalog.names(), /"TV Flavio" \(device, in "Camera"\)/);
+    assert.doesNotMatch(catalog.names(), /Sensore/);
+    assert.match(catalog.describe(false), /r1: remote "TV Sala" in "Sala", LG TV; keys: key:RED=Rosso \[NEW\]/);
+    const questions = ai.parseQuestions({ questions: [{ target: 'd1', question: 'Chi?' }, { target: 'r1/F1', question: 'Tasto?' }, { target: 'z9', question: 'No' }] }, catalog);
+    assert.deepEqual(questions.map((q) => q.target), ['1', 'remote:lg:x']);
+  });
 });
 
 if (failures) {

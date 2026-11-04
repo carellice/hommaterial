@@ -6,15 +6,15 @@
 
 <p align="center"><b>Comanda la tua smart home Alexa, senza fronzoli.</b></p>
 
-<p align="center">Android · Web · Windows 11 (anteprima) · Gratuita · Open source</p>
+<p align="center">Android · Server di casa (CasaOS) · Windows 11 (anteprima) · Gratuita · Open source</p>
 
 <p align="center">
   <a href="https://github.com/carellice/hommaterial/releases/latest" title="Scarica il file APK dall'ultima release"><img src="https://img.shields.io/badge/Android-Scarica_APK-3DDC84?style=for-the-badge&amp;logo=android&amp;logoColor=white" alt="Android — Scarica APK"></a>
-  <a href="https://carellice.github.io/hommaterial/"><img src="https://img.shields.io/badge/Web-Apri_online-6750A4?style=for-the-badge" alt="Web — Apri online"></a>
+  <a href="pwa/README.md"><img src="https://img.shields.io/badge/CasaOS-Installa_sul_server-6750A4?style=for-the-badge" alt="CasaOS — Installa sul server di casa"></a>
   <a href="https://github.com/carellice/hommaterial/releases/latest" title="Scarica lo ZIP Windows dall'ultima release"><img src="https://img.shields.io/badge/Windows_11-Scarica_ZIP-0078D4?style=for-the-badge" alt="Windows 11 — Scarica ZIP"></a>
 </p>
 
-<p align="center"><a href="pwa/README.md">Guida di configurazione web</a> · <a href="windows/README.md">Guida Windows</a></p>
+<p align="center"><a href="pwa/README.md">Guida del server di casa</a> · <a href="windows/README.md">Guida Windows</a></p>
 
 **Windows 11:** scarica lo ZIP Windows dalle [release GitHub](https://github.com/carellice/hommaterial/releases),
 estrailo interamente in una cartella personale e avvia `Hommaterial.Windows.exe`.
@@ -245,15 +245,21 @@ build autonoma x64/ARM64 e preparazione del pacchetto MSIX per una futura
 distribuzione sul Microsoft Store. Le funzioni avanzate sono ancora in porting:
 consulta [funzioni, limiti e istruzioni di prova](windows/README.md).
 
-## Versione web
+## Versione web, sul server di casa
 
-Nella cartella [`pwa`](pwa) c'è la stessa app come PWA, da aprire nel browser
-o da installare sulla schermata Home, anche su iPhone:
-**[carellice.github.io/hommaterial](https://carellice.github.io/hommaterial/)**. Ha bisogno di un
-piccolo proxy su Cloudflare Workers, che crei tu, e funziona solo mentre è
-aperta: niente widget, riquadri rapidi né azioni in sottofondo. Le
-istruzioni, con la guida di configurazione passo per passo, sono in
-[`pwa/README.md`](pwa/README.md).
+Nella cartella [`pwa`](pwa) c'è la stessa app come PWA, da installare con un comando su un
+server di casa con CasaOS (o Linux con Docker) e da aprire nel browser o sulla schermata Home di
+qualsiasi telefono, iPhone compreso:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/carellice/hommaterial/main/pwa/casaos/installa.sh | sudo bash
+```
+
+Il server parla con Amazon, SwitchBot, Cloudflare e i TV LG al posto del browser, esegue timer,
+azioni programmate, automazioni e avvisi anche ad app chiusa con notifiche push, raccoglie lo
+storico dei sensori e ha un account per ogni persona della famiglia. Si aggiorna da solo ogni
+notte. Anche l'app Android può usarlo, da **Impostazioni → Server di casa**: stessi dati
+nell'app e nel browser. Le istruzioni sono in [`pwa/README.md`](pwa/README.md).
 
 ## Limiti noti
 

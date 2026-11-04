@@ -2,7 +2,7 @@
 
 Le distribuzioni sono su **GitHub Releases**, senza pubblicazione sul Microsoft Store.
 `app/build.gradle.kts` è la fonte della versione: Windows la legge durante la build;
-lo script aggiorna anche `pwa/js/version.js`. Per esempio, `1.33` diventa `1.34` e
+lo script aggiorna anche `pwa/web/js/version.js`. Per esempio, `1.33` diventa `1.34` e
 Android passa da `versionCode 34` a `35`.
 
 ## Preparazione, una sola volta
