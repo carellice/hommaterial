@@ -45,7 +45,11 @@ import app.hommaterial.data.Schedule
 import app.hommaterial.data.ServerSync
 import app.hommaterial.data.SwitchBot
 import app.hommaterial.data.Update
+import app.hommaterial.data.CalendarEvent
+import app.hommaterial.data.CalendarInfo
+import app.hommaterial.data.CalendarSource
 import app.hommaterial.data.Echo
+import app.hommaterial.data.EventInput
 import app.hommaterial.data.Updater
 import app.hommaterial.data.WidgetConfig
 import app.hommaterial.data.WorkersAi
@@ -173,6 +177,18 @@ data class UiState(
     val correcting: Boolean = false,
     /** The Echo that what is said to the microphone goes to, as if said to it; null when the app understands it by itself. */
     val voiceEcho: Echo? = null,
+    /** The calendars chosen on this device, by id; null until the user chooses, showing those the calendar itself shows. */
+    val calendarShown: Set<String>? = null,
+    /** The calendar new events go to; null for the main one. */
+    val calendarDefault: String? = null,
+    /** Whether the events of today and tomorrow are at the top of the home. */
+    val calendarHome: Boolean = true,
+    /** Where Google Calendar stands on the home server: the keys given, the account linked. */
+    val calendarClient: Boolean = false,
+    val calendarLinked: Boolean = false,
+    val calendarAccount: String = "",
+    /** Whether the calendars can be read now: Google linked, or the permission given on the phone. */
+    val calendarReady: Boolean = false,
     /** The Echo devices of the account, once asked for in the settings; null while they are looked for. */
     val echos: List<Echo>? = null,
     /** When the states were last fetched from Alexa, in epoch milliseconds. */
@@ -349,6 +365,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }.getOrDefault(MonitorConfig()),
             pin = settings.contains(PIN_KEY),
             voiceEcho = settings.getString("voiceEcho", null)?.let { runCatching { Echo.fromJson(JSONObject(it)) }.getOrNull() },
+            calendarShown = settings.getString("calendarShown", null)?.let { text ->
+                runCatching { JSONArray(text).let { list -> (0 until list.length()).map { list.getString(it) }.toSet() } }.getOrNull()
+            },
+            calendarDefault = settings.getString("calendarDefault", null),
+            calendarHome = settings.getBoolean("calendarHome", true),
+            calendarClient = ServerSync.calendarClient,
+            calendarLinked = ServerSync.calendarLinked,
+            calendarAccount = ServerSync.calendarAccount,
+            calendarReady = CalendarSource.of(getApplication()).ready,
             switchBot = switchBot.connected,
             switchBotRemotes = switchBot.remotes(),
             remoteButtons = switchBot.buttons(),
@@ -1652,6 +1677,93 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun deleteAlexaListItem(listId: String, item: ListItem): Boolean =
         onList { api.deleteListItem(listId, item) } != null
+
+    // --- the calendar ----------------------------------------------------------------------------
+
+    private val calendar: CalendarSource get() = CalendarSource.of(getApplication())
+
+    suspend fun calendars(): List<CalendarInfo>? = onList { calendar.calendars() }
+
+    suspend fun calendarEvents(calendars: List<String>, from: Long, to: Long): List<CalendarEvent>? =
+        onList { calendar.events(calendars, from, to) }
+
+    /** Creates an event in [calendarId], when [event] is null, or changes it, moving it there if it was elsewhere. */
+    suspend fun saveEvent(event: CalendarEvent?, calendarId: String, input: EventInput): Boolean {
+        val done = onList {
+            if (event == null) calendar.create(calendarId, input) else calendar.update(event, input, calendarId)
+        } != null
+        _haptics.tryEmit(if (done) Haptic.Confirm else Haptic.Reject)
+        if (done) _messages.tryEmit(str(R.string.calendar_saved))
+        return done
+    }
+
+    suspend fun deleteEvent(event: CalendarEvent): Boolean {
+        val done = onList { calendar.delete(event) } != null
+        if (done) _messages.tryEmit(str(R.string.calendar_deleted))
+        return done
+    }
+
+    fun setCalendarShown(ids: Set<String>) {
+        settings.edit().putString("calendarShown", JSONArray(ids.toList()).toString()).apply()
+        _state.update { it.copy(calendarShown = ids) }
+    }
+
+    fun setCalendarDefault(id: String) {
+        settings.edit().putString("calendarDefault", id).apply()
+        _state.update { it.copy(calendarDefault = id) }
+    }
+
+    fun setCalendarHome(on: Boolean) {
+        settings.edit().putBoolean("calendarHome", on).apply()
+        _state.update { it.copy(calendarHome = on) }
+    }
+
+    /** Reads again whether the calendar can be read: after the permission is answered, or Google linked. */
+    fun checkCalendar() = _state.update {
+        it.copy(
+            calendarClient = ServerSync.calendarClient,
+            calendarLinked = ServerSync.calendarLinked,
+            calendarAccount = ServerSync.calendarAccount,
+            calendarReady = calendar.ready,
+        )
+    }
+
+    /** Keeps on the home server the keys of the OAuth client made in Google Cloud. */
+    suspend fun setGoogleClient(id: String, secret: String): Boolean {
+        val done = guarded {
+            ServerSync.call("POST", "/api/calendar/client", JSONObject().put("clientId", id.trim()).put("clientSecret", secret.trim()))
+            ServerSync.pull(force = true)
+        }
+        checkCalendar()
+        return done
+    }
+
+    /** The page of Google where the user signs in and allows the calendar. */
+    suspend fun googleAuthUrl(): String? = onList { ServerSync.call("GET", "/api/calendar/auth").getString("url") }
+
+    /** Finishes the sign-in with the address the browser ended on. */
+    suspend fun linkGoogle(address: String): Boolean {
+        val done = guarded {
+            ServerSync.call("POST", "/api/calendar/link", JSONObject().put("url", address.trim()))
+            ServerSync.pull(force = true)
+        }
+        checkCalendar()
+        if (done) {
+            _haptics.tryEmit(Haptic.Confirm)
+            _messages.tryEmit(str(R.string.calendar_linked_ok))
+        }
+        return done
+    }
+
+    fun unlinkGoogle() {
+        viewModelScope.launch {
+            guarded {
+                ServerSync.call("POST", "/api/calendar/unlink")
+                ServerSync.pull(force = true)
+            }
+            checkCalendar()
+        }
+    }
 
     // --- the home server -------------------------------------------------------------------------
 

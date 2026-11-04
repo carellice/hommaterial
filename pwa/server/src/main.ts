@@ -9,6 +9,7 @@ import * as data from './db.ts'
 import * as accounts from './accounts.ts'
 import * as alexa from './alexa.ts'
 import * as assistant from './assistant.ts'
+import * as calendar from './calendar.ts'
 import * as engine from './engine.ts'
 import { HttpError, setAccountLanguage } from './errors.ts'
 import * as lgtv from './lgtv.ts'
@@ -202,6 +203,7 @@ function status() {
     alexa: { loggedIn: alexa.isLoggedIn(), marketplace: alexa.marketplace().domain, attempt: alexa.pendingAttempt() != null },
     switchBot: switchBot.connected(),
     assistant: { configured: assistant.configured(), accountId: assistant.keys()?.accountId ?? '', model: assistant.model() },
+    calendar: { client: calendar.client() != null, linked: calendar.linked(), account: calendar.account() },
   }
 }
 
@@ -631,6 +633,60 @@ route('POST', '/api/lg/:id/enter', async (_req, res, [id]) => {
 /** Shows a message on the TV, to see that it answers. */
 route('POST', '/api/lg/:id/test', async (_req, res, [id]) => {
   await lgtv.send(lgtv.requireTv(decodeURIComponent(id)), 'toast', str('lgtv_hello'))
+  ok(res)
+})
+
+// --- Google Calendar ---------------------------------------------------------------------------
+
+/** The keys of the OAuth client the user made in Google Cloud; the sign-in comes after. */
+route('POST', '/api/calendar/client', async (req, res) => {
+  const body = await readJson<{ clientId?: string; clientSecret?: string }>(req)
+  const id = text(body.clientId, 300).trim()
+  const secret = text(body.clientSecret, 300).trim()
+  if (!id.endsWith('.apps.googleusercontent.com') || !secret) throw new HttpError(400, str('calendar_bad_client'))
+  calendar.setClient(id, secret)
+  data.touch()
+  ok(res)
+})
+
+route('GET', '/api/calendar/auth', (_req, res) => json(res, 200, { url: calendar.authUrl() }))
+
+route('POST', '/api/calendar/link', async (req, res) => {
+  const { url } = await readJson<{ url?: string }>(req)
+  await calendar.link(text(url, 4000))
+  data.touch()
+  ok(res)
+})
+
+route('POST', '/api/calendar/unlink', (_req, res) => {
+  calendar.unlink()
+  data.touch()
+  ok(res)
+})
+
+route('GET', '/api/calendar/calendars', async (_req, res) => json(res, 200, { calendars: await calendar.calendars() }))
+
+route('GET', '/api/calendar/events', async (_req, res, _p, url) => {
+  const ids = (url.searchParams.get('calendars') ?? '').split(',').filter(Boolean)
+  const from = text(url.searchParams.get('from'), 40)
+  const to = text(url.searchParams.get('to'), 40)
+  if (Number.isNaN(Date.parse(from)) || Number.isNaN(Date.parse(to))) throw new HttpError(400, str('something_wrong'))
+  json(res, 200, { events: await calendar.events(ids, from, to) })
+})
+
+route('POST', '/api/calendar/events', async (req, res) => {
+  const body = await readJson<{ calendar?: string; event?: any }>(req)
+  json(res, 200, { event: await calendar.create(text(body.calendar, 300), body.event ?? {}) })
+})
+
+route('PUT', '/api/calendar/events/:calendar/:id', async (req, res, [cal, id]) => {
+  const body = await readJson<{ event?: any; moveTo?: string }>(req)
+  const moveTo = body.moveTo ? text(body.moveTo, 300) : undefined
+  json(res, 200, { event: await calendar.update(decodeURIComponent(cal), decodeURIComponent(id), body.event ?? {}, moveTo) })
+})
+
+route('DELETE', '/api/calendar/events/:calendar/:id', async (_req, res, [cal, id]) => {
+  await calendar.remove(decodeURIComponent(cal), decodeURIComponent(id))
   ok(res)
 })
 

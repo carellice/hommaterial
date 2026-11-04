@@ -78,6 +78,9 @@ object ServerSync {
     val assistantLinked: Boolean get() = store.status.optJSONObject("assistant")?.optBoolean("configured") == true
     val assistantAccount: String get() = store.status.optJSONObject("assistant")?.optString("accountId").orEmpty()
     val assistantModel: String get() = store.status.optJSONObject("assistant")?.optString("model").orEmpty()
+    val calendarClient: Boolean get() = store.status.optJSONObject("calendar")?.optBoolean("client") == true
+    val calendarLinked: Boolean get() = store.status.optJSONObject("calendar")?.optBoolean("linked") == true
+    val calendarAccount: String get() = store.status.optJSONObject("calendar")?.optString("account").orEmpty()
 
     // --- requests ------------------------------------------------------------------------------------
 

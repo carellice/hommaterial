@@ -20,8 +20,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.Icon
@@ -40,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import app.hommaterial.R
 import app.hommaterial.str
 
-/** The two pages of the app the bottom bar moves between: the home and the lists of Alexa. */
+/** The pages of the app the bottom bar moves between: the home, the lists of Alexa and the calendar ([TAB_CALENDAR]). */
 const val TAB_HOME = "home"
 const val TAB_LISTS = "lists"
 
@@ -52,11 +54,15 @@ private class Tab(val key: String, val label: Int, val icon: ImageVector, val se
 private val TABS = listOf(
     Tab(TAB_HOME, R.string.nav_home, Icons.Outlined.Home, Icons.Filled.Home),
     Tab(TAB_LISTS, R.string.s_lists, Icons.Outlined.Checklist, Icons.Filled.Checklist),
+    Tab(TAB_CALENDAR, R.string.s_calendar, Icons.Outlined.CalendarMonth, Icons.Filled.CalendarMonth),
 )
+
+/** Where a tab sits in the bar, for the pages to slide in from its side. */
+internal fun tabIndex(key: String) = TABS.indexOfFirst { it.key == key }
 
 /**
  * The floating bar at the bottom of the app: a pill over the page, where the chosen tab grows to
- * show its name on a tinted background and the other keeps only its icon.
+ * show its name on a tinted background and the others keep only their icon.
  */
 @Composable
 internal fun FloatingBottomBar(current: String, visible: Boolean, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {

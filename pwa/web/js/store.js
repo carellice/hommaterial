@@ -91,6 +91,7 @@ const EMPTY_STATUS = {
   alexa: { loggedIn: false, marketplace: 'amazon.it', attempt: false },
   switchBot: false,
   assistant: { configured: false, accountId: '', model: '' },
+  calendar: { client: false, linked: false, account: '' },
 };
 
 const marketOf = (domain) => MARKETPLACES.find((m) => m.domain === domain) ?? MARKETPLACES[0];
@@ -108,6 +109,7 @@ function fromServer(data, status) {
     marketplace: marketOf(status.alexa.marketplace),
     loginPending: status.alexa.attempt,
     switchBot: status.switchBot,
+    calendar: { ...EMPTY_STATUS.calendar, ...status.calendar },
     assistant: {
       ...status.assistant,
       notes: data.assistantNotes,
@@ -143,6 +145,10 @@ function initialState() {
     voiceEcho: settings.get('voiceEcho', null),
     // The Echo devices of the account, once asked for in the settings; null while they are looked for.
     echos: null,
+    // The calendars chosen in this browser, by id; null until the user chooses, showing those Google shows.
+    calendarShown: settings.get('calendarShown', null),
+    calendarDefault: settings.get('calendarDefault', null),
+    calendarHome: settings.get('calendarHome', true),
     update: null,
     updatePrompt: false,
     push: pushState(),
@@ -775,6 +781,68 @@ export async function loadEchos() {
     ({ echos } = await get('/api/alexa/echos'));
   });
   update({ echos: echos ?? [] });
+}
+
+// ——— The calendar: Google Calendar through the home server (server/src/calendar.ts) ———
+
+export const calendars = () => onList(async () => (await get('/api/calendar/calendars')).calendars);
+
+export const calendarEvents = (ids, from, to) => onList(async () => {
+  const query = new URLSearchParams({ calendars: ids.join(','), from, to });
+  return (await get(`/api/calendar/events?${query}`)).events;
+});
+
+/** Creates an event in [calendar], when [event] is null, or changes it, moving it there if it was elsewhere. */
+export async function saveEvent(event, calendar, input) {
+  const done = await onList(() => (event
+    ? api('PUT', `/api/calendar/events/${encodeURIComponent(event.calendar)}/${encodeURIComponent(event.id)}`,
+      { event: input, moveTo: calendar !== event.calendar ? calendar : undefined })
+    : post('/api/calendar/events', { calendar, event: input })));
+  if (done) say(str('calendar_saved'));
+  return done != null;
+}
+
+export async function deleteEvent(event) {
+  const done = await onList(() => del(`/api/calendar/events/${encodeURIComponent(event.calendar)}/${encodeURIComponent(event.id)}`));
+  if (done) say(str('calendar_deleted'));
+  return done != null;
+}
+
+export function setCalendarShown(ids) {
+  settings.set('calendarShown', ids);
+  update({ calendarShown: ids });
+}
+
+export function setCalendarDefault(id) {
+  settings.set('calendarDefault', id);
+  update({ calendarDefault: id });
+}
+
+export function setCalendarHome(on) {
+  settings.set('calendarHome', on);
+  update({ calendarHome: on });
+}
+
+/** Keeps on the home server the keys of the OAuth client made in Google Cloud. */
+export async function setGoogleClient(clientId, clientSecret) {
+  const done = await guarded(() => post('/api/calendar/client', { clientId, clientSecret }));
+  await sync(true);
+  return done;
+}
+
+export const googleAuthUrl = () => onList(async () => (await get('/api/calendar/auth')).url);
+
+/** Finishes the sign-in with the address the browser ended on. */
+export async function linkGoogle(url) {
+  const done = await guarded(() => post('/api/calendar/link', { url }));
+  await sync(true);
+  if (done) say(str('calendar_linked_ok'));
+  return done;
+}
+
+export async function unlinkGoogle() {
+  await guarded(() => post('/api/calendar/unlink', {}));
+  await sync(true);
 }
 
 /** Sends what is said to the microphone to [echo], or, with null, has the app understand it by itself. */

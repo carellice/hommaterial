@@ -17,6 +17,7 @@ import { HistoryCharts } from './chart.js';
 import { SchedulesDialog, TimerChoices } from './schedules.js';
 import { AutomationsDialog } from './automations.js';
 import { ListsPage } from './lists.js';
+import { CalendarPage, HomeAgenda } from './calendar.js';
 
 // By size of the tiles: compact, normal, large.
 const LIST_MIN_WIDTH = 320;
@@ -112,7 +113,15 @@ export function HomeScreen({ onSettings }) {
   const found = query != null ? search(query, homeSections(PAGE_ALL, s)) : [];
   const look = homeLook(s, wide);
   // The page of the bottom bar, which stays in sight but for the search and the keyboard.
-  const [tab, setTab] = useState(TAB_HOME);
+  const [tab, setTabNow] = useState(TAB_HOME);
+  // A page comes in from the side its tab is on in the bar.
+  const [from, setFrom] = useState('from-right');
+  const setTab = (next) => {
+    setFrom(TABS.findIndex(([k]) => k === next) > TABS.findIndex(([k]) => k === tab) ? 'from-right' : 'from-left');
+    setTabNow(next);
+  };
+  // The events of today and tomorrow head the page that opens, not a monitor panel.
+  const agenda = s.calendarHome && s.calendar.linked && !s.monitor.enabled;
   useBack(() => setTab(TAB_HOME), tab !== TAB_HOME && query == null);
   const typing = useKeyboard();
 
@@ -137,12 +146,12 @@ export function HomeScreen({ onSettings }) {
   return html`
     <div class="screen">
       <div class="top-bar">
-        ${tab === TAB_LISTS
-          ? html`<div class="title"><div class="title-large">${str('s_lists')}</div></div>`
+        ${tab !== TAB_HOME
+          ? html`<div class="title"><div class="title-large">${str(tab === TAB_LISTS ? 's_lists' : 's_calendar')}</div></div>`
           : query == null
           ? html`<${Title} updatedAt=${s.updatedAt} />`
           : html`<${SearchField} query=${query} onChange=${setQuery} onEnter=${() => found[0] && activate(found[0])} />`}
-        ${tab === TAB_LISTS
+        ${tab !== TAB_HOME
           ? html`<${VoiceButton} /><${OverflowMenu} s=${s} onSettings=${onSettings} onArrange=${() => setArranging(true)} />`
           : query != null
           ? html`<${IconButton} icon="close" label=${str('search_close')} onClick=${() => setQuery(null)} />`
@@ -152,7 +161,8 @@ export function HomeScreen({ onSettings }) {
             <${VoiceButton} />
             <${OverflowMenu} s=${s} onSettings=${onSettings} onArrange=${() => setArranging(true)} />`}
       </div>
-      ${tab === TAB_LISTS ? html`<div class="body-row tab-page from-right" key="lists"><${ListsPage} /></div>` : html`
+      ${tab === TAB_LISTS ? html`<div class=${`body-row tab-page ${from}`} key="lists"><${ListsPage} /></div>`
+      : tab === TAB_CALENDAR ? html`<div class="body-row tab-page from-right" key="calendar"><${CalendarPage} s=${s} onSettings=${onSettings} /></div>` : html`
       <div class="body-row tab-page from-left" key="home">
         ${pages.length > 1 && query == null && html`
           <${SideBar} pages=${pages} current=${current} expanded=${width >= SIDE_BAR} clock=${showClock} onSelect=${setPage} />`}
@@ -160,7 +170,8 @@ export function HomeScreen({ onSettings }) {
           <div class=${look.list ? 'list-layout' : ''} style=${lookStyle(look)}>
             ${query != null
               ? html`<${SearchResults} query=${query} found=${found} s=${s} look=${look} />`
-              : html`<${PageGrid} page=${current} s=${s} look=${look} />`}
+              : html`<${PageGrid} page=${current} s=${s} look=${look}
+                  top=${agenda && current === pages[0] ? html`<${HomeAgenda} s=${s} onOpen=${() => setTab(TAB_CALENDAR)} />` : null} />`}
           </div>
         <//>
       </div>`}
@@ -172,11 +183,12 @@ export function HomeScreen({ onSettings }) {
 
 const TAB_HOME = 'home';
 const TAB_LISTS = 'lists';
-const TABS = [[TAB_HOME, 'nav_home', 'home'], [TAB_LISTS, 's_lists', 'checklist']];
+const TAB_CALENDAR = 'calendar';
+const TABS = [[TAB_HOME, 'nav_home', 'home'], [TAB_LISTS, 's_lists', 'checklist'], [TAB_CALENDAR, 's_calendar', 'calendar_month']];
 
 /**
  * The floating bar at the bottom of the app: a pill over the page, where the chosen tab grows to
- * show its name on a tinted background and the other keeps only its icon (ui/BottomNav.kt).
+ * show its name on a tinted background and the others keep only their icon (ui/BottomNav.kt).
  */
 function BottomBar({ current, visible, onSelect }) {
   return html`
@@ -294,7 +306,7 @@ function SideBar({ pages, current, expanded, clock: showClock, onSelect }) {
 }
 
 /** Pulling the list down from its top fetches everything again, as on the phone. */
-function PullToRefresh({ refreshing, onRefresh, children }) {
+export function PullToRefresh({ refreshing, onRefresh, children }) {
   const ref = useRef(null);
   const [pull, setPull] = useState(0);
   const start = useRef(null);
@@ -320,7 +332,7 @@ function PullToRefresh({ refreshing, onRefresh, children }) {
 }
 
 /** The tiles of a page: the whole home in sections, or only the favorites, the groups or a room. */
-function PageGrid({ page, s, look }) {
+function PageGrid({ page, s, look, top }) {
   const [grid, columns] = useGridColumns(look);
   const sections = homeSections(page, s);
   const shown = sections.flatMap((sec) => sec.entries).filter((e) => e.kind === 'dev').map((e) => e.device);
@@ -334,9 +346,10 @@ function PageGrid({ page, s, look }) {
   const repeating = all ? s.schedules.filter((it) => it.days.length && it.enabled) : [];
   const automations = all ? s.automations.filter((a) => a.enabled) : [];
   const running = timers.length || due.length || repeating.length || automations.length;
-  if (!sections.length && !running && !s.refreshing) return html`<div class="empty">${str('no_devices')}</div>`;
+  if (!sections.length && !running && !s.refreshing && !top) return html`<div class="empty">${str('no_devices')}</div>`;
   return html`
     <div class="grid" ref=${grid}>
+      ${top}
       ${(timers.length > 0 || due.length > 0) && html`
         <div class="span section-header"><span class="title-small">${str('s_timers')}</span></div>
         ${timers.map(([device, at]) => html`

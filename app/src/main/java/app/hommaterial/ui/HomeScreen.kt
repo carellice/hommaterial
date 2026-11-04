@@ -214,6 +214,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     // The page of the bottom bar, which stays in sight but for the search and the keyboard.
     var tab by rememberSaveable { mutableStateOf(TAB_HOME) }
     val lists = rememberListsModel(vm)
+    val calendar = rememberCalendarModel(vm)
     BackHandler(enabled = tab != TAB_HOME && query == null) { tab = TAB_HOME }
     val typing = WindowInsets.isImeVisible
     val found = query?.let { search(it, homeSections(PAGE_ALL, state)) }.orEmpty()
@@ -244,6 +245,8 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                     val typed = query
                     if (tab == TAB_LISTS) {
                         Text(str(R.string.s_lists))
+                    } else if (tab == TAB_CALENDAR) {
+                        Text(str(R.string.s_calendar))
                     } else if (typed == null) {
                         Title(state.updatedAt)
                     } else {
@@ -251,7 +254,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                     }
                 },
                 actions = {
-                    if (tab == TAB_LISTS) {
+                    if (tab == TAB_LISTS || tab == TAB_CALENDAR) {
                         VoiceButton(vm, correcting = state.correcting)
                         OverflowMenu(state, vm, onSettings, onArrange = { arranging = true })
                         return@TopAppBar
@@ -286,8 +289,8 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
         AnimatedContent(
             tab,
             transitionSpec = {
-                // The lists come in from the right, the home from the left, as their place in the bar.
-                val sign = if (targetState == TAB_LISTS) 1 else -1
+                // A page comes in from the side its tab is on in the bar.
+                val sign = if (tabIndex(targetState) > tabIndex(initialState)) 1 else -1
                 (slideInHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { sign * it / 5 } + fadeIn())
                     .togetherWith(slideOutHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { -sign * it / 5 } + fadeOut())
             },
@@ -295,6 +298,10 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
         ) { shown ->
         if (shown == TAB_LISTS) {
             ListsPage(lists, bottomSpace = BOTTOM_BAR_SPACE.value.toInt())
+            return@AnimatedContent
+        }
+        if (shown == TAB_CALENDAR) {
+            CalendarPage(calendar, state, vm, onSettings)
             return@AnimatedContent
         }
         Row(Modifier.fillMaxSize()) {
@@ -317,7 +324,15 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                     if (typed != null) {
                         SearchResults(typed, found, state, vm)
                     } else {
-                        Crossfade(current, label = "page") { PageGrid(it, state, vm) }
+                        // The events of today and tomorrow head the page that opens, not a monitor panel.
+                        val agenda = state.calendarHome && state.calendarReady && !monitor.enabled
+                        Crossfade(current, label = "page") { shownPage ->
+                            PageGrid(shownPage, state, vm, top = if (agenda && shownPage == pages.first()) {
+                                { HomeAgenda(calendar, state) { tab = TAB_CALENDAR } }
+                            } else {
+                                null
+                            })
+                        }
                     }
                 }
             }
@@ -600,7 +615,7 @@ private fun homeSections(page: String, state: UiState): List<Section> {
 
 /** The tiles of a page: the whole home in sections, or only the favorites, the groups or a room. */
 @Composable
-private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
+private fun PageGrid(page: String, state: UiState, vm: HomeViewModel, top: (@Composable () -> Unit)? = null) {
     val sections = homeSections(page, state)
     val list = LocalHomeLook.current.list
     val shown = sections.flatMap { it.entries }.filterIsInstance<Entry.Dev>().map { it.device }
@@ -613,7 +628,7 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
     val automations = if (page == PAGE_ALL) state.automations.filter { it.enabled } else emptyList()
 
     val running = timers.isNotEmpty() || due.isNotEmpty() || repeating.isNotEmpty() || automations.isNotEmpty()
-    if (sections.isEmpty() && !running && !state.refreshing) {
+    if (sections.isEmpty() && !running && !state.refreshing && top == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(str(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -625,6 +640,7 @@ private fun PageGrid(page: String, state: UiState, vm: HomeViewModel) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(LocalHomeLook.current.gap),
     ) {
+        if (top != null) item(key = "top", span = { GridItemSpan(maxLineSpan) }) { top() }
         if (timers.isNotEmpty() || due.isNotEmpty()) {
             item(key = "timers", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(str(R.string.s_timers))

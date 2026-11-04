@@ -1,6 +1,7 @@
 package app.hommaterial.ui
 
 import androidx.compose.material.icons.outlined.ToggleOn
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Notifications
@@ -511,6 +512,8 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 Setting(title = str(R.string.lgtv_add), text = str(R.string.lgtv_add_text), onClick = vm::searchLgTvs)
             }
 
+            Section(R.string.s_calendar, R.string.calendar_settings_text) { CalendarSettings(state, vm) }
+
             Section(R.string.s_voice, R.string.voice_settings_text) {
                 var picking by remember { mutableStateOf(false) }
                 if (picking) {
@@ -819,6 +822,7 @@ private fun sectionIcon(@StringRes title: Int): ImageVector? = when (title) {
     R.string.s_lgtv -> Icons.Outlined.Tv
     R.string.s_assistant -> Icons.Outlined.AutoAwesome
     R.string.s_voice -> Icons.Outlined.RecordVoiceOver
+    R.string.s_calendar -> Icons.Outlined.CalendarMonth
     R.string.s_updates -> Icons.Outlined.SystemUpdate
     R.string.s_rooms -> Icons.Outlined.MeetingRoom
     R.string.s_devices -> Icons.Outlined.DevicesOther
