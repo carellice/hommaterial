@@ -1,5 +1,6 @@
 package app.hommaterial
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -42,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.hommaterial.data.ServerSync
+import app.hommaterial.quick.EXTRA_TAB
 import app.hommaterial.ui.accentScheme
 import app.hommaterial.ui.HomeScreen
 import app.hommaterial.ui.LocalHaptics
@@ -52,6 +54,7 @@ import app.hommaterial.ui.RestScreen
 import app.hommaterial.ui.SettingsScreen
 import app.hommaterial.ui.UpdateDialog
 import app.hommaterial.ui.rememberNow
+import app.hommaterial.ui.requestedTab
 import java.util.Calendar
 import kotlinx.coroutines.delay
 
@@ -66,6 +69,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) openTab(intent)
         enableEdgeToEdge()
         setContent {
             val vm: HomeViewModel = viewModel()
@@ -162,6 +166,16 @@ class MainActivity : ComponentActivity() {
                 UpdateDialog(state, vm)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openTab(intent)
+    }
+
+    /** The page of the bottom bar a widget asked for, if any. */
+    private fun openTab(intent: Intent?) {
+        intent?.getStringExtra(EXTRA_TAB)?.let { requestedTab.value = it }
     }
 
     override fun onUserInteraction() {

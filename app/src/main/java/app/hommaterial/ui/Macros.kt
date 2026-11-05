@@ -6,11 +6,14 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
@@ -21,15 +24,18 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -39,9 +45,12 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -61,6 +70,7 @@ import app.hommaterial.data.ACTION_WAIT
 import app.hommaterial.data.Echo
 import app.hommaterial.data.Macro
 import app.hommaterial.data.MacroAction
+import app.hommaterial.data.PhraseSuggestions
 import app.hommaterial.data.Remote
 import app.hommaterial.data.RemoteKind
 import app.hommaterial.plural
@@ -247,7 +257,19 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    PhraseList(phrases) { phrases = it }
+                    PhraseList(
+                        phrases,
+                        suggest = if (!state.assistant.configured) null else ({
+                            vm.suggestPhrases(
+                                name,
+                                steps.map { describe(it, state) },
+                                watched?.name,
+                                otherwise.map { describe(it, state) },
+                                phrases,
+                                macro?.id,
+                            )
+                        }),
+                    ) { phrases = it }
                     SectionCard {
                         ListItem(
                             headlineContent = { Text(str(R.string.macro_condition)) },
@@ -343,14 +365,28 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
     }
 }
 
-/** The phrases that, said to the microphone of the app, run the custom device; one is added by typing it. */
+/**
+ * The phrases that, said to the microphone of the app, run the custom device; one is added by typing
+ * it or, with the assistant, picked among those it [suggest]s.
+ */
 @Composable
-private fun PhraseList(phrases: List<String>, onChange: (List<String>) -> Unit) {
+private fun PhraseList(
+    phrases: List<String>,
+    suggest: (suspend () -> Result<PhraseSuggestions>)?,
+    onChange: (List<String>) -> Unit,
+) {
     var typed by remember { mutableStateOf("") }
-    fun add() {
-        val phrase = typed.trim()
+    var suggesting by remember { mutableStateOf(false) }
+    fun add(text: String) {
+        val phrase = text.trim()
         if (phrase.isNotEmpty() && phrases.none { it.equals(phrase, ignoreCase = true) }) onChange(phrases + phrase)
+    }
+    fun add() {
+        add(typed)
         typed = ""
+    }
+    if (suggesting && suggest != null) {
+        PhraseSuggestionsDialog(phrases, suggest, onAdd = { add(it) }, onDismiss = { suggesting = false })
     }
     SectionCard {
         Column(Modifier.padding(bottom = 12.dp)) {
@@ -392,8 +428,89 @@ private fun PhraseList(phrases: List<String>, onChange: (List<String>) -> Unit) 
                 },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             )
+            if (suggest != null) {
+                TextButton(onClick = { suggesting = true }, modifier = Modifier.padding(start = 8.dp, top = 4.dp)) {
+                    Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(str(R.string.macro_phrases_suggest))
+                }
+            }
         }
     }
+}
+
+/** The phrases the assistant suggests, short, medium and longer, each added with a tap. */
+@Composable
+private fun PhraseSuggestionsDialog(
+    phrases: List<String>,
+    suggest: suspend () -> Result<PhraseSuggestions>,
+    onAdd: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var round by remember { mutableIntStateOf(0) }
+    var result by remember { mutableStateOf<Result<PhraseSuggestions>?>(null) }
+    val current by rememberUpdatedState(suggest)
+    LaunchedEffect(round) {
+        result = null
+        result = current()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.AutoAwesome, contentDescription = null) },
+        title = { Text(str(R.string.macro_phrases_suggest)) },
+        text = {
+            val answer = result
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                when {
+                    answer == null -> Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Text(str(R.string.macro_phrases_thinking))
+                    }
+                    answer.isFailure -> Text(answer.exceptionOrNull()?.message ?: str(R.string.something_wrong))
+                    answer.getOrThrow().isEmpty -> Text(str(R.string.macro_phrases_none))
+                    else -> {
+                        val found = answer.getOrThrow()
+                        val groups = listOf(
+                            R.string.macro_phrases_short to found.short,
+                            R.string.macro_phrases_medium to found.medium,
+                            R.string.macro_phrases_long to found.long,
+                        )
+                        for ((title, list) in groups) {
+                            if (list.isEmpty()) continue
+                            Text(
+                                str(title),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+                            )
+                            for (phrase in list) {
+                                val added = phrases.any { it.equals(phrase, ignoreCase = true) }
+                                ListItem(
+                                    headlineContent = { Text("“$phrase”") },
+                                    trailingContent = {
+                                        Icon(
+                                            if (added) Icons.Outlined.Check else Icons.Outlined.Add,
+                                            contentDescription = str(if (added) R.string.macro_phrase_added else R.string.macro_phrase_add),
+                                            tint = if (added) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                                        )
+                                    },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable(enabled = !added) { onAdd(phrase) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str(R.string.close)) } },
+        dismissButton = {
+            TextButton(onClick = { round++ }, enabled = result != null) { Text(str(R.string.macro_phrases_more)) }
+        },
+    )
 }
 
 @Composable

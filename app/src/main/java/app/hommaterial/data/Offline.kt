@@ -84,6 +84,15 @@ object Offline {
 
     fun putItems(listId: String, items: List<ListItem>) = write("items:$listId", JSONArray(items.map(::itemJson)))
 
+    /** The notes of Notion, and the text of each note opened, as read last. */
+    fun notes(): List<NotionNote>? = read("notes") { it.mapObjects(NotionNote::fromJson) }
+
+    fun putNotes(notes: List<NotionNote>) = write("notes", JSONArray(notes.map { it.toJson() }))
+
+    fun note(id: String): List<NoteBlock>? = read("note:$id") { it.mapObjects(NoteBlock::fromJson) }
+
+    fun putNote(id: String, blocks: List<NoteBlock>) = write("note:$id", JSONArray(blocks.map { it.toJson() }))
+
     fun calendars(): List<CalendarInfo>? = read("calendars") { it.mapObjects(::calendarFromJson) }
 
     fun putCalendars(calendars: List<CalendarInfo>) = write("calendars", JSONArray(calendars.map(::calendarJson)))
@@ -362,11 +371,11 @@ private fun calendarFromJson(o: JSONObject) = CalendarInfo(
     o.optBoolean("primary"), o.optBoolean("writable"), o.optBoolean("shown", true),
 )
 
-private fun eventJson(it: CalendarEvent) = JSONObject().put("id", it.id).put("calendar", it.calendar).put("title", it.title)
+internal fun eventJson(it: CalendarEvent) = JSONObject().put("id", it.id).put("calendar", it.calendar).put("title", it.title)
     .put("location", it.location).put("notes", it.notes).put("allDay", it.allDay).put("start", it.start).put("end", it.end)
     .put("recurring", it.recurring).put("editable", it.editable)
 
-private fun eventFromJson(o: JSONObject) = CalendarEvent(
+internal fun eventFromJson(o: JSONObject) = CalendarEvent(
     o.getString("id"), o.getString("calendar"), o.optString("title"), o.optString("location"), o.optString("notes"),
     o.optBoolean("allDay"), o.optLong("start"), o.optLong("end"), o.optBoolean("recurring"), o.optBoolean("editable", true),
 )

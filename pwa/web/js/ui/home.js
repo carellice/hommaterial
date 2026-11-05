@@ -16,8 +16,9 @@ import { RemoteTile } from './remotes.js';
 import { HistoryCharts } from './chart.js';
 import { SchedulesDialog, TimerChoices } from './schedules.js';
 import { AutomationsDialog } from './automations.js';
-import { ListsPage } from './lists.js';
-import { CalendarPage, HomeAgenda } from './calendar.js';
+import { ListsPage, reloadLists } from './lists.js';
+import { CalendarPage, HomeAgenda, reloadCalendar } from './calendar.js';
+import { NotesPage, reloadNotes } from './notes.js';
 
 // By size of the tiles: compact, normal, large.
 const LIST_MIN_WIDTH = 320;
@@ -113,7 +114,10 @@ export function HomeScreen({ onSettings }) {
   const found = query != null ? search(query, homeSections(PAGE_ALL, s)) : [];
   const look = homeLook(s, wide);
   // The page of the bottom bar, which stays in sight but for the search and the keyboard.
-  const [tab, setTabNow] = useState(TAB_HOME);
+  const [chosenTab, setTabNow] = useState(TAB_HOME);
+  // The notes have a page once some are chosen; without them it goes back to the home.
+  const hasNotes = s.notion.linked && s.notionNotes.length > 0;
+  const tab = chosenTab === TAB_NOTES && !hasNotes ? TAB_HOME : chosenTab;
   // A page comes in from the side its tab is on in the bar.
   const [from, setFrom] = useState('from-right');
   const setTab = (next) => {
@@ -147,12 +151,13 @@ export function HomeScreen({ onSettings }) {
     <div class="screen">
       <div class="top-bar">
         ${tab !== TAB_HOME
-          ? html`<div class="title"><div class="title-large">${str(tab === TAB_LISTS ? 's_lists' : 's_calendar')}</div></div>`
+          ? html`<div class="title"><div class="title-large">${str(TABS.find(([k]) => k === tab)[1])}</div></div>`
           : query == null
           ? html`<${Title} updatedAt=${s.updatedAt} />`
           : html`<${SearchField} query=${query} onChange=${setQuery} onEnter=${() => found[0] && activate(found[0])} />`}
         ${tab !== TAB_HOME
-          ? html`<${VoiceButton} /><${OverflowMenu} s=${s} onSettings=${onSettings} onArrange=${() => setArranging(true)} />`
+          ? html`<${RefreshButton} key=${tab} onRefresh=${() => (tab === TAB_LISTS ? reloadLists() : tab === TAB_CALENDAR ? reloadCalendar(s) : reloadNotes())} />
+            <${VoiceButton} /><${OverflowMenu} s=${s} onSettings=${onSettings} onArrange=${() => setArranging(true)} />`
           : query != null
           ? html`<${IconButton} icon="close" label=${str('search_close')} onClick=${() => setQuery(null)} />`
           : html`
@@ -161,8 +166,9 @@ export function HomeScreen({ onSettings }) {
             <${VoiceButton} />
             <${OverflowMenu} s=${s} onSettings=${onSettings} onArrange=${() => setArranging(true)} />`}
       </div>
-      ${tab === TAB_LISTS ? html`<div class=${`body-row tab-page ${from}`} key="lists"><${ListsPage} /></div>`
-      : tab === TAB_CALENDAR ? html`<div class="body-row tab-page from-right" key="calendar"><${CalendarPage} s=${s} onSettings=${onSettings} /></div>` : html`
+      ${tab === TAB_LISTS ? html`<div class=${`body-row tab-page ${from}`} key="lists"><${ListsPage} s=${s} /></div>`
+      : tab === TAB_CALENDAR ? html`<div class=${`body-row tab-page ${from}`} key="calendar"><${CalendarPage} s=${s} onSettings=${onSettings} /></div>`
+      : tab === TAB_NOTES ? html`<div class="body-row tab-page from-right" key="notes"><${NotesPage} s=${s} /></div>` : html`
       <div class="body-row tab-page from-left" key="home">
         ${pages.length > 1 && query == null && html`
           <${SideBar} pages=${pages} current=${current} expanded=${width >= SIDE_BAR} clock=${showClock} onSelect=${setPage} />`}
@@ -175,7 +181,7 @@ export function HomeScreen({ onSettings }) {
           </div>
         <//>
       </div>`}
-      <${BottomBar} current=${tab} visible=${query == null && !typing} onSelect=${setTab} />
+      <${BottomBar} current=${tab} visible=${query == null && !typing} notes=${hasNotes} onSelect=${setTab} />
       ${arranging && html`<${ArrangeDialog} s=${s} onDismiss=${() => setArranging(false)} />`}
       ${s.voice && html`<${VoiceDialog} ask=${s.voice} />`}
     </div>`;
@@ -184,16 +190,35 @@ export function HomeScreen({ onSettings }) {
 const TAB_HOME = 'home';
 const TAB_LISTS = 'lists';
 const TAB_CALENDAR = 'calendar';
-const TABS = [[TAB_HOME, 'nav_home', 'home'], [TAB_LISTS, 's_lists', 'checklist'], [TAB_CALENDAR, 's_calendar', 'calendar_month']];
+const TAB_NOTES = 'notes';
+const TABS = [
+  [TAB_HOME, 'nav_home', 'home'], [TAB_LISTS, 's_lists', 'checklist'], [TAB_CALENDAR, 's_calendar', 'calendar_month'],
+  [TAB_NOTES, 's_notes', 'description'],
+];
+
+/** Reads the page again from Alexa, Notion or the calendar, without waiting for a pull. */
+function RefreshButton({ onRefresh }) {
+  const [busy, setBusy] = useState(false);
+  return busy
+    ? html`<span class="icon-btn" aria-busy="true"><${Spinner} /></span>`
+    : html`<${IconButton} icon="refresh" label=${str('refresh_now')} onClick=${async () => {
+      setBusy(true);
+      try {
+        await onRefresh();
+      } finally {
+        setBusy(false);
+      }
+    }} />`;
+}
 
 /**
  * The floating bar at the bottom of the app: a pill over the page, where the chosen tab grows to
  * show its name on a tinted background and the others keep only their icon (ui/BottomNav.kt).
  */
-function BottomBar({ current, visible, onSelect }) {
+function BottomBar({ current, visible, notes, onSelect }) {
   return html`
     <nav class=${`bottom-bar ${visible ? '' : 'hidden'}`} role="tablist" aria-hidden=${!visible}>
-      ${TABS.map(([key, label, icon]) => html`
+      ${TABS.filter(([key]) => notes || key !== TAB_NOTES).map(([key, label, icon]) => html`
         <button key=${key} class=${`tab-pill ${key === current ? 'selected' : ''}`} role="tab" aria-selected=${key === current}
           aria-label=${str(label)} tabindex=${visible ? 0 : -1} onClick=${() => onSelect(key)}>
           <${Icon} name=${icon} filled=${key === current} />

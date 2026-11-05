@@ -328,6 +328,60 @@ What the home has:
 ${catalog.names()}
 """.trim()
 
+private const val SCHEMA_PHRASES = """
+{"type":"object","properties":{
+ "short":{"type":"array","items":{"type":"string"}},
+ "medium":{"type":"array","items":{"type":"string"}},
+ "long":{"type":"array","items":{"type":"string"}}},
+ "required":["short","medium","long"]}
+"""
+
+/** Phrases the assistant suggests to run a custom device: short, medium and longer ones. */
+data class PhraseSuggestions(val short: List<String>, val medium: List<String>, val long: List<String>) {
+    val isEmpty: Boolean get() = short.isEmpty() && medium.isEmpty() && long.isEmpty()
+}
+
+/** Reads the phrases of the model, without those already used and each once, a few per length. */
+fun parsePhrases(answer: JSONObject, taken: Collection<String>, max: Int = 4): PhraseSuggestions {
+    val seen = taken.map { it.trim().lowercase() }.toMutableSet()
+    fun read(key: String): List<String> {
+        val list = answer.optJSONArray(key) ?: return emptyList()
+        return (0 until list.length()).map { list.optString(it).trim().trim('"', '“', '”', '.').trim() }
+            .filter { it.isNotEmpty() && it.length <= 80 && seen.add(it.lowercase()) }
+            .take(max)
+    }
+    return PhraseSuggestions(read("short"), read("medium"), read("long"))
+}
+
+/**
+ * The instructions for suggesting phrases that, said to the microphone of the app, run the custom
+ * device [name], which does [does] (or [otherwise] while [condition] is off).
+ */
+fun phrasesPrompt(
+    name: String,
+    does: List<String>,
+    condition: String?,
+    otherwise: List<String>,
+    phrases: List<String>,
+    taken: List<String>,
+    language: String,
+): String = """
+You suggest voice phrases for a custom device of a smart home app: a button that runs a series of actions.
+Saying one of the phrases to the microphone of the app runs it; only the whole phrase counts, so it must be
+something a person would naturally say, in $language, to have exactly these actions done. No quotes, no final dot.
+Give 4 "short" phrases (1 to 3 words, like "buonanotte"), 4 "medium" ones (4 to 6 words) and 4 "long" ones
+(7 to 12 words, natural and specific). Keep them coherent with what the device does, varied, never generic
+commands like "accendi" alone. Do not repeat the phrases it already has or those of other devices.
+The custom device is called: ${name.trim().ifEmpty { "(no name yet)" }}
+What it does, in order:
+${bullets(does).ifEmpty { "- (nothing yet)" }}
+${if (condition != null) "That is while “$condition” is on; while it is off it does:\n${bullets(otherwise)}\n" else ""}
+${if (phrases.isNotEmpty()) "Its phrases already: ${phrases.joinToString("; ")}\n" else ""}
+${if (taken.isNotEmpty()) "Phrases of other devices, not to be used: ${taken.joinToString("; ")}\n" else ""}
+""".trim()
+
+private fun bullets(lines: List<String>) = lines.joinToString("\n") { "- $it" }
+
 /**
  * Workers AI over the REST API of Cloudflare, with the account and the token of the user. Every
  * answer is asked as JSON, read back from what the model returned.
@@ -354,6 +408,13 @@ class WorkersAi(private val http: OkHttpClient, private val base: String = "http
             .optString("text").trim()
     }
 
+    /** Phrases to run a custom device, as the model suggests them, a bit freely to have them varied. */
+    suspend fun phrases(accountId: String, token: String, model: String, system: String): JSONObject =
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/assistant/ask", JSONObject().put("kind", "phrases").put("system", system))
+                .optJSONObject("answer") ?: JSONObject()
+        } else json(accountId, token, model, listOf("system" to system, "user" to "Suggest the phrases."), SCHEMA_PHRASES, 800, 0.7)
+
     suspend fun questions(accountId: String, token: String, model: String, system: String): JSONObject =
         if (ServerSync.active) {
             ServerSync.call("POST", "/api/assistant/ask", JSONObject().put("kind", "questions").put("system", system))
@@ -367,13 +428,14 @@ class WorkersAi(private val http: OkHttpClient, private val base: String = "http
         messages: List<Pair<String, String>>,
         schema: String,
         maxTokens: Int,
+        temperature: Double = 0.1,
     ): JSONObject {
         val answer = try {
-            run(accountId, token, model, messages, JSONObject(schema), maxTokens)
+            run(accountId, token, model, messages, JSONObject(schema), maxTokens, temperature)
         } catch (e: AssistantException) {
             // When the model cannot keep to the schema, it is asked again free: the JSON is then looked for in the text.
             if (e.text != R.string.assistant_json_failed) throw e
-            run(accountId, token, model, messages, null, maxTokens)
+            run(accountId, token, model, messages, null, maxTokens, temperature)
         }
         return when (answer) {
             is JSONObject -> answer
@@ -388,12 +450,13 @@ class WorkersAi(private val http: OkHttpClient, private val base: String = "http
         messages: List<Pair<String, String>>,
         schema: JSONObject?,
         maxTokens: Int,
+        temperature: Double = 0.1,
     ): Any = withContext(Dispatchers.IO) {
         if (!accountId.matches(Regex("[0-9a-fA-F]{32}"))) throw AssistantException(R.string.assistant_bad_account)
         val body = JSONObject()
             .put("messages", JSONArray(messages.map { (role, content) -> JSONObject().put("role", role).put("content", content) }))
             .put("max_tokens", maxTokens)
-            .put("temperature", 0.1)
+            .put("temperature", temperature)
         if (schema != null) body.put("response_format", JSONObject().put("type", "json_schema").put("json_schema", schema))
         val request = Request.Builder()
             .url("$base/accounts/$accountId/ai/run/$model")

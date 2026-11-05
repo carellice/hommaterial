@@ -92,6 +92,7 @@ const EMPTY_STATUS = {
   switchBot: false,
   assistant: { configured: false, accountId: '', model: '' },
   calendar: { client: false, linked: false, account: '' },
+  notion: { linked: false, workspace: '' },
 };
 
 const marketOf = (domain) => MARKETPLACES.find((m) => m.domain === domain) ?? MARKETPLACES[0];
@@ -110,6 +111,7 @@ function fromServer(data, status) {
     loginPending: status.alexa.attempt,
     switchBot: status.switchBot,
     calendar: { ...EMPTY_STATUS.calendar, ...status.calendar },
+    notion: { ...EMPTY_STATUS.notion, ...status.notion },
     assistant: {
       ...status.assistant,
       notes: data.assistantNotes,
@@ -147,6 +149,8 @@ function initialState() {
     echos: null,
     // The calendars chosen in this browser, by id; null until the user chooses, showing those Google shows.
     calendarShown: settings.get('calendarShown', null),
+    notionLists: settings.get('notionLists', []),
+    notionNotes: settings.get('notionNotes', []),
     calendarDefault: settings.get('calendarDefault', null),
     calendarHome: settings.get('calendarHome', true),
     update: null,
@@ -632,23 +636,88 @@ async function onList(block) {
   return ok ? result ?? true : null;
 }
 
-export const alexaLists = () => onList(async () => (await get('/api/lists')).lists);
+/** The lists of Alexa, then those chosen of Notion; those of Notion alone when Alexa has none to give. */
+export async function alexaLists() {
+  const fromNotion = state.notion.linked
+    ? state.notionLists.map((it) => ({ id: `${NOTION_LIST}${it.kind}:${it.id}`, name: it.name, type: LIST_NOTION, active: null }))
+    : [];
+  if (!state.loggedIn && fromNotion.length) return fromNotion;
+  const fromAlexa = await onList(async () => (await get('/api/lists')).lists);
+  if (!fromAlexa && !fromNotion.length) return null;
+  return [...(fromAlexa || []), ...fromNotion];
+}
+
+// ——— Notion: to-do lists and notes, through the home server (server/src/notion.ts) ———
+
+export const NOTION_LIST = 'notion:';
+export const LIST_NOTION = 'NOTION';
+
+/** The path of a list of Notion on the server, or null for a list of Alexa. */
+function notionPath(listId) {
+  if (!listId.startsWith(NOTION_LIST)) return null;
+  const rest = listId.slice(NOTION_LIST.length);
+  return `/api/notion/lists/${rest.slice(0, rest.indexOf(':'))}/${encodeURIComponent(rest.slice(rest.indexOf(':') + 1))}`;
+}
+
+/** Tries the secret of the integration and keeps it on the server if Notion takes it; the error to show otherwise. */
+export async function connectNotion(token) {
+  try {
+    await post('/api/notion/connect', { token });
+  } catch (e) {
+    return e instanceof OfflineError ? e.message || str('no_connection') : e.message || str('something_wrong');
+  }
+  await sync(true);
+  say(str('notion_linked_ok'));
+  return null;
+}
+
+export async function disconnectNotion() {
+  await guarded(() => post('/api/notion/disconnect', {}));
+  setNotionLists([]);
+  setNotionNotes([]);
+  await sync(true);
+}
+
+export const notionSources = () => onList(async () => (await get('/api/notion/sources')).sources);
+
+export function setNotionLists(sources) {
+  settings.set('notionLists', sources);
+  update({ notionLists: sources });
+}
+
+export function setNotionNotes(sources) {
+  settings.set('notionNotes', sources);
+  update({ notionNotes: sources });
+}
+
+export const notionNotes = () => onList(async () => {
+  if (!state.notionNotes.length) return [];
+  const query = encodeURIComponent(state.notionNotes.map((it) => `${it.kind}:${it.id}`).join(','));
+  return (await get(`/api/notion/notes?sources=${query}`)).notes;
+});
+
+export const notionNote = (id) => onList(async () => (await get(`/api/notion/notes/${encodeURIComponent(id)}`)).blocks);
 
 export const alexaListItems = (listId) =>
-  onList(async () => (await get(`/api/lists/${encodeURIComponent(listId)}/items`)).items);
+  onList(async () => (await get(`${notionPath(listId) ?? `/api/lists/${encodeURIComponent(listId)}`}/items`)).items);
 
 export async function addAlexaListItem(listId, name) {
   navigator.vibrate?.(12);
-  return (await onList(() => post(`/api/lists/${encodeURIComponent(listId)}/items`, { name }))) != null;
+  const path = `${notionPath(listId) ?? `/api/lists/${encodeURIComponent(listId)}`}/items`;
+  return (await onList(() => post(path, { name }))) != null;
 }
 
 export async function setAlexaListItemDone(listId, item, completed) {
+  const notion = notionPath(listId);
+  if (notion) return (await onList(() => api('PUT', `${notion}/items/${encodeURIComponent(item.id)}`, { completed }))) != null;
   navigator.vibrate?.(12);
   const path = `/api/lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(item.id)}`;
   return (await onList(() => api('PUT', path, { version: item.version, completed }))) != null;
 }
 
 export async function deleteAlexaListItem(listId, item) {
+  const notion = notionPath(listId);
+  if (notion) return (await onList(() => del(`${notion}/items/${encodeURIComponent(item.id)}`))) != null;
   const path = `/api/lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(item.id)}?version=${item.version}`;
   return (await onList(() => del(path))) != null;
 }
@@ -852,9 +921,23 @@ export function setVoiceEcho(echo) {
 }
 
 /** Tells Alexa [said] through [echo], which answers aloud. */
+/** Tells Alexa [said] through [echo], which answers aloud; what she answers is shown here too. */
 async function sayToAlexa(echo, said) {
   say(str('voice_to_alexa', said));
-  await guarded(() => post('/api/alexa/say', { echo: echo.serial, text: said }));
+  const since = Date.now();
+  if (!(await guarded(() => post('/api/alexa/say', { echo: echo.serial, text: said })))) return;
+  // The answer reaches the voice history of Amazon some seconds later, if at all.
+  for (const wait of [3000, 3000, 4000, 5000]) {
+    await new Promise((done) => setTimeout(done, wait));
+    let text = null;
+    try {
+      ({ text } = await get(`/api/alexa/reply?echo=${encodeURIComponent(echo.serial)}&since=${since}`));
+    } catch {
+      // Without the history Alexa has still answered aloud.
+      return;
+    }
+    if (text) return say(str('voice_alexa_reply', text));
+  }
 }
 
 /**
@@ -1022,6 +1105,17 @@ export async function testLgTv(id) {
 }
 
 // ——— The assistant ———
+
+/** Phrases the assistant suggests for the custom device being edited; it throws what to show when it fails. */
+export async function suggestPhrases({ name, does, condition, otherwise, phrases, macroId }) {
+  const taken = state.macros.filter((m) => m.id !== macroId).flatMap((m) => m.phrases ?? []);
+  try {
+    return await post('/api/assistant/phrases', { name, does, condition, otherwise, phrases, taken });
+  } catch (e) {
+    if (e instanceof NotLoggedInError) update({ loggedIn: false, loginMessage: e.message });
+    throw e instanceof OfflineError ? new Error(e.message || str('no_connection')) : e;
+  }
+}
 
 /** The keys of a remote as the assistant sees them: what is sent, whether the user added it, how it is called. */
 function assistantKeys(remote) {

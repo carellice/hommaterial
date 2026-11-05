@@ -181,6 +181,28 @@
                 android:resource="@xml/home_widget" />
         </receiver>
         <receiver
+            android:name=".quick.ListsWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_lists_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/lists_widget" />
+        </receiver>
+        <receiver
+            android:name=".quick.AgendaWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_agenda_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/agenda_widget" />
+        </receiver>
+        <receiver
             android:name=".quick.ScheduleReceiver"
             android:exported="false">
             <intent-filter>

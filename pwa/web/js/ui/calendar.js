@@ -77,6 +77,9 @@ function defaultCalendar(s) {
   return writable.find((c) => c.id === s.calendarDefault) ?? writable.find((c) => c.primary) ?? writable[0] ?? null;
 }
 
+/** Reads the calendars and the events again, as the button of the top bar asks. */
+export const reloadCalendar = (s) => reload(s);
+
 async function reload(s) {
   if (model.loading || !s.calendar.linked) return;
   set({ loading: true });

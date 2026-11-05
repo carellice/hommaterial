@@ -311,6 +311,17 @@ function amazonReason(body: string, errorType: string | null): string {
 
 /** A call to the Alexa web API; [site] is "www" for the lists, which live on the shop's own host. */
 async function api(method: string, path: string, body: unknown = null, site = 'alexa'): Promise<any> {
+  const text = await apiText(method, path, body, site)
+  if (!text.trim()) return {}
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new HttpError(502, str('alexa_unexpected'))
+  }
+}
+
+/** The same call, its answer as it comes: [headers] are added to those of the Alexa app. */
+async function apiText(method: string, path: string, body: unknown = null, site = 'alexa', headers: Record<string, string> = {}): Promise<string> {
   const market = marketplace()
   const host = `alexa.${market.domain}`
   let current = await session()
@@ -325,6 +336,7 @@ async function api(method: string, path: string, body: unknown = null, site = 'a
       csrf: current.csrf,
       Cookie: current.cookie,
       ...(body ? { 'Content-Type': 'application/json; charset=utf-8' } : {}),
+      ...headers,
     }, body ? JSON.stringify(body) : null)
     // The web session lasts a few days; the first 401 just means it needs renewing.
     if (response.status === 401 && attempt === 0) {
@@ -335,12 +347,7 @@ async function api(method: string, path: string, body: unknown = null, site = 'a
     if (response.status < 200 || response.status >= 300) {
       throw new HttpError(502, str('alexa_error', response.status) + amazonReason(response.body, response.errorType))
     }
-    if (!response.body.trim()) return {}
-    try {
-      return JSON.parse(response.body)
-    } catch {
-      throw new HttpError(502, str('alexa_unexpected'))
-    }
+    return response.body
   }
   throw new HttpError(502, str('alexa_unexpected'))
 }
@@ -491,6 +498,49 @@ export async function say(serial: string, text: string) {
   }
   const sequence = { '@type': 'com.amazon.alexa.behaviors.model.Sequence', startNode: node }
   await api('POST', '/api/behaviors/preview', { behaviorId: 'PREVIEW', sequenceJson: JSON.stringify(sequence), status: 'ENABLED' })
+}
+
+// The answer of Alexa is read back from the voice history of the account, as alexa-remote does:
+// the page of the history hands out the token its own calls need. Undocumented too.
+
+const HISTORY_PAGE = '/alexa-privacy/apd/activity?disableGlobalNav=true&ref=activityHistory'
+const historyTokens = new Map<number, { token: string; until: number }>()
+
+async function historyToken(): Promise<string> {
+  const id = currentUserId() ?? 0
+  const saved = historyTokens.get(id)
+  if (saved && saved.until > Date.now()) return saved.token
+  const page = await apiText('GET', HISTORY_PAGE, null, 'www', { Accept: 'text/html' })
+  const token = /meta name="csrf-token" content="([^"]+)"/.exec(page)?.[1]
+  if (!token) throw new HttpError(502, str('alexa_unexpected'))
+  historyTokens.set(id, { token, until: Date.now() + 2 * 3600_000 })
+  return token
+}
+
+/** The words of Alexa in the latest record of the history heard by [serial] since [since]. */
+export function replyIn(history: any, serial: string, since: number): string | null {
+  const records: any[] = Array.isArray(history?.customerHistoryRecords) ? history.customerHistoryRecords : []
+  const record = records
+    .filter((it) => String(it?.recordKey ?? '').split('#')[3] === serial && Number(it?.timestamp) >= since - 2_000)
+    .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))[0]
+  if (!record || !Array.isArray(record.voiceHistoryRecordItems)) return null
+  const words = record.voiceHistoryRecordItems
+    .filter((it: any) => it?.recordItemType === 'ALEXA_RESPONSE' || it?.recordItemType === 'TTS_REPLACEMENT_TEXT')
+    .map((it: any) => String(it.transcriptText ?? '').trim())
+    .filter((it: string, i: number, all: string[]) => it && all.indexOf(it) === i)
+  return words.length ? words.join(' ') : null
+}
+
+/** What Alexa answered aloud through the Echo [serial] since [since]; null while the history does not have it yet. */
+export async function reply(serial: string, since: number): Promise<string | null> {
+  const path = `/alexa-privacy/apd/rvh/customer-history-records-v2?startTime=${since - 5_000}&endTime=${Date.now() + 60_000}`
+  const headers = { 'anti-csrftoken-a2z': await historyToken(), Referer: `https://www.${marketplace().domain}${HISTORY_PAGE}` }
+  const text = await apiText('POST', path, { previousRequestToken: null }, 'www', headers)
+  try {
+    return replyIn(text.trim() ? JSON.parse(text) : {}, serial, since)
+  } catch {
+    throw new HttpError(502, str('alexa_unexpected'))
+  }
 }
 
 // --- lists -------------------------------------------------------------------------------------

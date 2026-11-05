@@ -30,7 +30,9 @@ Material. Il server porta tutto quello che il telefono faceva fuori dalle scherm
 | `ui/RoomDialogs.kt` | `web/js/ui/rooms.js` | fatto |
 | `ui/HistoryChart.kt` | `web/js/ui/chart.js` (dati da `/api/history`) | fatto |
 | `ui/UpdateDialog.kt` | `web/js/ui/app.js` `UpdateDialog` | fatto |
-| `ui/BottomNav.kt` (barra in basso: Casa e Liste) | `home.js` `BottomBar` | fatto |
+| `ui/BottomNav.kt` (barra in basso: Casa, Liste, Calendario e, con note scelte, Note) | `home.js` `BottomBar` | fatto |
+| `ui/Notes.kt`, `data/Notion.kt` (liste e note da Notion, con la chiave dell'integrazione: sul telefono senza server, altrimenti sul server) | `web/js/ui/notes.js`, `server/src/notion.ts`, `/api/notion/*` | fatto; con Notion vero da verificare |
+| tasto «Aggiorna» in alto in liste, calendario e note | `home.js` `RefreshButton` | fatto |
 | `ui/Lists.kt` (pagina delle liste di Alexa) | `web/js/ui/lists.js` `ListsPage`, `/api/lists` | verificato con Amazon |
 | `ui/NfcTag.kt` | — | non portabile |
 
@@ -72,12 +74,14 @@ Material. Il server porta tutto quello che il telefono faceva fuori dalle scherm
 | `voice/VoiceParser.kt` | `web/js/voice.js`, correzione con `/api/assistant/correct` | fatto |
 | dettatura di Google (fa da sé da riscontro) | `home.js` `ListeningPanel`: pannello «Ti ascolto» con le parole mentre arrivano, solo sul web | fatto |
 | frasi vocali dei dispositivi personalizzati (`parsePhrase`), voce passata ad Alexa (`AlexaApi.say`, Echo scelto per dispositivo), azione `alexa` | `voice.js` `parsePhrase`, `store.js` `onSpeech`, `server/src/alexa.ts` `echos`/`say`, `/api/alexa/echos`, `/api/alexa/say` | fatto; con Amazon vero da verificare |
+| risposta di Alexa mostrata nell'app, letta dalla cronologia vocale (`AlexaApi.reply`); la voce ad Alexa non passa dall'assistente | `store.js` `sayToAlexa`, `server/src/alexa.ts` `reply`, `/api/alexa/reply` | fatto; con Amazon vero da verificare |
+| frasi vocali suggerite dall'assistente (`phrasesPrompt`, `WorkersAi.phrases`) | `macros.js` `PhraseSuggestions`, `/api/assistant/phrases` | fatto; con Cloudflare vero da verificare |
 
 ## Non portabili
 
 | Android | Alternativa |
 |---|---|
-| Widget della schermata Home e della schermata di blocco | nessuna; le scelte restano nel backup |
+| Widget della schermata Home e della schermata di blocco (preferiti, lista di cose da fare, agenda: `quick/Boards.kt`) | nessuna; le scelte restano nel backup |
 | Riquadri delle Impostazioni rapide (`quick/PowerTile.kt`) | nessuna; le scelte restano nel backup |
 | Scorciatoie dell'icona (`quick/Shortcuts.kt`) | nessuna |
 | Tag NFC (`quick/Nfc.kt`) | nessuna |

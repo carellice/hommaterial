@@ -89,7 +89,9 @@ import androidx.compose.ui.util.lerp
 import app.hommaterial.HomeViewModel
 import app.hommaterial.R
 import app.hommaterial.data.AlexaList
+import app.hommaterial.data.LIST_NOTION
 import app.hommaterial.data.ListItem as AlexaItem
+import app.hommaterial.data.NotionSource
 import app.hommaterial.str
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
@@ -141,12 +143,30 @@ internal class ListsModel(private val vm: HomeViewModel, private val scope: Coro
     }
 
     // A change is kept on the phone and shows at once; it goes to Alexa with the reading after it,
-    // or, without internet, when the connection comes back.
-    fun add(listId: String, name: String) = changed(listId) { vm.addAlexaListItem(listId, name) }
+    // or, without internet, when the connection comes back. Notion gets it at once, or not at all.
+    fun add(listId: String, name: String) =
+        if (NotionSource.ofList(listId) != null) notion(listId, null) { vm.addNotionItem(listId, name) }
+        else changed(listId) { vm.addAlexaListItem(listId, name) }
 
-    fun toggle(listId: String, item: AlexaItem) = changed(listId) { vm.setAlexaListItemDone(listId, item, !item.completed) }
+    fun toggle(listId: String, item: AlexaItem) =
+        if (NotionSource.ofList(listId) != null) {
+            notion(listId, { list -> list.map { if (it.id == item.id) it.copy(completed = !item.completed) else it } }) {
+                vm.setNotionItemDone(listId, item, !item.completed)
+            }
+        } else changed(listId) { vm.setAlexaListItemDone(listId, item, !item.completed) }
 
-    fun delete(listId: String, item: AlexaItem) = changed(listId) { vm.deleteAlexaListItem(listId, item) }
+    fun delete(listId: String, item: AlexaItem) =
+        if (NotionSource.ofList(listId) != null) notion(listId, { list -> list.filter { it.id != item.id } }) { vm.deleteNotionItem(listId, item) }
+        else changed(listId) { vm.deleteAlexaListItem(listId, item) }
+
+    /** Shows the change at once with [shown], then reads the list again, as Notion has it, whether it went or not. */
+    private fun notion(listId: String, shown: ((List<AlexaItem>) -> List<AlexaItem>)?, change: suspend () -> Boolean) {
+        if (shown != null) items[listId]?.let { items[listId] = shown(it) }
+        scope.launch {
+            change()
+            refresh(listId)
+        }
+    }
 
     private fun changed(listId: String, change: () -> Unit) {
         change()
@@ -359,7 +379,7 @@ private fun ListContent(model: ListsModel, list: AlexaList, bottomSpace: Int) {
         }
         item(key = "footnote") {
             Text(
-                str(R.string.lists_text),
+                str(if (list.type == LIST_NOTION) R.string.lists_notion_text else R.string.lists_text),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 24.dp, start = 8.dp, end = 8.dp).animateItem(),
@@ -561,7 +581,7 @@ private fun DoneHeader(count: Int, open: Boolean, modifier: Modifier, onClick: (
 }
 
 @Composable
-private fun EmptyState(title: String, text: String?, modifier: Modifier = Modifier) {
+internal fun EmptyState(title: String, text: String?, modifier: Modifier = Modifier) {
     Column(
         modifier.fillMaxWidth().padding(vertical = 32.dp, horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

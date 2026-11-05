@@ -842,14 +842,14 @@ private fun GoogleSetup(state: UiState, vm: HomeViewModel) {
 
 /** A step of the setup, with the page of Google Cloud it happens on. */
 @Composable
-private fun Step(title: Int, text: Int, done: Boolean = false, onOpen: () -> Unit) {
+internal fun Step(title: Int, text: Int, done: Boolean = false, onOpen: (() -> Unit)?) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(16.dp)) {
         Row(Modifier.fillMaxWidth().padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(str(title), style = MaterialTheme.typography.titleSmall, color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                 Text(str(text), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            TextButton(onClick = onOpen) { Text(str(R.string.gcal_open)) }
+            if (onOpen != null) TextButton(onClick = onOpen) { Text(str(R.string.gcal_open)) }
         }
     }
 }

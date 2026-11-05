@@ -22,9 +22,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,9 +44,15 @@ import androidx.compose.ui.unit.dp
 import app.hommaterial.R
 import app.hommaterial.str
 
-/** The pages of the app the bottom bar moves between: the home, the lists of Alexa and the calendar ([TAB_CALENDAR]). */
+/**
+ * The pages of the app the bottom bar moves between: the home, the lists of Alexa, the calendar
+ * ([TAB_CALENDAR]) and, once some are chosen, the notes of Notion ([TAB_NOTES]).
+ */
 const val TAB_HOME = "home"
 const val TAB_LISTS = "lists"
+
+/** The page a widget asked to open, until the home takes it. */
+internal val requestedTab = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 
 /** The room the floating bar takes over the bottom of a page, for what scrolls under it to clear it. */
 internal val BOTTOM_BAR_SPACE = 88.dp
@@ -55,6 +63,7 @@ private val TABS = listOf(
     Tab(TAB_HOME, R.string.nav_home, Icons.Outlined.Home, Icons.Filled.Home),
     Tab(TAB_LISTS, R.string.s_lists, Icons.Outlined.Checklist, Icons.Filled.Checklist),
     Tab(TAB_CALENDAR, R.string.s_calendar, Icons.Outlined.CalendarMonth, Icons.Filled.CalendarMonth),
+    Tab(TAB_NOTES, R.string.s_notes, Icons.Outlined.Description, Icons.Filled.Description),
 )
 
 /** Where a tab sits in the bar, for the pages to slide in from its side. */
@@ -65,7 +74,13 @@ internal fun tabIndex(key: String) = TABS.indexOfFirst { it.key == key }
  * show its name on a tinted background and the others keep only their icon.
  */
 @Composable
-internal fun FloatingBottomBar(current: String, visible: Boolean, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+internal fun FloatingBottomBar(
+    current: String,
+    visible: Boolean,
+    notes: Boolean,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
@@ -79,7 +94,7 @@ internal fun FloatingBottomBar(current: String, visible: Boolean, onSelect: (Str
             shadowElevation = 8.dp,
         ) {
             Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                for (tab in TABS) TabPill(tab, tab.key == current) { onSelect(tab.key) }
+                for (tab in TABS) if (notes || tab.key != TAB_NOTES) TabPill(tab, tab.key == current) { onSelect(tab.key) }
             }
         }
     }

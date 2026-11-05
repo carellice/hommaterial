@@ -10,6 +10,7 @@ import * as accounts from './accounts.ts'
 import * as alexa from './alexa.ts'
 import * as assistant from './assistant.ts'
 import * as calendar from './calendar.ts'
+import * as notion from './notion.ts'
 import * as engine from './engine.ts'
 import { HttpError, setAccountLanguage } from './errors.ts'
 import * as lgtv from './lgtv.ts'
@@ -204,6 +205,7 @@ function status() {
     switchBot: switchBot.connected(),
     assistant: { configured: assistant.configured(), accountId: assistant.keys()?.accountId ?? '', model: assistant.model() },
     calendar: { client: calendar.client() != null, linked: calendar.linked(), account: calendar.account() },
+    notion: { linked: notion.linked(), workspace: notion.workspace() },
   }
 }
 
@@ -358,6 +360,13 @@ route('POST', '/api/alexa/say', async (req, res) => {
   if (!said) throw new HttpError(400, str('something_wrong'))
   await alexa.say(text(body.echo, 200), said)
   ok(res)
+})
+
+route('GET', '/api/alexa/reply', async (_req, res, _p, url) => {
+  const query = url.searchParams
+  const since = Number(query.get('since'))
+  if (!Number.isFinite(since)) throw new HttpError(400, str('something_wrong'))
+  json(res, 200, { text: await alexa.reply(text(query.get('echo'), 200), since) })
 })
 
 route('GET', '/api/alexa/diagnostics/:id', async (_req, res, [id]) => {
@@ -636,6 +645,55 @@ route('POST', '/api/lg/:id/test', async (_req, res, [id]) => {
   ok(res)
 })
 
+// --- Notion: to-do lists and notes ------------------------------------------------------------------
+
+route('POST', '/api/notion/connect', async (req, res) => {
+  const { token } = await readJson<{ token?: string }>(req)
+  const secret = text(token, 300).trim()
+  if (!secret) throw new HttpError(400, str('notion_unauthorized'))
+  json(res, 200, { workspace: await notion.connect(secret) })
+})
+
+route('POST', '/api/notion/disconnect', (_req, res) => {
+  notion.disconnect()
+  ok(res)
+})
+
+route('GET', '/api/notion/sources', async (_req, res) => json(res, 200, { sources: await notion.sources() }))
+
+const notionKind = (kind: string) => (kind === 'database' ? 'database' : 'page')
+
+route('GET', '/api/notion/lists/:kind/:id/items', async (_req, res, [kind, id]) =>
+  json(res, 200, { items: await notion.items(notionKind(kind), decodeURIComponent(id)) }))
+
+route('POST', '/api/notion/lists/:kind/:id/items', async (req, res, [kind, id]) => {
+  const { name } = await readJson<{ name?: string }>(req)
+  const value = text(name, 500).trim()
+  if (!value) throw new HttpError(400, str('something_wrong'))
+  await notion.add(notionKind(kind), decodeURIComponent(id), value)
+  ok(res)
+})
+
+route('PUT', '/api/notion/lists/:kind/:id/items/:item', async (req, res, [kind, id, item]) => {
+  const { completed } = await readJson<{ completed?: boolean }>(req)
+  await notion.setDone(notionKind(kind), decodeURIComponent(id), decodeURIComponent(item), completed === true)
+  ok(res)
+})
+
+route('DELETE', '/api/notion/lists/:kind/:id/items/:item', async (_req, res, [kind, , item]) => {
+  await notion.remove(notionKind(kind), decodeURIComponent(item))
+  ok(res)
+})
+
+route('GET', '/api/notion/notes', async (_req, res, _p, url) => {
+  const chosen = (url.searchParams.get('sources') ?? '').split(',').filter(Boolean).slice(0, 50).map((it) => ({
+    kind: notionKind(it.split(':')[0]), id: it.slice(it.indexOf(':') + 1),
+  }))
+  json(res, 200, { notes: await notion.notes(chosen) })
+})
+
+route('GET', '/api/notion/notes/:id', async (_req, res, [id]) => json(res, 200, { blocks: await notion.noteBlocks(decodeURIComponent(id)) }))
+
 // --- Google Calendar ---------------------------------------------------------------------------
 
 /** The keys of the OAuth client the user made in Google Cloud; the sign-in comes after. */
@@ -746,9 +804,24 @@ route('POST', '/api/assistant/ask', async (req, res) => {
   if (kind === 'correct') {
     const guesses = (Array.isArray(heard) ? heard : []).map((it) => text(it, 500)).filter((it) => it.trim())
     json(res, 200, { text: guesses.length ? await assistant.correct(prompt, guesses) : '' })
+  } else if (kind === 'phrases') {
+    json(res, 200, { answer: await assistant.phrases(prompt) })
   } else {
     json(res, 200, { answer: await assistant.questions(prompt) })
   }
+})
+
+/** Phrases to run a custom device, suggested from its name and what it does. */
+route('POST', '/api/assistant/phrases', async (req, res) => {
+  const body = await readJson<{ name?: string; does?: string[]; condition?: string | null; otherwise?: string[]; phrases?: string[]; taken?: string[] }>(req)
+  const texts = (value: unknown, max = 40) => (Array.isArray(value) ? value : []).slice(0, max).map((it) => text(it, 300)).filter((it) => it.trim())
+  const phrases = texts(body.phrases)
+  const taken = texts(body.taken, 200)
+  const prompt = assistant.phrasesPrompt(
+    text(body.name, 200), texts(body.does), body.condition ? text(body.condition, 200) : null, texts(body.otherwise), phrases, taken,
+    str('assistant_language_name'),
+  )
+  json(res, 200, assistant.parsePhrases(await assistant.phrases(prompt), [...phrases, ...taken]))
 })
 
 // --- backup, in the format of the Android app ----------------------------------------------------

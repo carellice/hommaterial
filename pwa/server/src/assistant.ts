@@ -181,6 +181,42 @@ What the home has:
 ${catalog.names()}`.trim()
 }
 
+/**
+ * The instructions for suggesting phrases that, said to the microphone of the app, run the custom
+ * device [name], which does [does] (or [otherwise] while [condition] is off). As in Assistant.kt.
+ */
+export function phrasesPrompt(
+  name: string, does: string[], condition: string | null, otherwise: string[], phrases: string[], taken: string[], language: string,
+): string {
+  const list = (items: string[]) => items.map((it) => `- ${it}`).join('\n')
+  return `You suggest voice phrases for a custom device of a smart home app: a button that runs a series of actions.
+Saying one of the phrases to the microphone of the app runs it; only the whole phrase counts, so it must be
+something a person would naturally say, in ${language}, to have exactly these actions done. No quotes, no final dot.
+Give 4 "short" phrases (1 to 3 words, like "buonanotte"), 4 "medium" ones (4 to 6 words) and 4 "long" ones
+(7 to 12 words, natural and specific). Keep them coherent with what the device does, varied, never generic
+commands like "accendi" alone. Do not repeat the phrases it already has or those of other devices.
+The custom device is called: ${name.trim() || '(no name yet)'}
+What it does, in order:
+${list(does) || '- (nothing yet)'}
+${condition ? `That is while "${condition}" is on; while it is off it does:\n${list(otherwise)}\n` : ''}
+${phrases.length ? `Its phrases already: ${phrases.join('; ')}\n` : ''}
+${taken.length ? `Phrases of other devices, not to be used: ${taken.join('; ')}\n` : ''}`.trim()
+}
+
+/** Reads the phrases of the model, without those already used and each once, a few per length. */
+export function parsePhrases(answer: any, taken: string[], max = 4) {
+  const seen = new Set(taken.map((it) => it.trim().toLowerCase()))
+  const read = (key: string) => (Array.isArray(answer?.[key]) ? answer[key] : [])
+    .map((it: unknown) => String(it ?? '').trim().replace(/^["“”.]+|["“”.]+$/g, '').trim())
+    .filter((it: string) => {
+      if (!it || it.length > 80 || seen.has(it.toLowerCase())) return false
+      seen.add(it.toLowerCase())
+      return true
+    })
+    .slice(0, max)
+  return { short: read('short'), medium: read('medium'), long: read('long') }
+}
+
 /** Reads the questions of the model, keeping one per thing and only about things that exist. */
 export function parseQuestions(answer: any, catalog: Catalog, max = 12) {
   const questions: { target: string; name: string; question: string }[] = []
@@ -208,6 +244,16 @@ const SCHEMA_QUESTIONS = {
   required: ['questions'],
 }
 
+const SCHEMA_PHRASES = {
+  type: 'object',
+  properties: {
+    short: { type: 'array', items: { type: 'string' } },
+    medium: { type: 'array', items: { type: 'string' } },
+    long: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['short', 'medium', 'long'],
+}
+
 /** The first JSON object in [text], which some models wrap in words or in a code block. */
 export function extractJson(text: string): any {
   // Reasoning models think aloud first, inside these tags.
@@ -222,12 +268,12 @@ export function extractJson(text: string): any {
   }
 }
 
-async function run(account: Keys, name: string, messages: [string, string][], schema: unknown, maxTokens: number): Promise<unknown> {
+async function run(account: Keys, name: string, messages: [string, string][], schema: unknown, maxTokens: number, temperature = 0.1): Promise<unknown> {
   if (!/^[0-9a-fA-F]{32}$/.test(account.accountId)) throw new AssistantError('assistant_bad_account')
   const body: Record<string, unknown> = {
     messages: messages.map(([role, content]) => ({ role, content })),
     max_tokens: maxTokens,
-    temperature: 0.1,
+    temperature,
   }
   if (schema) body.response_format = { type: 'json_schema', json_schema: schema }
   let response
@@ -260,14 +306,14 @@ async function run(account: Keys, name: string, messages: [string, string][], sc
   return result
 }
 
-async function askJson(account: Keys, messages: [string, string][], schema: unknown, maxTokens: number): Promise<any> {
+async function askJson(account: Keys, messages: [string, string][], schema: unknown, maxTokens: number, temperature = 0.1): Promise<any> {
   let answer
   try {
-    answer = await run(account, model(), messages, schema, maxTokens)
+    answer = await run(account, model(), messages, schema, maxTokens, temperature)
   } catch (e) {
     // When the model cannot keep to the schema, it is asked again free: the JSON is then looked for in the text.
     if (!(e instanceof AssistantError) || e.text !== 'assistant_json_failed') throw e
-    answer = await run(account, model(), messages, null, maxTokens)
+    answer = await run(account, model(), messages, null, maxTokens, temperature)
   }
   if (answer && typeof answer === 'object') return answer
   const found = extractJson(String(answer))
@@ -290,5 +336,8 @@ export async function correct(system: string, heard: string[]): Promise<string> 
   const answer = await askJson(account(), [['system', system], ['user', guesses]], SCHEMA_TEXT, 120)
   return String(answer?.text ?? '').trim()
 }
+
+/** Phrases to run a custom device, as the model suggests them, a bit freely to have them varied. */
+export const phrases = (system: string) => askJson(account(), [['system', system], ['user', 'Suggest the phrases.']], SCHEMA_PHRASES, 800, 0.7)
 
 export const questions = (system: string) => askJson(account(), [['system', system], ['user', 'Ask your questions.']], SCHEMA_QUESTIONS, 1500)

@@ -104,6 +104,15 @@ collegati al proprio account Alexa.
 - Lo stesso widget si può mettere anche sulla schermata di blocco, dove
   Android lo consente: Android 16 QPR2 e successivi, e i tablet con l'hub
   dei widget.
+- Altri due widget: una lista di cose da fare (di Alexa o di Notion), dove un
+  tocco spunta una voce e il nome passa alla lista successiva, e l'agenda dei
+  prossimi giorni dai calendari mostrati nell'app.
+- Liste e note da Notion: nelle Impostazioni, in **Notion**, si collega
+  un'integrazione e si scelgono pagine e database. Le liste scelte compaiono
+  accanto a quelle di Alexa; le note hanno una quarta pagina nella barra in
+  basso.
+- Nelle pagine delle liste, del calendario e delle note, l'icona in alto a
+  destra le legge di nuovo subito.
 - Fino a dieci dispositivi a scelta si comandano dalle Impostazioni rapide di
   Android, ognuno con il suo riquadro.
   Sotto il nome del dispositivo il riquadro mostra la stanza in cui si

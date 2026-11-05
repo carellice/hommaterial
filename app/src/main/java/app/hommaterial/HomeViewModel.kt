@@ -1,5 +1,6 @@
 package app.hommaterial
 
+import app.hommaterial.quick.Boards
 import app.hommaterial.ui.ACCENT_AUTO
 import android.app.Application
 import android.content.ClipData
@@ -54,7 +55,16 @@ import app.hommaterial.data.Offline
 import app.hommaterial.data.Updater
 import app.hommaterial.data.WidgetConfig
 import app.hommaterial.data.WorkersAi
+import app.hommaterial.data.LIST_NOTION
+import app.hommaterial.data.NoteBlock
+import app.hommaterial.data.Notion
+import app.hommaterial.data.NotionNote
+import app.hommaterial.data.NotionSource
+import app.hommaterial.data.NotionStore
+import app.hommaterial.data.PhraseSuggestions
 import app.hommaterial.data.correctionPrompt
+import app.hommaterial.data.parsePhrases
+import app.hommaterial.data.phrasesPrompt
 import app.hommaterial.data.mapObjects
 import app.hommaterial.data.nextTime
 import app.hommaterial.data.parseQuestions
@@ -190,6 +200,11 @@ data class UiState(
     val calendarAccount: String = "",
     /** Whether the calendars can be read now: Google linked, or the permission given on the phone. */
     val calendarReady: Boolean = false,
+    /** Notion linked, with the name of its workspace, and what of it this device shows: lists and notes. */
+    val notionLinked: Boolean = false,
+    val notionWorkspace: String = "",
+    val notionLists: List<NotionSource> = emptyList(),
+    val notionNotes: List<NotionSource> = emptyList(),
     /** The Echo devices of the account, once asked for in the settings; null while they are looked for. */
     val echos: List<Echo>? = null,
     /** When the states were last fetched from Alexa, in epoch milliseconds. */
@@ -284,6 +299,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val switchBot = SwitchBot(app, alexa.http)
     private val pairedTvs = LgTvs(app)
     private val assistantStore = AssistantStore(app)
+    private val notionStore = NotionStore(app)
+    private val notion = Notion(alexa.http, notionStore)
     private val workersAi = WorkersAi(alexa.http)
     private val tvRemote = alexa.lgTv
     private val local = Cache(app)
@@ -375,6 +392,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             calendarLinked = ServerSync.calendarLinked,
             calendarAccount = ServerSync.calendarAccount,
             calendarReady = CalendarSource.of(getApplication()).ready,
+            notionLinked = notionStore.linked,
+            notionWorkspace = notionStore.workspace(),
+            notionLists = notionStore.lists(),
+            notionNotes = notionStore.notes(),
             switchBot = switchBot.connected,
             switchBotRemotes = switchBot.remotes(),
             remoteButtons = switchBot.buttons(),
@@ -762,13 +783,33 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Tells Alexa [said] through [echo], which answers aloud. */
+    /** Tells Alexa [said] through [echo], which answers aloud; what she answers is shown here too. */
     private fun sayToAlexa(echo: Echo, said: String) {
         _messages.tryEmit(str(R.string.voice_to_alexa, said))
         viewModelScope.launch {
+            val since = System.currentTimeMillis()
             val done = guarded { api.say(echo.serial, said) }
             _haptics.tryEmit(if (done) Haptic.Confirm else Haptic.Reject)
+            if (done) alexaReply(echo.serial, since)?.let { _messages.tryEmit(str(R.string.voice_alexa_reply, it)) }
         }
+    }
+
+    /** Waits for the answer of Alexa to reach the voice history, for some seconds at most. */
+    private suspend fun alexaReply(serial: String, since: Long): String? {
+        for (wait in listOf(3_000L, 3_000L, 4_000L, 5_000L)) {
+            delay(wait)
+            val text = try {
+                api.reply(serial, since)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Without the history Alexa has still answered aloud.
+                android.util.Log.w("Alexa", "Reply not read", e)
+                return null
+            }
+            if (text != null) return text
+        }
+        return null
     }
 
     fun runVoice(command: VoiceCommand) {
@@ -1316,6 +1357,37 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Phrases the assistant suggests for the custom device being edited, from its [name] and what it
+     * does. The error, when it fails, is the text to show; without the assistant nothing is asked.
+     */
+    suspend fun suggestPhrases(
+        name: String,
+        does: List<String>,
+        condition: String?,
+        otherwise: List<String>,
+        phrases: List<String>,
+        macroId: String?,
+    ): Result<PhraseSuggestions> {
+        if (!assistantStore.configured) return Result.failure(Exception(str(R.string.something_wrong)))
+        val taken = _state.value.macros.filter { it.id != macroId }.flatMap { it.phrases }
+        return try {
+            val answer = workersAi.phrases(
+                assistantStore.accountId(),
+                assistantStore.token(),
+                assistantStore.model(),
+                phrasesPrompt(name, does, condition, otherwise, phrases, taken, assistantLanguage),
+            )
+            Result.success(parsePhrases(answer, phrases + taken))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: java.io.IOException) {
+            Result.failure(Exception(str(R.string.no_connection)))
+        } catch (e: Exception) {
+            Result.failure(Exception(e.message ?: str(R.string.something_wrong)))
+        }
+    }
+
     /** Keeps the [answer] to the question being asked, or skips it when null, and goes to the next. */
     fun answerQuestion(answer: String?) {
         val teach = _state.value.assistant.teach ?: return
@@ -1686,12 +1758,104 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { runCatching { Offline.flush() } }
     }
 
-    suspend fun alexaLists(): List<AlexaList>? = readKept(Offline::lists, Offline::putLists) { api.lists() }
+    /** The lists of Alexa, then those chosen of Notion; those of Notion alone when Alexa has none to give. */
+    suspend fun alexaLists(): List<AlexaList>? {
+        val fromNotion = if (notionStore.linked) notionStore.lists().map { AlexaList(it.listId, it.name, LIST_NOTION, null) } else emptyList()
+        if (!_state.value.loggedIn && fromNotion.isNotEmpty()) return fromNotion
+        val fromAlexa = readKept(Offline::lists, Offline::putLists) { api.lists() }
+        if (fromAlexa == null && fromNotion.isEmpty()) return null
+        return fromAlexa.orEmpty() + fromNotion
+    }
 
     /** The items of a list as Alexa has them, with what was changed here and waits to be sent. */
-    suspend fun alexaListItems(listId: String): List<ListItem>? =
-        readKept({ Offline.items(listId) }, { Offline.putItems(listId, it) }) { api.listItems(listId) }
+    suspend fun alexaListItems(listId: String): List<ListItem>? {
+        NotionSource.ofList(listId)?.let { source ->
+            return readKept({ Offline.items(listId) }, { Offline.putItems(listId, it) }) { notion.items(source) }
+                .also { Boards.update(getApplication()) }
+        }
+        return readKept({ Offline.items(listId) }, { Offline.putItems(listId, it) }) { api.listItems(listId) }
             ?.let { Offline.withPending(listId, it) }
+            .also { Boards.update(getApplication()) }
+    }
+
+    // A list of Notion changes at once, with internet only: Notion is not kept in order as Alexa is.
+
+    suspend fun addNotionItem(listId: String, name: String): Boolean {
+        val source = NotionSource.ofList(listId) ?: return false
+        return guarded { notion.add(source, name) }.also { _haptics.tryEmit(if (it) Haptic.Confirm else Haptic.Reject) }
+    }
+
+    suspend fun setNotionItemDone(listId: String, item: ListItem, completed: Boolean): Boolean {
+        val source = NotionSource.ofList(listId) ?: return false
+        _haptics.tryEmit(if (completed) Haptic.On else Haptic.Off)
+        return guarded { notion.setDone(source, item, completed) }
+    }
+
+    suspend fun deleteNotionItem(listId: String, item: ListItem): Boolean {
+        val source = NotionSource.ofList(listId) ?: return false
+        return guarded { notion.delete(source, item) }
+    }
+
+    // --- Notion ----------------------------------------------------------------------------------
+
+    private fun refreshNotion() = _state.update {
+        it.copy(
+            notionLinked = notionStore.linked,
+            notionWorkspace = notionStore.workspace(),
+            notionLists = notionStore.lists(),
+            notionNotes = notionStore.notes(),
+        )
+    }
+
+    /** Tries the secret of the integration and keeps it if Notion takes it; the error to show otherwise. */
+    suspend fun connectNotion(token: String): String? {
+        val error = try {
+            val workspace = notion.test(token)
+            if (!ServerSync.active) notionStore.connect(token, workspace)
+            null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: java.io.IOException) {
+            str(R.string.no_connection)
+        } catch (e: Exception) {
+            e.message ?: str(R.string.something_wrong)
+        }
+        refreshNotion()
+        if (error == null) {
+            _haptics.tryEmit(Haptic.Confirm)
+            _messages.tryEmit(str(R.string.notion_linked_ok))
+        }
+        return error
+    }
+
+    fun disconnectNotion() {
+        viewModelScope.launch {
+            guarded { notion.disconnect() }
+            notionStore.disconnect()
+            refreshNotion()
+        }
+    }
+
+    /** The pages and databases shared with the integration, to choose from; null when they could not be read. */
+    suspend fun notionSources(): List<NotionSource>? = onList { notion.sources() }
+
+    fun setNotionLists(sources: List<NotionSource>) {
+        notionStore.putLists(sources)
+        refreshNotion()
+    }
+
+    fun setNotionNotes(sources: List<NotionSource>) {
+        notionStore.putNotes(sources)
+        refreshNotion()
+    }
+
+    /** The notes of the chosen pages and databases, kept for when there is no internet. */
+    suspend fun notionNotes(): List<NotionNote>? =
+        readKept(Offline::notes, Offline::putNotes) { notion.notes(notionStore.notes()) }
+
+    /** The text of a note, kept for when there is no internet. */
+    suspend fun notionNote(id: String): List<NoteBlock>? =
+        readKept({ Offline.note(id) }, { Offline.putNote(id, it) }) { notion.note(id) }
 
     /** The items as last read, with what waits: shown at once after a change. */
     fun keptListItems(listId: String): List<ListItem>? = Offline.items(listId)?.let { Offline.withPending(listId, it) }
@@ -1720,10 +1884,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         if (keptCalendar) readKept(Offline::calendars, Offline::putCalendars) { calendar.calendars() } else onList { calendar.calendars() }
 
     suspend fun calendarEvents(calendars: List<String>, from: Long, to: Long): List<CalendarEvent>? {
-        if (!keptCalendar) return onList { calendar.events(calendars, from, to) }
-        return readKept({ Offline.events(from, to)?.filter { it.calendar in calendars } }, { Offline.putEvents(from, to, it) }) {
-            calendar.events(calendars, from, to)
-        }?.let(Offline::withPending)
+        val read = if (!keptCalendar) {
+            onList { calendar.events(calendars, from, to) }
+        } else {
+            readKept({ Offline.events(from, to)?.filter { it.calendar in calendars } }, { Offline.putEvents(from, to, it) }) {
+                calendar.events(calendars, from, to)
+            }?.let(Offline::withPending)
+        }
+        // The widget of the agenda shows the same events.
+        read?.let {
+            Boards.putAgenda(getApplication(), it)
+            Boards.update(getApplication())
+        }
+        return read
     }
 
     /** The events as last read, with what waits: shown at once after a change. */

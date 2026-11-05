@@ -35,6 +35,16 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
 
     /** A call to the Alexa web API; [site] is "www" for the lists, which live on the shop's own host. */
     private suspend fun call(method: String, path: String, body: JSONObject? = null, site: String = "alexa"): JSONObject =
+        callText(method, path, body, site).let { if (it.isBlank()) JSONObject() else JSONObject(it) }
+
+    /** The same call, its answer as it comes: [headers] are added to those of the Alexa app. */
+    private suspend fun callText(
+        method: String,
+        path: String,
+        body: JSONObject? = null,
+        site: String = "alexa",
+        headers: Map<String, String> = emptyMap(),
+    ): String =
         withContext(Dispatchers.IO) {
             val market = auth.marketplace
             val host = market.alexaHost
@@ -50,6 +60,7 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
                     .header("Origin", "https://$host")
                     .header("csrf", session.csrf)
                     .header("Cookie", session.cookie)
+                    .apply { headers.forEach { (name, value) -> header(name, value) } }
                     .method(method, body?.toString()?.toRequestBody("application/json; charset=utf-8".toMediaType()))
                     .build()
                 http.newCall(request).execute().use { response ->
@@ -61,7 +72,7 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
                         !response.isSuccessful -> throw Exception(
                             str(R.string.alexa_error, response.code) + amazonReason(text, response.header("x-amzn-ErrorType")),
                         )
-                        else -> return@withContext if (text.isBlank()) JSONObject() else JSONObject(text)
+                        else -> return@withContext text
                     }
                 }
             }
@@ -288,6 +299,35 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
         )
     }
 
+    // The answer of Alexa is read back from the voice history of the account, as alexa-remote does:
+    // the page of the history hands out the token its own calls need. Undocumented too.
+
+    private var historyToken: Pair<String, Long>? = null
+
+    private suspend fun historyToken(): String {
+        historyToken?.takeIf { it.second > System.currentTimeMillis() }?.let { return it.first }
+        val page = callText("GET", HISTORY_PAGE, site = "www", headers = mapOf("Accept" to "text/html"))
+        val token = Regex("""meta name="csrf-token" content="([^"]+)"""").find(page)?.groupValues?.get(1)
+            ?: throw Exception(str(R.string.alexa_unexpected))
+        historyToken = token to System.currentTimeMillis() + 2 * 3600_000L
+        return token
+    }
+
+    /**
+     * What Alexa answered aloud through the Echo [serial] to what was said to it since [since], in
+     * epoch milliseconds; null while the history does not have it yet.
+     */
+    suspend fun reply(serial: String, since: Long): String? {
+        if (ServerSync.active) {
+            return ServerSync.call("GET", "/api/alexa/reply?echo=${ServerSync.encode(serial)}&since=$since")
+                .optString("text").ifEmpty { null }
+        }
+        val path = "/alexa-privacy/apd/rvh/customer-history-records-v2?startTime=${since - 5_000}&endTime=${System.currentTimeMillis() + 60_000}"
+        val headers = mapOf("anti-csrftoken-a2z" to historyToken(), "Referer" to "https://www.${auth.marketplace.domain}$HISTORY_PAGE")
+        val answer = JSONObject(callText("POST", path, JSONObject().put("previousRequestToken", JSONObject.NULL), "www", headers).ifBlank { "{}" })
+        return replyIn(answer, serial, since)
+    }
+
     // --- lists ---------------------------------------------------------------------------------
     // The to-do and shopping lists of Alexa, through the API its own app uses (as alexa-remote
     // does): undocumented, so the answers are read loosely.
@@ -353,6 +393,26 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
 }
 
 private const val LISTS = "/alexashoppinglists/api/v2/lists"
+private const val HISTORY_PAGE = "/alexa-privacy/apd/activity?disableGlobalNav=true&ref=activityHistory"
+
+/** The words of Alexa in the latest record of the history heard by [serial] since [since]. */
+internal fun replyIn(history: JSONObject, serial: String, since: Long): String? {
+    val records = history.optJSONArray("customerHistoryRecords") ?: return null
+    return (0 until records.length()).mapNotNull { records.optJSONObject(it) }
+        .filter { it.optString("recordKey").split("#").getOrNull(3) == serial && it.optLong("timestamp") >= since - 2_000 }
+        .maxByOrNull { it.optLong("timestamp") }
+        ?.let { record ->
+            val items = record.optJSONArray("voiceHistoryRecordItems") ?: return@let null
+            (0 until items.length()).mapNotNull { items.optJSONObject(it) }
+                .filter { it.optString("recordItemType") in setOf("ALEXA_RESPONSE", "TTS_REPLACEMENT_TEXT") }
+                .map { it.optString("transcriptText").trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .joinToString(" ")
+                .ifEmpty { null }
+        }
+}
+
 private const val LISTS_USER_AGENT = "AppleWebKit PitanguiBridge/2.2.595606.0-[HARDWARE=iPhone14_7][SOFTWARE=17.4.1][DEVICE=iPhone]"
 
 /** Why Amazon refused a call, in its own words when it gives them, to show after the code. */

@@ -81,6 +81,8 @@ object ServerSync {
     val calendarClient: Boolean get() = store.status.optJSONObject("calendar")?.optBoolean("client") == true
     val calendarLinked: Boolean get() = store.status.optJSONObject("calendar")?.optBoolean("linked") == true
     val calendarAccount: String get() = store.status.optJSONObject("calendar")?.optString("account").orEmpty()
+    val notionLinked: Boolean get() = store.status.optJSONObject("notion")?.optBoolean("linked") == true
+    val notionWorkspace: String get() = store.status.optJSONObject("notion")?.optString("workspace").orEmpty()
 
     // --- requests ------------------------------------------------------------------------------------
 

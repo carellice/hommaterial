@@ -58,7 +58,10 @@ export function MacroEditor({ macro, s, onDismiss }) {
         ${macro && html`<button class="text-btn" onClick=${() => setConfirmDelete(true)}>${str('delete')}</button>`}
         <button class="text-btn" disabled=${!name.trim() || (!steps.length && !otherwise.length)} onClick=${save}>${str('save')}</button>`}>
       <${Field} label=${str('room_name')} value=${name} onInput=${setName} />
-      <${PhraseList} phrases=${phrases} onChange=${setPhrases} />
+      <${PhraseList} phrases=${phrases} onChange=${setPhrases} suggest=${s.assistant.configured ? () => store.suggestPhrases({
+        name, does: steps.map((it) => describe(it, s)), condition: watched?.name ?? null,
+        otherwise: watched ? otherwise.map((it) => describe(it, s)) : [], phrases, macroId: macro?.id ?? null,
+      }) : null} />
       <${Card}><${Setting} title=${str('macro_condition')} text=${watched?.name ?? str('macro_condition_none')}
         onClick=${() => setChoosingCondition(true)} /><//>
       ${/* Only once it exists: a timer runs what is saved. */ ''}
@@ -98,12 +101,19 @@ export function MacroEditor({ macro, s, onDismiss }) {
     <//>`;
 }
 
-/** The phrases that, said to the microphone of the app, run the custom device; one is added by typing it. */
-function PhraseList({ phrases, onChange }) {
+/**
+ * The phrases that, said to the microphone of the app, run the custom device; one is added by typing
+ * it or, with the assistant, picked among those it [suggest]s.
+ */
+function PhraseList({ phrases, onChange, suggest }) {
   const [typed, setTyped] = useState('');
-  const add = () => {
-    const phrase = typed.trim();
+  const [suggesting, setSuggesting] = useState(false);
+  const addPhrase = (text) => {
+    const phrase = text.trim();
     if (phrase && !phrases.some((it) => it.toLowerCase() === phrase.toLowerCase())) onChange([...phrases, phrase]);
+  };
+  const add = () => {
+    addPhrase(typed);
     setTyped('');
   };
   return html`
@@ -117,6 +127,42 @@ function PhraseList({ phrases, onChange }) {
         <${Field} label=${str('macro_phrase_add')} support=${str('macro_phrase_hint')} value=${typed} onInput=${setTyped} onEnter=${add} />
         <${IconButton} icon="add" label=${str('macro_phrase_add')} disabled=${!typed.trim()} onClick=${add} />
       </div>
+      ${suggest && html`<button class="text-btn phrase-suggest" onClick=${() => setSuggesting(true)}>
+        <${Icon} name="auto_awesome" /> ${str('macro_phrases_suggest')}</button>`}
+      ${suggesting && html`<${PhraseSuggestions} phrases=${phrases} suggest=${suggest} onAdd=${addPhrase}
+        onDismiss=${() => setSuggesting(false)} />`}
+    <//>`;
+}
+
+/** The phrases the assistant suggests, short, medium and longer, each added with a tap. */
+function PhraseSuggestions({ phrases, suggest, onAdd, onDismiss }) {
+  const [round, setRound] = useState(0);
+  const [result, setResult] = useState(null);
+  useEffect(() => {
+    let live = true;
+    setResult(null);
+    suggest().then((found) => live && setResult({ found }), (e) => live && setResult({ error: e.message || str('something_wrong') }));
+    return () => {
+      live = false;
+    };
+  }, [round]);
+  const found = result?.found;
+  const empty = found && !found.short.length && !found.medium.length && !found.long.length;
+  const groups = found ? [['macro_phrases_short', found.short], ['macro_phrases_medium', found.medium], ['macro_phrases_long', found.long]] : [];
+  return html`
+    <${Dialog} title=${str('macro_phrases_suggest')} onDismiss=${onDismiss} actions=${html`
+      <button class="text-btn" disabled=${!result} onClick=${() => setRound(round + 1)}>${str('macro_phrases_more')}</button>
+      <button class="text-btn" onClick=${onDismiss}>${str('close')}</button>`}>
+      ${!result && html`<p class="body-medium supporting">${str('macro_phrases_thinking')}</p>`}
+      ${result?.error && html`<p class="body-medium">${result.error}</p>`}
+      ${empty && html`<p class="body-medium supporting">${str('macro_phrases_none')}</p>`}
+      ${!empty && groups.filter(([, list]) => list.length).map(([title, list]) => html`
+        <div class="label-large phrase-group">${str(title)}</div>
+        ${list.map((phrase) => {
+          const added = phrases.some((it) => it.toLowerCase() === phrase.toLowerCase());
+          return html`<${Setting} key=${phrase} title=${`“${phrase}”`} onClick=${added ? undefined : () => onAdd(phrase)}
+            trailing=${html`<${Icon} name=${added ? 'check' : 'add'} />`} />`;
+        })}`)}
     <//>`;
 }
 

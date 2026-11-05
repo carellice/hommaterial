@@ -74,6 +74,7 @@ import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.PowerSettingsNew
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
@@ -110,6 +111,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -217,6 +219,10 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf(TAB_HOME) }
     val lists = rememberListsModel(vm)
     val calendar = rememberCalendarModel(vm)
+    val notes = rememberNotesModel(vm)
+    // The notes have a page once some are chosen; without them it goes back to the home.
+    val hasNotes = state.notionLinked && state.notionNotes.isNotEmpty()
+    if (tab == TAB_NOTES && !hasNotes) tab = TAB_HOME
     // What was changed without internet went: the lists and the calendar are read again, as they are now.
     val latest = rememberUpdatedState(state)
     LaunchedEffect(Unit) {
@@ -225,6 +231,14 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
             calendar.reload(latest.value)
         }
     }
+    // A widget opens the app on its own page.
+    val asked by requestedTab.collectAsState()
+    LaunchedEffect(asked) {
+        asked?.let { tab = it }
+        requestedTab.value = null
+    }
+    // The lists chosen of Notion come and go with the settings: read again when they change.
+    LaunchedEffect(state.notionLinked, state.notionLists) { if (lists.lists != null) lists.reload() }
     BackHandler(enabled = tab != TAB_HOME && query == null) { tab = TAB_HOME }
     val typing = WindowInsets.isImeVisible
     val found = query?.let { search(it, homeSections(PAGE_ALL, state)) }.orEmpty()
@@ -257,6 +271,8 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                         Text(str(R.string.s_lists))
                     } else if (tab == TAB_CALENDAR) {
                         Text(str(R.string.s_calendar))
+                    } else if (tab == TAB_NOTES) {
+                        Text(str(R.string.s_notes))
                     } else if (typed == null) {
                         Title(state.updatedAt)
                     } else {
@@ -264,7 +280,29 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                     }
                 },
                 actions = {
-                    if (tab == TAB_LISTS || tab == TAB_CALENDAR) {
+                    if (tab == TAB_LISTS || tab == TAB_CALENDAR || tab == TAB_NOTES) {
+                        // Reads the page again from Alexa, Notion or the calendar, without waiting for a pull.
+                        val loading = when (tab) {
+                            TAB_LISTS -> lists.loading
+                            TAB_CALENDAR -> calendar.loading
+                            else -> notes.loading
+                        }
+                        IconButton(
+                            onClick = {
+                                when (tab) {
+                                    TAB_LISTS -> lists.reload()
+                                    TAB_CALENDAR -> calendar.reload(state)
+                                    else -> notes.reload()
+                                }
+                            },
+                            enabled = !loading,
+                        ) {
+                            if (loading) {
+                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Outlined.Refresh, contentDescription = str(R.string.refresh_now))
+                            }
+                        }
                         VoiceButton(vm, correcting = state.correcting)
                         OverflowMenu(state, vm, onSettings, onArrange = { arranging = true })
                         return@TopAppBar
@@ -314,6 +352,10 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
             CalendarPage(calendar, state, vm, onSettings)
             return@AnimatedContent
         }
+        if (shown == TAB_NOTES) {
+            NotesPage(notes, state, vm)
+            return@AnimatedContent
+        }
         Row(Modifier.fillMaxSize()) {
             if (pages.size > 1 && query == null) {
                 SideBar(pages, current, expanded = width >= SIDE_BAR_DP, clock) { page = it }
@@ -351,6 +393,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
         FloatingBottomBar(
             current = tab,
             visible = query == null && !typing,
+            notes = hasNotes,
             onSelect = { tab = it },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
         )

@@ -86,8 +86,16 @@ async function remove(listId, item) {
 /** How many items are still to do: counted from those read, or as Alexa last said. */
 const active = (list) => model.items[list.id]?.filter((it) => !it.completed).length ?? list.active;
 
-export function ListsPage() {
+export function ListsPage({ s }) {
   const m = useModel();
+  // The lists chosen of Notion come and go with the settings: read again when they change.
+  const notion = JSON.stringify([s.notion.linked, s.notionLists]);
+  const [seen, setSeen] = useState(notion);
+  useEffect(() => {
+    if (notion === seen) return;
+    setSeen(notion);
+    if (m.lists) reloadLists();
+  }, [notion]);
   const [chosen, setChosen] = useState(null);
   // Which way the last change of list went, for the new one to come in from that side.
   const [direction, setDirection] = useState(0);
@@ -215,7 +223,7 @@ function ListContent({ m, list }) {
         <${Icon} name="expand_more" cls="chevron faint" />
       </button>
       ${showDone && html`<div class="item-group appear-down">${finished.map((it) => html`<${ItemRow} key=${it.id} item=${it} m=${m} list=${list} />`)}</div>`}`}
-    <div class="body-small faint lists-footnote">${str('lists_text')}</div>`;
+    <div class="body-small faint lists-footnote">${str(list.type === store.LIST_NOTION ? 'lists_notion_text' : 'lists_text')}</div>`;
 }
 
 /** The field at the top of a list, with its button that comes up once there is something to add. */
