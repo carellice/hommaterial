@@ -542,6 +542,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
                 Toggle(R.string.read_aloud, R.string.read_aloud_text, state.readAloud, vm::setReadAloud)
+                WakeSettings(state, vm)
             }
 
             Section(R.string.s_assistant, R.string.assistant_text) { AssistantSettings(state, vm) }

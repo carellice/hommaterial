@@ -123,6 +123,11 @@ collegati al proprio account Alexa.
 - Col microfono in alto si dice "accendi la lampada" o "spegni tutto in
   salotto". Capisce solo accensione e spegnimento, e chiede conferma quando il
   nome non è esatto o riguarda una stanza intera.
+- Con la parola di attivazione "Giacomino" (Impostazioni → Voce) basta dirla,
+  con la casa aperta, per far partire l'ascolto senza toccare il microfono.
+  Prima va insegnata ripetendola quattro volte: l'app impara la tua voce e
+  la confronta sul dispositivo, senza inviare nulla. La sensibilità è
+  regolabile; se non risponde bene o si attiva per sbaglio, insegnala di nuovo.
 - Mostra temperatura e umidità dei sensori, con il grafico dell'ultimo giorno
   o dell'ultima settimana. I dati li raccoglie il telefono quando l'app o il
   widget si aggiornano, quindi il grafico parte vuoto e può avere dei buchi.

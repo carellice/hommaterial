@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The wake word: the microphone listens for it while the home is open, on the device only. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- To know when internet comes back, and send what was changed without it. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Switch-off timers fire at the minute that was asked for and survive a restart of the phone. -->

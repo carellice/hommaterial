@@ -14,6 +14,8 @@ import { createBackup, parseBackup, selectBackup } from '/shared/backup.js';
 import { enablePush, disablePush, pushState } from './push.js';
 
 const settings = new Prefs('settings');
+// How the user says the wake word in this browser: kept apart, as it is large and read once.
+const wake = new Prefs('wake');
 
 const BACKUP_APP = 'hommaterial';
 const PIN_KEY = 'monitorPin';
@@ -148,6 +150,11 @@ function initialState() {
     reply: null,
     // Whether those answers are read aloud at once: this browser only.
     readAloud: settings.get('readAloud', false),
+    // Whether saying the wake word on the home starts listening, how it is said (null until taught)
+    // and how easily it is heard: this browser only.
+    wakeWord: settings.get('wakeWord', false),
+    wakeModel: wake.get('model', null),
+    wakeSensitivity: settings.get('wakeSensitivity', 1),
     // The Echo that what is said to the microphone goes to, as if said to it: this browser only.
     voiceEcho: settings.get('voiceEcho', null),
     // The Echo devices of the account, once asked for in the settings; null while they are looked for.
@@ -1178,6 +1185,23 @@ export const dismissReply = () => update({ reply: null });
 export function setReadAloud(on) {
   settings.set('readAloud', on);
   update({ readAloud: on });
+}
+
+export function setWakeWord(on) {
+  settings.set('wakeWord', on);
+  update({ wakeWord: on });
+}
+
+/** Keeps what was just taught and turns the wake word on. */
+export function setWakeModel(model) {
+  wake.set('model', model);
+  settings.set('wakeWord', true);
+  update({ wakeModel: model, wakeWord: true });
+}
+
+export function setWakeSensitivity(level) {
+  settings.set('wakeSensitivity', level);
+  update({ wakeSensitivity: level });
 }
 
 // ——— Remotes: SwitchBot and the LG TVs ———
