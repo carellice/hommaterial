@@ -64,7 +64,7 @@ private fun amount(trigger: String, threshold: Double): String =
     if (trigger in HUMIDITY_TRIGGERS) "${threshold.roundToInt()}%" else degrees(threshold)
 
 /** The condition of an automation as a sentence, about the device called [name]. */
-private fun conditionText(name: String, trigger: String, threshold: Double): String = when (trigger) {
+internal fun conditionText(name: String, trigger: String, threshold: Double): String = when (trigger) {
     TRIGGER_TEMPERATURE_ABOVE -> str(R.string.automation_temperature_above, name, amount(trigger, threshold))
     TRIGGER_TEMPERATURE_BELOW -> str(R.string.automation_temperature_below, name, amount(trigger, threshold))
     TRIGGER_HUMIDITY_ABOVE -> str(R.string.automation_humidity_above, name, amount(trigger, threshold))

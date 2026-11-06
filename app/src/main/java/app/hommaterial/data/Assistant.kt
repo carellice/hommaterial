@@ -382,6 +382,148 @@ ${if (taken.isNotEmpty()) "Phrases of other devices, not to be used: ${taken.joi
 
 private fun bullets(lines: List<String>) = lines.joinToString("\n") { "- $it" }
 
+// --- the agent: requests in words, acted on by the app (as agentPrompt in server/src/assistant.ts) ---
+
+/**
+ * One thing the assistant would do, by the key of the app: [kind] is "power", "run", "later",
+ * "automation" (when [sensor] gets to [trigger] past [threshold]), "list" or "event" (at [start],
+ * local "YYYY-MM-DDTHH:MM", for [minutes], or the whole day of [date]).
+ */
+data class AgentAction(
+    val kind: String,
+    val key: String = "",
+    val name: String = "",
+    val on: Boolean = true,
+    val minutes: Int = 0,
+    val sensor: String = "",
+    val sensorName: String = "",
+    val trigger: String = "",
+    val threshold: Double = 0.0,
+    val list: String = "",
+    val items: List<String> = emptyList(),
+    val title: String = "",
+    val start: String = "",
+    val date: String = "",
+)
+
+/** What the assistant answered: the words, whether it is a matter for Alexa, what it would do. */
+data class AgentPlan(val reply: String, val alexa: Boolean, val actions: List<AgentAction>) {
+    /** Switching or running one thing is done at once; anything more waits for a yes. */
+    val needsConfirm: Boolean get() = actions.size > 1 || actions.any { it.kind in setOf("automation", "list", "event") }
+}
+
+/** Kept word for word the same as AGENT_RULES in server/src/assistant.ts. */
+private const val AGENT_RULES = """You are the assistant of a smart home app. Answer in {language}. Now it is {now}.
+Return JSON {"reply": text for the user, "alexa": boolean, "actions": [...]}. Actions, by the ids below:
+- {"do":"power","target":id,"on":true|false}: switch a device (d...), a group (g...) or a remote (r...) on or off.
+- {"do":"run","target":id}: run a custom device (m...).
+- {"do":"later","target":id,"on":true|false,"minutes":n}: the same, in n minutes from now ("tra 20 minuti", "alle 23").
+- {"do":"automation","sensor":id of a device,"when":"temperatureAbove"|"temperatureBelow"|"humidityAbove"|"humidityBelow"|"on"|"off","threshold":number,"target":id,"on":true|false}:
+  from now on, each time that device gets there, switch or run the target. One condition and one action only:
+  for anything more (a time of day, several actions) make the closest one and say in the reply what was left out.
+- {"do":"list","list":exact name of a list,"items":[...]}: add items to a list; a dish asked for becomes its ingredients, one per item.
+- {"do":"event","title":text,"start":"YYYY-MM-DDTHH:MM","minutes":duration} or {"do":"event","title":text,"date":"YYYY-MM-DD"} for a whole day: add to the calendar.
+"Tutto tranne X" means each switchable device (of the room, if one is said) except X, one action each.
+Questions about the home (what is on, temperatures, how a sensor went, the agenda) are answered
+in the reply from the data below, with no actions. A brief of the day: greet, then what is on, the temperatures,
+the events of today and tomorrow, the timers; six sentences at most. A note given below is summed up in a few sentences.
+Set "alexa" true, with no actions and an empty reply, only when the request is about nothing of this app
+(weather, music, news, general knowledge, Alexa routines): it is then passed to Alexa.
+The reply is read aloud: short plain sentences, no lists, no markdown, never the ids. When acting, say briefly what you do.
+Use only what is listed; when something asked for is not there, say so and do nothing about it."""
+
+/** The instructions for a request in words, with what the client knows besides the home in [context]. */
+fun agentPrompt(catalog: AssistantCatalog, house: String, language: String, now: String, context: String): String = buildString {
+    append(AGENT_RULES.replace("{language}", language).replace("{now}", now)).append('\n')
+    if (house.isNotBlank()) append("What the owner says about the home:\n").append(house.trim()).append("\n\n")
+    append("The things of the home:\n").append(catalog.describe(withState = true))
+    if (context.isNotBlank()) append('\n').append(context.trim())
+}.trim()
+
+/** The readings of a sensor of the last week, a line a day: what the model needs to tell how it went. */
+fun historyLine(name: String, readings: List<Reading>, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): String {
+    val format = java.time.format.DateTimeFormatter.ofPattern("MM-dd")
+    fun range(values: List<Double>, unit: String) = "%.1f-%.1f%s".format(java.util.Locale.ROOT, values.min(), values.max(), unit)
+    val days = readings.groupBy { java.time.Instant.ofEpochMilli(it.at).atZone(zone).format(format) }
+    val parts = days.map { (day, list) ->
+        val humidity = list.mapNotNull { it.humidity?.toDouble() }
+        "$day ${range(list.map { it.temperature }, "°C")}" + if (humidity.isNotEmpty()) " ${range(humidity, "%")}" else ""
+    }
+    return "\"$name\" by day (MM-DD min-max): ${parts.joinToString("; ")}"
+}
+
+private val AUTOMATION_TRIGGERS = setOf("temperatureAbove", "temperatureBelow", "humidityAbove", "humidityBelow", "on", "off")
+
+/** Reads what the model would do, keeping only what names things of the [catalog], each by its key in the app. */
+fun parseAgent(answer: JSONObject, catalog: AssistantCatalog): AgentPlan {
+    val actions = mutableListOf<AgentAction>()
+    val list = answer.optJSONArray("actions") ?: JSONArray()
+    for (i in 0 until list.length()) {
+        val a = list.optJSONObject(i) ?: continue
+        val target = catalog[a.optString("target")]
+        val switchable = when (target) {
+            is AssistantTarget.Dev -> target.device.hasPower
+            is AssistantTarget.Grp, is AssistantTarget.Rem -> true
+            else -> false
+        }
+        val runnable = target is AssistantTarget.Mac
+        val on = a.optBoolean("on", true)
+        when (a.optString("do")) {
+            "power" -> if (switchable) actions += AgentAction("power", target!!.key, target.name, on)
+            "run" -> if (runnable) actions += AgentAction("run", target!!.key, target.name)
+            "later" -> {
+                val minutes = a.optDouble("minutes", 0.0).let { if (it.isNaN()) 0 else Math.round(it).toInt() }
+                if ((switchable || runnable) && minutes in 1..7 * 24 * 60) {
+                    actions += AgentAction("later", target!!.key, target.name, on, minutes = minutes)
+                }
+            }
+            "automation" -> {
+                val sensor = catalog[a.optString("sensor")] as? AssistantTarget.Dev
+                val threshold = a.optDouble("threshold", 0.0)
+                val trigger = a.optString("when")
+                if (sensor != null && target !is AssistantTarget.Grp && (switchable || runnable) &&
+                    trigger in AUTOMATION_TRIGGERS && !threshold.isNaN()
+                ) {
+                    actions += AgentAction(
+                        "automation", target!!.key, target.name, on,
+                        sensor = sensor.key, sensorName = sensor.name, trigger = trigger, threshold = threshold,
+                    )
+                }
+            }
+            "list" -> {
+                val items = a.optJSONArray("items")?.let { arr -> (0 until arr.length()).map { arr.optString(it).trim() } }
+                    .orEmpty().filter { it.isNotEmpty() && it != "null" }.take(40)
+                val name = a.optString("list").trim()
+                if (name.isNotEmpty() && items.isNotEmpty()) actions += AgentAction("list", list = name, items = items)
+            }
+            "event" -> {
+                val title = a.optString("title").trim()
+                val start = a.optString("start")
+                val date = a.optString("date")
+                val minutes = a.optDouble("minutes", 60.0).let { if (it.isNaN() || it < 1) 60 else Math.round(it).toInt() }
+                if (title.isNotEmpty() && Regex("""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}.*""").matches(start)) {
+                    actions += AgentAction("event", title = title, start = start.take(16), minutes = minutes.coerceIn(5, 24 * 60))
+                } else if (title.isNotEmpty() && Regex("""\d{4}-\d{2}-\d{2}""").matches(date)) {
+                    actions += AgentAction("event", title = title, date = date)
+                }
+            }
+        }
+    }
+    val reply = if (answer.isNull("reply")) "" else answer.optString("reply").trim()
+    return AgentPlan(reply, answer.optBoolean("alexa") && actions.isEmpty(), actions)
+}
+
+private const val SCHEMA_AGENT = """
+{"type":"object","properties":{
+ "reply":{"type":"string"},"alexa":{"type":"boolean"},
+ "actions":{"type":"array","items":{"type":"object","properties":{
+  "do":{"type":"string"},"target":{"type":"string"},"on":{"type":"boolean"},"minutes":{"type":"number"},
+  "sensor":{"type":"string"},"when":{"type":"string"},"threshold":{"type":"number"},
+  "list":{"type":"string"},"items":{"type":"array","items":{"type":"string"}},
+  "title":{"type":"string"},"start":{"type":"string"},"date":{"type":"string"}},"required":["do"]}}},
+ "required":["reply","actions"]}
+"""
+
 /**
  * Workers AI over the REST API of Cloudflare, with the account and the token of the user. Every
  * answer is asked as JSON, read back from what the model returned.
@@ -420,6 +562,13 @@ class WorkersAi(private val http: OkHttpClient, private val base: String = "http
             ServerSync.call("POST", "/api/assistant/ask", JSONObject().put("kind", "questions").put("system", system))
                 .optJSONObject("answer") ?: JSONObject()
         } else json(accountId, token, model, listOf("system" to system, "user" to "Ask your questions."), SCHEMA_QUESTIONS, 1500)
+
+    /** What the assistant answers to [request] and would do, under the instructions [system]. */
+    suspend fun agent(accountId: String, token: String, model: String, system: String, request: String): JSONObject =
+        if (ServerSync.active) {
+            val body = JSONObject().put("kind", "agent").put("system", system).put("heard", JSONArray().put(request))
+            ServerSync.call("POST", "/api/assistant/ask", body).optJSONObject("answer") ?: JSONObject()
+        } else json(accountId, token, model, listOf("system" to system, "user" to request), SCHEMA_AGENT, 1200, 0.2)
 
     private suspend fun json(
         accountId: String,

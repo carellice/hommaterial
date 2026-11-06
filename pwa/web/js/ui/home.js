@@ -184,7 +184,6 @@ export function HomeScreen({ onSettings }) {
       <${BottomBar} current=${tab} visible=${query == null && !typing} notes=${hasNotes} onSelect=${setTab} />
       ${arranging && html`<${ArrangeDialog} s=${s} onDismiss=${() => setArranging(false)} />`}
       ${s.voice && html`<${VoiceDialog} ask=${s.voice} />`}
-      ${s.alexaReply && html`<${AlexaReplyScreen} reply=${s.alexaReply} />`}
     </div>`;
 }
 
@@ -817,41 +816,6 @@ function ListeningPanel({ session }) {
     </div>`;
 }
 
-/** The most natural Italian voice of the browser: the online ("Natural", Google) ones sound the most human. */
-function italianVoice() {
-  const voices = speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith('it'));
-  const rank = (v) => (/natural|neural|online/i.test(v.name) ? 2 : /google/i.test(v.name) ? 1 : 0);
-  return voices.sort((a, b) => rank(b) - rank(a))[0] ?? null;
-}
-
-/** What was said to Alexa and her answer, full screen, to read at leisure or to have read aloud. */
-function AlexaReplyScreen({ reply }) {
-  const [speaking, setSpeaking] = useState(false);
-  const canSpeak = 'speechSynthesis' in window;
-  useEffect(() => () => canSpeak && speechSynthesis.cancel(), []);
-  const read = () => {
-    speechSynthesis.cancel();
-    if (speaking) return setSpeaking(false);
-    const utterance = new SpeechSynthesisUtterance(reply.reply);
-    utterance.lang = 'it-IT';
-    utterance.voice = italianVoice();
-    utterance.onend = utterance.onerror = () => setSpeaking(false);
-    setSpeaking(true);
-    speechSynthesis.speak(utterance);
-  };
-  return html`
-    <${FullDialog} title="Alexa" onDismiss=${store.dismissAlexaReply} closeLabel=${str('close')}>
-      <div class="supporting" style="padding:8px 0 24px">${str('voice_to_alexa', reply.said)}</div>
-      ${reply.waiting
-        ? html`<div style="display:flex;align-items:center;gap:16px"><${Spinner} /><span class="title-large">${str('alexa_waiting')}</span></div>`
-        : html`<div class=${reply.reply ? 'headline-medium' : 'title-large'} style="white-space:pre-wrap">${reply.reply ?? str('alexa_no_reply')}</div>`}
-      ${reply.reply && canSpeak && html`
-        <button class="filled-btn" style="width:100%;margin-top:32px" onClick=${read}>
-          <${Icon} name=${speaking ? 'stop' : 'volume_up'} /> ${str(speaking ? 'alexa_stop_reading' : 'alexa_read')}
-        </button>`}
-    <//>`;
-}
-
 function VoiceDialog({ ask }) {
   return html`
     <${Dialog} title=${str('voice_ask_title')} onDismiss=${store.dismissVoice}
@@ -873,6 +837,7 @@ function OverflowMenu({ s, onSettings, onArrange }) {
   const guarded = (action) => (isLocked(s) ? setBehindPin(() => action) : action());
   const items = [
     [str('refresh'), store.refresh],
+    s.assistant.configured && [str('ai_brief'), store.askBrief],
     (s.hidden.length > 0 || s.hiddenRemotes.length > 0) && [str(s.showHidden ? 'hide_hidden' : 'show_hidden'), store.toggleShowHidden],
     [str('check_updates'), () => store.checkForUpdate(true)],
     [str('arrange'), () => guarded(onArrange)],

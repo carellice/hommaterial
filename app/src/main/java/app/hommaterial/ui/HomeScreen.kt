@@ -198,7 +198,6 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
 
     state.voice?.let { VoiceDialog(it, vm) }
-    state.alexaReply?.let { AlexaReplyScreen(it, onDismiss = vm::dismissAlexaReply) }
 
     // A wide screen has room for a side bar that splits the home in pages.
     val width = LocalConfiguration.current.screenWidthDp
@@ -1355,6 +1354,9 @@ private fun OverflowMenu(state: UiState, vm: HomeViewModel, onSettings: () -> Un
     IconButton(onClick = { open = true }) { Icon(Icons.Filled.MoreVert, contentDescription = str(R.string.menu)) }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
         DropdownMenuItem(text = { Text(str(R.string.refresh)) }, onClick = { open = false; vm.refresh() })
+        if (state.assistant.configured) {
+            DropdownMenuItem(text = { Text(str(R.string.ai_brief)) }, onClick = { open = false; vm.brief() })
+        }
         if (state.hidden.isNotEmpty() || state.hiddenRemotes.isNotEmpty()) {
             DropdownMenuItem(
                 text = { Text(str(if (state.showHidden) R.string.hide_hidden else R.string.show_hidden)) },

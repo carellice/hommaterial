@@ -806,9 +806,29 @@ route('POST', '/api/assistant/ask', async (req, res) => {
     json(res, 200, { text: guesses.length ? await assistant.correct(prompt, guesses) : '' })
   } else if (kind === 'phrases') {
     json(res, 200, { answer: await assistant.phrases(prompt) })
+  } else if (kind === 'agent') {
+    json(res, 200, { answer: await assistant.agent(prompt, (Array.isArray(heard) ? heard : []).map((it) => text(it, 4000)).join('\n')) })
   } else {
     json(res, 200, { answer: await assistant.questions(prompt) })
   }
+})
+
+/**
+ * A request in words: what the model answers and would do, by the keys of the app. The client
+ * gives the home without what it hides, what it knows besides ([context]: lists, agenda, a note),
+ * its time and its offset from UTC in minutes, as Date.getTimezoneOffset; the history is added here.
+ */
+route('POST', '/api/assistant/agent', async (req, res) => {
+  const body = await readJson<{ home?: any; request?: string; context?: string; now?: string; offset?: number }>(req)
+  const catalog = new assistant.Catalog(body.home ?? {})
+  const offset = Number(body.offset) || 0
+  const history = (Array.isArray(body.home?.devices) ? body.home.devices : [])
+    .map((d: any) => ({ name: String(d.name ?? ''), readings: data.readings(String(d.applianceId ?? '')) }))
+    .filter((it: { readings: unknown[] }) => it.readings.length)
+    .map((it: { name: string; readings: data.Reading[] }) => assistant.historyLine(it.name, it.readings, offset))
+  const context = [text(body.context, 30_000), history.length ? `Sensor history:\n${history.join('\n')}` : ''].filter(Boolean).join('\n')
+  const prompt = assistant.agentPrompt(catalog, data.get<string>('assistantHouse'), str('assistant_language_name'), text(body.now, 100), context)
+  json(res, 200, assistant.parseAgent(await assistant.agent(prompt, text(body.request, 4000)), catalog))
 })
 
 /** Phrases to run a custom device, suggested from its name and what it does. */

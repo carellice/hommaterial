@@ -2,6 +2,7 @@ import { str, clock, degrees } from '../../shared/i18n.js'
 import { ACTION_ALEXA, ACTION_MACRO, ACTION_POWER, ACTION_REMOTE, ACTION_WAIT, holds, cleared, nextTime } from '../../shared/model.js'
 import { userIds } from './accounts.ts'
 import * as alexa from './alexa.ts'
+import * as assistant from './assistant.ts'
 import { type Device, type DeviceState, emptyState } from './alexa.ts'
 import { currentUserId, edit, get, getSecret, record, setSecret, withUser } from './db.ts'
 import { HttpError, NotLoggedInError, OfflineError } from './errors.ts'
@@ -50,6 +51,14 @@ function notify(title: string, body: string, tag: string) {
   const notices = getSecret<{ id: number; at: number; title: string; body: string; tag: string }[]>('notices', [])
   const id = (notices.at(-1)?.id ?? 0) + 1
   setSecret('notices', [...notices, { id, at: Date.now(), title, body, tag }].slice(-NOTICES_KEPT))
+}
+
+/** An alert, put in words by the assistant when there is one; as it is otherwise. [facts] are what the assistant is told. */
+function notifyAlert(title: string, body: string, tag: string, facts: string) {
+  if (!assistant.configured()) return notify(title, body, tag)
+  assistant.alertText(facts, str('assistant_language_name'))
+    .then((text) => notify(title, text || body, tag))
+    .catch(() => notify(title, body, tag))
 }
 
 /** The notes of what happened after [after], the id of the last one already seen. */
@@ -285,12 +294,14 @@ function checkAlerts(states: Record<string, DeviceState>) {
     const name = device(id)?.name
     if (typeof temperature !== 'number' || Number.isNaN(temperature) || !name) continue
     const title = `${name}: ${degrees(temperature)}`
+    const humidity = states[id]?.humidity != null ? `, humidity ${states[id].humidity}%` : ''
     if (alert.above != null) {
       const key = `${id}|above`
       if (temperature > alert.above) {
         if (!set.has(key)) {
           set.add(key)
-          notify(title, str('alert_notification_above', degrees(alert.above)), key)
+          notifyAlert(title, str('alert_notification_above', degrees(alert.above)), key,
+            `Sensor "${name}" reads ${temperature.toFixed(1)}°C${humidity}, above the ${alert.above}°C the owner set as alert.`)
         }
       } else if (temperature <= alert.above - HYSTERESIS) {
         set.delete(key)
@@ -301,7 +312,8 @@ function checkAlerts(states: Record<string, DeviceState>) {
       if (temperature < alert.below) {
         if (!set.has(key)) {
           set.add(key)
-          notify(title, str('alert_notification_below', degrees(alert.below)), key)
+          notifyAlert(title, str('alert_notification_below', degrees(alert.below)), key,
+            `Sensor "${name}" reads ${temperature.toFixed(1)}°C${humidity}, below the ${alert.below}°C the owner set as alert.`)
         }
       } else if (temperature >= alert.below + HYSTERESIS) {
         set.delete(key)

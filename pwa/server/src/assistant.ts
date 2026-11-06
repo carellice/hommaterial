@@ -341,3 +341,145 @@ export async function correct(system: string, heard: string[]): Promise<string> 
 export const phrases = (system: string) => askJson(account(), [['system', system], ['user', 'Suggest the phrases.']], SCHEMA_PHRASES, 800, 0.7)
 
 export const questions = (system: string) => askJson(account(), [['system', system], ['user', 'Ask your questions.']], SCHEMA_QUESTIONS, 1500)
+
+// --- the agent: requests in words, acted on by the app (as agentPrompt in Assistant.kt) ----------
+
+const SCHEMA_AGENT = {
+  type: 'object',
+  properties: {
+    reply: { type: 'string' },
+    alexa: { type: 'boolean' },
+    actions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          do: { type: 'string' }, target: { type: 'string' }, on: { type: 'boolean' }, minutes: { type: 'number' },
+          sensor: { type: 'string' }, when: { type: 'string' }, threshold: { type: 'number' },
+          list: { type: 'string' }, items: { type: 'array', items: { type: 'string' } },
+          title: { type: 'string' }, start: { type: 'string' }, date: { type: 'string' },
+        },
+        required: ['do'],
+      },
+    },
+  },
+  required: ['reply', 'actions'],
+}
+
+/**
+ * The instructions for a request in words: the model answers and says what to do, by the ids of
+ * the list; the app does it, and asks first for what is more than switching one thing.
+ */
+export function agentPrompt(catalog: Catalog, house: string, language: string, now: string, context: string): string {
+  return `${AGENT_RULES.replace('{language}', language).replace('{now}', now)}
+${house.trim() ? `What the owner says about the home:\n${house.trim()}\n` : ''}
+The things of the home:
+${catalog.describe(true)}${context.trim() ? `\n${context.trim()}` : ''}`.trim()
+}
+
+/** Kept word for word the same as AGENT_RULES in Assistant.kt. */
+const AGENT_RULES = `You are the assistant of a smart home app. Answer in {language}. Now it is {now}.
+Return JSON {"reply": text for the user, "alexa": boolean, "actions": [...]}. Actions, by the ids below:
+- {"do":"power","target":id,"on":true|false}: switch a device (d...), a group (g...) or a remote (r...) on or off.
+- {"do":"run","target":id}: run a custom device (m...).
+- {"do":"later","target":id,"on":true|false,"minutes":n}: the same, in n minutes from now ("tra 20 minuti", "alle 23").
+- {"do":"automation","sensor":id of a device,"when":"temperatureAbove"|"temperatureBelow"|"humidityAbove"|"humidityBelow"|"on"|"off","threshold":number,"target":id,"on":true|false}:
+  from now on, each time that device gets there, switch or run the target. One condition and one action only:
+  for anything more (a time of day, several actions) make the closest one and say in the reply what was left out.
+- {"do":"list","list":exact name of a list,"items":[...]}: add items to a list; a dish asked for becomes its ingredients, one per item.
+- {"do":"event","title":text,"start":"YYYY-MM-DDTHH:MM","minutes":duration} or {"do":"event","title":text,"date":"YYYY-MM-DD"} for a whole day: add to the calendar.
+"Tutto tranne X" means each switchable device (of the room, if one is said) except X, one action each.
+Questions about the home (what is on, temperatures, how a sensor went, the agenda) are answered
+in the reply from the data below, with no actions. A brief of the day: greet, then what is on, the temperatures,
+the events of today and tomorrow, the timers; six sentences at most. A note given below is summed up in a few sentences.
+Set "alexa" true, with no actions and an empty reply, only when the request is about nothing of this app
+(weather, music, news, general knowledge, Alexa routines): it is then passed to Alexa.
+The reply is read aloud: short plain sentences, no lists, no markdown, never the ids. When acting, say briefly what you do.
+Use only what is listed; when something asked for is not there, say so and do nothing about it.`
+
+type Reading = { at: number; temperature: number; humidity: number | null }
+
+/** The readings of a sensor of the last week, a line a day: what the model needs to tell how it went. */
+export function historyLine(name: string, readings: Reading[], offsetMinutes: number): string {
+  const days = new Map<string, Reading[]>()
+  for (const r of readings) {
+    const day = new Date(r.at - offsetMinutes * 60_000).toISOString().slice(5, 10)
+    days.set(day, [...(days.get(day) ?? []), r])
+  }
+  const range = (values: number[], unit: string) => `${Math.min(...values).toFixed(1)}-${Math.max(...values).toFixed(1)}${unit}`
+  const parts = [...days].map(([day, list]) => {
+    const humidity = list.map((r) => r.humidity).filter((it): it is number => it != null)
+    return `${day} ${range(list.map((r) => r.temperature), '°C')}${humidity.length ? ` ${range(humidity, '%')}` : ''}`
+  })
+  return `"${name}" by day (MM-DD min-max): ${parts.join('; ')}`
+}
+
+export const AUTOMATION_TRIGGERS = ['temperatureAbove', 'temperatureBelow', 'humidityAbove', 'humidityBelow', 'on', 'off']
+
+/**
+ * Reads what the model would do, keeping only what names things of the list, each by its key in
+ * the app: what is left the client does as it is.
+ */
+export function parseAgent(answer: any, catalog: Catalog) {
+  const actions: any[] = []
+  const find = (id: unknown) => catalog.find(String(id ?? ''))
+  for (const a of Array.isArray(answer?.actions) ? answer.actions : []) {
+    const target = find(a?.target)
+    const kind = target?.id[0]
+    // A device that cannot be switched has no voice.
+    const switchable = target != null && (kind === 'g' || kind === 'r' || (kind === 'd' && target.voice != null))
+    const on = a?.on !== false
+    switch (a?.do) {
+      case 'power':
+        if (switchable) actions.push({ do: 'power', key: target!.key, name: target!.name, on })
+        break
+      case 'run':
+        if (kind === 'm') actions.push({ do: 'run', key: target!.key, name: target!.name })
+        break
+      case 'later': {
+        const minutes = Math.round(Number(a.minutes))
+        if ((switchable || kind === 'm') && minutes >= 1 && minutes <= 7 * 24 * 60) {
+          actions.push({ do: 'later', key: target!.key, name: target!.name, on, minutes })
+        }
+        break
+      }
+      case 'automation': {
+        const sensor = find(a.sensor)
+        const threshold = Number(a.threshold ?? 0)
+        if (sensor?.id[0] === 'd' && kind !== 'g' && (switchable || kind === 'm')
+          && AUTOMATION_TRIGGERS.includes(a.when) && Number.isFinite(threshold)) {
+          actions.push({ do: 'automation', sensor: sensor.key, sensorName: sensor.name, when: a.when, threshold, key: target!.key, name: target!.name, on })
+        }
+        break
+      }
+      case 'list': {
+        const items = (Array.isArray(a.items) ? a.items : []).map((it: unknown) => String(it ?? '').trim()).filter(Boolean).slice(0, 40)
+        if (String(a.list ?? '').trim() && items.length) actions.push({ do: 'list', list: String(a.list).trim(), items })
+        break
+      }
+      case 'event': {
+        const title = String(a.title ?? '').trim()
+        const start = String(a.start ?? '')
+        const date = String(a.date ?? '')
+        const minutes = Math.round(Number(a.minutes)) || 60
+        if (title && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(start)) {
+          actions.push({ do: 'event', title, start: start.slice(0, 16), minutes: Math.min(Math.max(minutes, 5), 24 * 60) })
+        } else if (title && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          actions.push({ do: 'event', title, date })
+        }
+        break
+      }
+    }
+  }
+  return { reply: String(answer?.reply ?? '').trim(), alexa: answer?.alexa === true && !actions.length, actions }
+}
+
+export const agent = (system: string, request: string) => askJson(account(), [['system', system], ['user', request]], SCHEMA_AGENT, 1200, 0.2)
+
+/** A push about a sensor past its threshold, said as a person would; [facts] are what is known of it. */
+export async function alertText(facts: string, language: string): Promise<string> {
+  const system = `You write the body of a push notification of a smart home app, in ${language}: one or two short, friendly sentences,
+at most 25 words, saying what happened and, if useful, what could be done. No emoji, no greeting, nothing invented.`
+  const answer = await askJson(account(), [['system', system], ['user', facts]], SCHEMA_TEXT, 120, 0.3)
+  return String(answer?.text ?? '').trim()
+}

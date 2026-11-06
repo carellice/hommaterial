@@ -50,6 +50,7 @@ import app.hommaterial.ui.LocalHaptics
 import app.hommaterial.ui.LoginScreen
 import app.hommaterial.ui.OnboardingScreen
 import app.hommaterial.ui.ProvideHaptics
+import app.hommaterial.ui.ReplyScreen
 import app.hommaterial.ui.RestScreen
 import app.hommaterial.ui.SettingsScreen
 import app.hommaterial.ui.UpdateDialog
@@ -205,27 +206,30 @@ class MainActivity : ComponentActivity() {
 private fun Screens(state: UiState, vm: HomeViewModel, settings: Boolean, onSettings: (Boolean) -> Unit) {
     when {
         !state.onboarded -> OnboardingScreen(onAccept = vm::acceptOnboarding)
-        state.loggedIn -> AnimatedContent(
-            targetState = settings,
-            // The settings slide in over the list from the right and leave the same way.
-            transitionSpec = {
-                val spec = tween<IntOffset>(SETTINGS_SLIDE_MS)
-                val fade = tween<Float>(SETTINGS_SLIDE_MS)
-                if (targetState) {
-                    (slideInHorizontally(spec) { it } + fadeIn(fade)) togetherWith
-                        (slideOutHorizontally(spec) { -it / 4 } + fadeOut(fade))
+        state.loggedIn -> {
+            AnimatedContent(
+                targetState = settings,
+                // The settings slide in over the list from the right and leave the same way.
+                transitionSpec = {
+                    val spec = tween<IntOffset>(SETTINGS_SLIDE_MS)
+                    val fade = tween<Float>(SETTINGS_SLIDE_MS)
+                    if (targetState) {
+                        (slideInHorizontally(spec) { it } + fadeIn(fade)) togetherWith
+                            (slideOutHorizontally(spec) { -it / 4 } + fadeOut(fade))
+                    } else {
+                        (slideInHorizontally(spec) { -it / 4 } + fadeIn(fade)) togetherWith
+                            (slideOutHorizontally(spec) { it } + fadeOut(fade))
+                    }
+                },
+                label = "settings",
+            ) { shown ->
+                if (shown) {
+                    SettingsScreen(state, vm, onBack = { onSettings(false) })
                 } else {
-                    (slideInHorizontally(spec) { -it / 4 } + fadeIn(fade)) togetherWith
-                        (slideOutHorizontally(spec) { it } + fadeOut(fade))
+                    HomeScreen(state, vm, onSettings = { onSettings(true) })
                 }
-            },
-            label = "settings",
-        ) { shown ->
-            if (shown) {
-                SettingsScreen(state, vm, onBack = { onSettings(false) })
-            } else {
-                HomeScreen(state, vm, onSettings = { onSettings(true) })
             }
+            state.reply?.let { ReplyScreen(it, state.readAloud, vm) }
         }
         else -> LoginScreen(state, vm)
     }

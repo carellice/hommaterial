@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Summarize
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -117,7 +118,7 @@ internal fun rememberNotesModel(vm: HomeViewModel): NotesModel {
 internal fun NotesPage(model: NotesModel, state: UiState, vm: HomeViewModel) {
     LaunchedEffect(state.notionNotes) { model.reload() }
     var open by remember { mutableStateOf<NotionNote?>(null) }
-    open?.let { NoteDialog(it, vm) { open = null } }
+    open?.let { NoteDialog(it, state.assistant.configured, vm) { open = null } }
     val notes = model.notes
     Column(Modifier.fillMaxSize()) {
         OfflineBanner()
@@ -170,7 +171,7 @@ private fun edited(time: Long): String = DateFormat.getDateTimeInstance(DateForm
 /** One note, read from Notion as it is now, with the way to open it there to change it. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NoteDialog(note: NotionNote, vm: HomeViewModel, onDismiss: () -> Unit) {
+private fun NoteDialog(note: NotionNote, ai: Boolean, vm: HomeViewModel, onDismiss: () -> Unit) {
     val uri = LocalUriHandler.current
     var blocks by remember(note.id) { mutableStateOf<List<NoteBlock>?>(null) }
     var failed by remember(note.id) { mutableStateOf(false) }
@@ -188,6 +189,12 @@ private fun NoteDialog(note: NotionNote, vm: HomeViewModel, onDismiss: () -> Uni
                         IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, contentDescription = str(R.string.close)) }
                     },
                     actions = {
+                        val text = blocks?.joinToString("\n") { it.text }.orEmpty()
+                        if (ai && text.isNotBlank()) {
+                            IconButton(onClick = { vm.summarize(note.title, text) }) {
+                                Icon(Icons.Outlined.Summarize, contentDescription = str(R.string.ai_summary))
+                            }
+                        }
                         if (note.url.isNotBlank()) {
                             IconButton(onClick = { uri.openUri(note.url) }) {
                                 Icon(Icons.Outlined.OpenInNew, contentDescription = str(R.string.notes_open_notion))

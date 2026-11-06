@@ -3,11 +3,11 @@
 // sensors) here runs on the server of the home, which also speaks to Alexa, SwitchBot and the TVs.
 import { Prefs } from './prefs.js';
 import { api, get, post, del, onSessionLost, NotLoggedInError, OfflineError, SessionError } from './net.js';
-import { str, plural, lang, setLanguage as applyLanguage } from '/shared/i18n.js';
+import { str, plural, lang, clock, setLanguage as applyLanguage } from '/shared/i18n.js';
 import { parseVoice, parseExtras, parsePhrase } from './voice.js';
 import {
   LAYOUT_GRID, REST_ITEMS, emptyState, macroKey, remoteKey, placed, placeOf, shownRemotes, remoteKind, isLg,
-  standardCommands, commandLabel,
+  standardCommands, commandLabel, describe, conditionText, ACTION_POWER, ACTION_REMOTE, ACTION_MACRO,
 } from '/shared/model.js';
 import { APP_VERSION } from './version.js';
 import { createBackup, parseBackup, selectBackup } from '/shared/backup.js';
@@ -143,8 +143,11 @@ function initialState() {
     refreshing: false,
     voice: null,
     correcting: false,
-    // What was last said to Alexa and her answer, shown full screen until closed: { said, reply, waiting }.
-    alexaReply: null,
+    // What was last asked of Alexa or of the assistant and the answer, shown full screen until closed:
+    // { id, from: 'alexa' | 'ai', said, reply, waiting, actions to confirm }.
+    reply: null,
+    // Whether those answers are read aloud at once: this browser only.
+    readAloud: settings.get('readAloud', false),
     // The Echo that what is said to the microphone goes to, as if said to it: this browser only.
     voiceEcho: settings.get('voiceEcho', null),
     // The Echo devices of the account, once asked for in the settings; null while they are looked for.
@@ -931,10 +934,10 @@ export function setVoiceEcho(echo) {
 
 /** Tells Alexa [said] through [echo], which answers aloud; what she answers is shown full screen too. */
 async function sayToAlexa(echo, said) {
-  const asked = { said, reply: null, waiting: true };
-  update({ alexaReply: asked });
+  const asked = { id: Date.now(), from: 'alexa', said, reply: null, waiting: true, actions: [] };
+  update({ reply: asked });
   // Closed meanwhile, or replaced by a newer question: nothing to show.
-  const show = (reply) => update((s) => (s.alexaReply === asked ? { alexaReply: { said, reply, waiting: false } } : {}));
+  const show = (reply) => update((s) => (s.reply?.id === asked.id ? { reply: { ...asked, reply, waiting: false } } : {}));
   const since = Date.now();
   if (!(await guarded(() => post('/api/alexa/say', { echo: echo.serial, text: said })))) return show(null);
   // The answer reaches the voice history of Amazon some seconds later, if at all.
@@ -952,13 +955,12 @@ async function sayToAlexa(echo, said) {
   show(null);
 }
 
-export const dismissAlexaReply = () => update({ alexaReply: null });
 
 /**
  * Acts on what the speech recognizer [heard], its guesses best first. A voice phrase of a custom
  * device runs it; a device, group, custom device or remote of the app named without doubt is
- * switched here; anything else goes to Alexa, when an Echo was chosen for it. Otherwise what is
- * not clearly understood goes to the assistant, when there is one, to have the names put right first.
+ * switched here. Anything else goes to the assistant, when there is one, which acts on it or answers;
+ * what is about nothing of the app goes on to Alexa, when an Echo was chosen for it.
  */
 export async function onSpeech(heard) {
   const phrase = parsePhrase(heard, state.macros.map((m) => [m.id, m.phrases ?? []]));
@@ -968,28 +970,23 @@ export async function onSpeech(heard) {
     return runMacro(macro);
   }
   const said = heard.find((it) => it.trim());
-  if (state.voiceEcho) {
-    if (!said) return answer({ type: 'unknown', heard: '' });
-    // What the app knows is done here: Alexa does not know the groups of the app, for one.
-    return act(heard) ? undefined : sayToAlexa(state.voiceEcho, said);
-  }
+  if (!said) return answer({ type: 'unknown', heard: '' });
+  // What the app knows without doubt is done here: Alexa does not know the groups of the app, for one.
   if (act(heard)) return;
-  const result = parseVoice(heard, voiceDevices());
-  if (!state.assistant.configured || heard.every((it) => !it.trim())) return answer(result);
-  update({ correcting: true });
-  let corrected = '';
-  try {
-    ({ text: corrected } = await post('/api/assistant/correct', { heard: heard.filter((it) => it.trim()), home: assistantHome() }));
-  } catch {
-    // Without the assistant the sentence is still read as it was heard.
-  } finally {
-    update({ correcting: false });
+  if (state.assistant.configured) {
+    const others = heard.filter((it) => it.trim() && it !== said);
+    const request = others.length ? `${said}
+(Other guesses of the speech recognizer: ${others.join(' | ')})` : said;
+    const plan = await askAssistant(request, { said });
+    // What is about nothing of the app, or what the assistant could not answer, goes on to Alexa.
+    if (plan && !plan.alexa) return;
+    if (state.voiceEcho) return sayToAlexa(state.voiceEcho, said);
+    if (!plan) return;
+    dismissReply();
+  } else if (state.voiceEcho) {
+    return sayToAlexa(state.voiceEcho, said);
   }
-  if (!corrected || !act([corrected])) {
-    // What was put right is offered first, should it still be understood only in part.
-    const again = corrected ? parseVoice([corrected, ...heard], voiceDevices()) : result;
-    answer(again.type === 'unknown' ? result : again);
-  }
+  answer(parseVoice(heard, voiceDevices()));
 }
 
 /** The command as a sentence, to offer it or to say it is being carried out. */
@@ -1007,6 +1004,181 @@ export function runVoice(command) {
 
 export const dismissVoice = () => update({ voice: null });
 export const speechUnavailable = () => say(str('voice_unavailable'));
+
+// ——— The assistant acting on requests in words (server/src/assistant.ts, parseAgent) ———
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const localDate = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+/** A moment with the offset of the home, as Google Calendar wants it. */
+function localMoment(d) {
+  const offset = -d.getTimezoneOffset();
+  const hours = pad2(Math.floor(Math.abs(offset) / 60));
+  return `${localDate(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00${offset >= 0 ? '+' : '-'}${hours}:${pad2(Math.abs(offset) % 60)}`;
+}
+
+/** What the assistant is told besides the home: the lists, the agenda of the next days, the timers. Each part may be missing. */
+async function agentContext() {
+  const quiet = (work) => work().catch(() => null);
+  const today = new Date(new Date().setHours(0, 0, 0, 0));
+  const [lists, events] = await Promise.all([
+    quiet(async () => [
+      ...(state.loggedIn ? (await get('/api/lists')).lists : []),
+      ...(state.notion.linked ? state.notionLists : []),
+    ]),
+    quiet(async () => {
+      if (!state.calendar.linked) return null;
+      const all = (await get('/api/calendar/calendars')).calendars;
+      const shown = all.filter((c) => (state.calendarShown ? state.calendarShown.includes(c.id) : c.shown)).map((c) => c.id);
+      const query = new URLSearchParams({ calendars: shown.join(','), from: localMoment(today), to: localMoment(new Date(today.getTime() + 3 * 86_400_000)) });
+      return (await get(`/api/calendar/events?${query}`)).events;
+    }),
+  ]);
+  const parts = [];
+  if (lists?.length) parts.push(`Lists: ${lists.map((l) => `"${l.name}"`).join(', ')}`);
+  if (events) parts.push(`Calendar, today and the next two days:\n${events.map((e) => `- ${e.start}${e.allDay ? ' (all day)' : ` to ${e.end}`}: ${e.title}`).join('\n') || '- nothing'}`);
+  const timers = [
+    ...Object.entries(state.timers).map(([id, at]) => `- ${state.devices.find((d) => d.applianceId === id)?.name ?? id} switches off at ${clock(at)}`),
+    ...state.schedules.filter((it) => it.enabled).map((it) => `- ${it.label} at ${clock(it.at)}${it.days.length ? ' (repeats)' : ''}`),
+  ];
+  if (timers.length) parts.push(`Timers and schedules:\n${timers.join('\n')}`);
+  return parts.join('\n');
+}
+
+const nowText = () => new Date().toLocaleString(lang(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+/** What an action of the assistant does, as a sentence, for the list to confirm. */
+export function agentLabel(a) {
+  switch (a.do) {
+    case 'power': return str(a.on ? 'voice_on' : 'voice_off', a.name);
+    case 'run': return str('schedule_run', a.name);
+    case 'later': return str(a.on ? 'ai_later_on' : 'ai_later_off', a.minutes, a.name);
+    case 'automation': return str('ai_automation', conditionText(a.sensorName, a.when, a.threshold), str(a.key.startsWith('macro:') ? 'schedule_run' : a.on ? 'voice_on' : 'voice_off', a.name));
+    case 'list': return str('ai_list', a.list, a.items.join(', '));
+    default: return str('ai_event', a.title, a.date ?? a.start.replace('T', ' '));
+  }
+}
+
+/** The actions of the app that switch or run what [key] stands for: a device, a group, a custom device, a remote. */
+function actionsOf(key, on) {
+  const value = on ? 'on' : 'off';
+  if (key.startsWith('group:')) {
+    const group = state.groups.find((g) => `group:${g.id}` === key);
+    return state.devices.filter((d) => d.hasPower && group?.devices.includes(d.applianceId) && !state.hidden.includes(d.applianceId))
+      .map((d) => ({ type: ACTION_POWER, target: d.applianceId, value }));
+  }
+  const macro = state.macros.find((m) => macroKey(m.id) === key);
+  if (macro) return [{ type: ACTION_MACRO, target: macro.id, value: '' }];
+  const remote = state.remotes.find((r) => remoteKey(r.id) === key);
+  if (remote) return [{ type: ACTION_REMOTE, target: remote.id, value: on ? 'turnOn' : 'turnOff' }];
+  return state.devices.some((d) => d.applianceId === key) ? [{ type: ACTION_POWER, target: key, value }] : [];
+}
+
+/** Does at once what is now: switching and running. */
+function runNow(action) {
+  if (action.type === ACTION_MACRO) {
+    const macro = state.macros.find((m) => m.id === action.target);
+    return macro && runMacro(macro);
+  }
+  if (action.type === ACTION_REMOTE) {
+    const remote = state.remotes.find((r) => r.id === action.target);
+    return remote && sendRemote(remote, action.value);
+  }
+  const device = state.devices.find((d) => d.applianceId === action.target);
+  return device && setPower(device, action.value === 'on');
+}
+
+/** Does the actions the assistant chose; false when one of them could not be done. */
+async function doAgent(actions) {
+  let ok = true;
+  for (const a of actions) {
+    if (a.do === 'power' || a.do === 'run') {
+      actionsOf(a.key, a.on !== false).forEach(runNow);
+    } else if (a.do === 'later') {
+      for (const action of actionsOf(a.key, a.on)) await addTimer(action, describe(action, state), a.minutes);
+    } else if (a.do === 'automation') {
+      const device = state.devices.find((d) => d.applianceId === a.sensor);
+      const action = actionsOf(a.key, a.on)[0];
+      if (device && action) await addAutomation(device, a.when, a.threshold, action, conditionText(device.name, a.when, a.threshold), describe(action, state));
+      else ok = false;
+    } else if (a.do === 'list') {
+      const lists = await alexaLists();
+      const list = lists?.find((l) => l.name.trim().toLowerCase() === a.list.toLowerCase());
+      if (!list) ok = false;
+      else for (const item of a.items) ok = (await addAlexaListItem(list.id, item)) && ok;
+    } else if (a.do === 'event') {
+      const all = (await calendars()) ?? [];
+      const writable = all.filter((c) => c.writable);
+      const calendar = writable.find((c) => c.id === state.calendarDefault) ?? writable.find((c) => c.primary) ?? writable[0];
+      if (!calendar) {
+        ok = false;
+        continue;
+      }
+      let input;
+      if (a.date) {
+        const day = new Date(`${a.date}T00:00`);
+        input = { title: a.title, location: '', notes: '', allDay: true, start: a.date, end: localDate(new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)) };
+      } else {
+        const start = new Date(a.start);
+        input = { title: a.title, location: '', notes: '', allDay: false, start: localMoment(start), end: localMoment(new Date(start.getTime() + a.minutes * 60_000)) };
+      }
+      ok = (await saveEvent(null, calendar.id, input)) && ok;
+    }
+  }
+  return ok;
+}
+
+/**
+ * Has the assistant answer [request] and do what it asks, full screen. Switching one thing is done
+ * at once; anything more waits for the user to confirm. [said] is what is shown as asked, [extra]
+ * more to know (a note to sum up). Gives back what the assistant answered, null when it failed.
+ */
+export async function askAssistant(request, { said = request, extra = '' } = {}) {
+  const asked = { id: Date.now(), from: 'ai', said, reply: null, waiting: true, actions: [] };
+  update({ reply: asked });
+  // Closed meanwhile, or replaced by a newer request: nothing to show.
+  const show = (change) => update((s) => (s.reply?.id === asked.id ? { reply: { ...asked, waiting: false, ...change } } : {}));
+  let plan;
+  try {
+    const context = [await agentContext(), extra].filter(Boolean).join('\n');
+    plan = await post('/api/assistant/agent', { home: assistantHome(), request, context, now: nowText(), offset: new Date().getTimezoneOffset() });
+  } catch (e) {
+    show({ reply: e instanceof OfflineError ? str('no_connection') : e.message || str('something_wrong') });
+    return null;
+  }
+  if (plan.alexa) return plan;
+  const confirm = plan.actions.length > 1 || plan.actions.some((a) => ['automation', 'list', 'event'].includes(a.do));
+  if (confirm) {
+    show({ reply: plan.reply || str('ai_confirm_text'), actions: plan.actions });
+  } else {
+    const done = await doAgent(plan.actions);
+    show({ reply: done ? plan.reply || str('ai_done') : str('ai_partly') });
+  }
+  return plan;
+}
+
+/** Does what the assistant offered, once the user confirms it. */
+export async function confirmAgent() {
+  const shown = state.reply;
+  if (!shown?.actions?.length) return;
+  update({ reply: { ...shown, actions: [], waiting: true } });
+  const done = await doAgent(shown.actions);
+  update((s) => (s.reply?.id === shown.id ? { reply: { ...s.reply, waiting: false, reply: done ? str('ai_done') : str('ai_partly') } } : {}));
+}
+
+/** Tells what the home looks like today: the brief of the assistant. */
+export const askBrief = () => askAssistant(str('ai_brief_request'), { said: str('ai_brief') });
+
+/** Sums up a note of Notion, given as its [title] and its [text]. */
+export const summarizeNote = (title, text) =>
+  askAssistant(str('ai_summary_request'), { said: str('ai_summary_of', title), extra: `The note "${title}":\n${text.slice(0, 20_000)}` });
+
+export const dismissReply = () => update({ reply: null });
+
+/** Whether every answer shown full screen is read aloud at once: this browser only. */
+export function setReadAloud(on) {
+  settings.set('readAloud', on);
+  update({ readAloud: on });
+}
 
 // ——— Remotes: SwitchBot and the LG TVs ———
 

@@ -5,6 +5,8 @@ import android.speech.tts.UtteranceProgressListener
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,14 +39,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import app.hommaterial.AlexaReply
+import app.hommaterial.HomeViewModel
+import app.hommaterial.VoiceReply
 import app.hommaterial.R
+import app.hommaterial.data.AgentAction
+import app.hommaterial.quick.Quick
 import app.hommaterial.str
 import java.util.Locale
 
-/** What was said to Alexa and her answer, full screen, to read at leisure or to have read aloud. */
+/**
+ * What was asked of Alexa or of the assistant and the answer, full screen, to read at leisure or to
+ * have read aloud; at once when [readAloud]. What the assistant would do waits here for a yes.
+ */
 @Composable
-fun AlexaReplyScreen(reply: AlexaReply, onDismiss: () -> Unit) {
+fun ReplyScreen(reply: VoiceReply, readAloud: Boolean, vm: HomeViewModel) {
+    val onDismiss = vm::dismissReply
     val context = LocalContext.current
     var ready by remember { mutableStateOf(false) }
     var speaking by remember { mutableStateOf(false) }
@@ -70,6 +81,11 @@ fun AlexaReplyScreen(reply: AlexaReply, onDismiss: () -> Unit) {
         engine
     }
     DisposableEffect(Unit) { onDispose { tts.stop(); tts.shutdown() } }
+    val text = reply.reply.takeIf { !reply.waiting }
+    // Read as soon as both the answer and the voice are there.
+    LaunchedEffect(reply.id, text, ready) {
+        if (text != null && ready && readAloud) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "reply")
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -79,7 +95,7 @@ fun AlexaReplyScreen(reply: AlexaReply, onDismiss: () -> Unit) {
             Column(Modifier.safeDrawingPadding().padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        str(R.string.voice_to_alexa, reply.said),
+                        if (reply.fromAlexa) str(R.string.voice_to_alexa, reply.said) else "“${reply.said}”",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
@@ -93,13 +109,26 @@ fun AlexaReplyScreen(reply: AlexaReply, onDismiss: () -> Unit) {
                     when {
                         reply.waiting -> Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(Modifier.size(24.dp))
-                            Text(str(R.string.alexa_waiting), Modifier.padding(start = 16.dp), style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                str(if (reply.fromAlexa) R.string.alexa_waiting else R.string.ai_thinking),
+                                Modifier.padding(start = 16.dp),
+                                style = MaterialTheme.typography.titleLarge,
+                            )
                         }
-                        reply.reply == null -> Text(str(R.string.alexa_no_reply), style = MaterialTheme.typography.titleLarge)
-                        else -> Text(reply.reply, style = MaterialTheme.typography.headlineMedium)
+                        text == null -> Text(str(R.string.alexa_no_reply), style = MaterialTheme.typography.titleLarge)
+                        else -> Text(text, style = MaterialTheme.typography.headlineMedium)
+                    }
+                    for (action in reply.actions) {
+                        Text("• " + agentLabel(action), Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
-                val text = reply.reply
+                if (reply.actions.isNotEmpty()) {
+                    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+                        FilledTonalButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(str(R.string.cancel)) }
+                        Spacer(Modifier.width(12.dp))
+                        Button(onClick = vm::confirmAgent, modifier = Modifier.weight(1f)) { Text(str(R.string.ai_confirm)) }
+                    }
+                }
                 if (text != null) {
                     Button(
                         onClick = {
@@ -107,7 +136,7 @@ fun AlexaReplyScreen(reply: AlexaReply, onDismiss: () -> Unit) {
                                 tts.stop()
                                 speaking = false
                             } else {
-                                tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "alexa")
+                                tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "reply")
                             }
                         },
                         enabled = ready,
@@ -120,4 +149,18 @@ fun AlexaReplyScreen(reply: AlexaReply, onDismiss: () -> Unit) {
             }
         }
     }
+}
+
+/** What an action of the assistant does, as a sentence, for the list to confirm. */
+fun agentLabel(a: AgentAction): String = when (a.kind) {
+    "power" -> str(if (a.on) R.string.voice_on else R.string.voice_off, a.name)
+    "run" -> str(R.string.schedule_run, a.name)
+    "later" -> str(if (a.on) R.string.ai_later_on else R.string.ai_later_off, a.minutes, a.name)
+    "automation" -> str(
+        R.string.ai_automation,
+        conditionText(a.sensorName, a.trigger, a.threshold),
+        str(if (a.key.startsWith(Quick.macroKey(""))) R.string.schedule_run else if (a.on) R.string.voice_on else R.string.voice_off, a.name),
+    )
+    "list" -> str(R.string.ai_list, a.list, a.items.joinToString(", "))
+    else -> str(R.string.ai_event, a.title, a.date.ifEmpty { a.start.replace('T', ' ') })
 }

@@ -26,7 +26,9 @@ const SOURCE_URL = 'https://github.com/carellice/hommaterial';
 
 /** A section of the settings that opens and closes on a tap of its title. */
 // The icon at the head of each section, so that a long list of them is quick to scan.
-const SECTION_ICONS = { appearance: 'palette', notifications: 'notifications', switchbot: 'settings_remote', lgtv: 'tv', assistant: 'auto_awesome', voice: 'record_voice_over', calendar: 'calendar_month', notion: 'description', updates: 'system_update', rooms: 'meeting_room', devices: 'devices_other', groups: 'layers', macros: 'extension', monitor: 'tablet_android', timers: 'timer', alerts: 'warning', backup: 'backup', data: 'storage', account: 'account_circle', server: 'dns', hints: 'tips_and_updates', about: 'info' };
+const AI_EXAMPLES = Array.from({ length: 10 }, (_, i) => `ai_example_${i + 1}`);
+
+const SECTION_ICONS = { appearance: 'palette', notifications: 'notifications', switchbot: 'settings_remote', lgtv: 'tv', assistant: 'auto_awesome', aiExamples: 'lightbulb', voice: 'record_voice_over', calendar: 'calendar_month', notion: 'description', updates: 'system_update', rooms: 'meeting_room', devices: 'devices_other', groups: 'layers', macros: 'extension', monitor: 'tablet_android', timers: 'timer', alerts: 'warning', backup: 'backup', data: 'storage', account: 'account_circle', server: 'dns', hints: 'tips_and_updates', about: 'info' };
 
 function Section({ title, text, icon, open, onToggle, children }) {
   return html`
@@ -182,6 +184,11 @@ export function SettingsScreen({ onBack }) {
         ${section('notion', 's_notion', 'notion_settings_text', html`<${NotionSettings} s=${s} />`)}
         ${section('voice', 's_voice', 'voice_settings_text', html`<${VoiceSettings} s=${s} />`)}
         ${section('assistant', 's_assistant', 'srv_assistant_text', html`<${AssistantSettings} s=${s} />`)}
+        ${section('aiExamples', 's_ai_examples', 'ai_examples_text', html`
+          ${!s.assistant.configured && html`<p class="body-medium supporting" style="padding:8px 16px">${str('ai_examples_off')}</p>`}
+          ${AI_EXAMPLES.map((key) => html`
+            <${Setting} key=${key} lead=${html`<${Icon} name="chat_bubble" />`} title=${`“${str(key)}”`}
+              onClick=${s.assistant.configured ? () => store.askAssistant(str(key)) : undefined} />`)}`)}
 
         ${section('updates', 's_updates', null, html`
           <${Toggle} title=${str('auto_update')} text=${str('pwa_auto_update_text')} checked=${s.autoUpdate} onChange=${store.setAutoUpdate} />
@@ -449,6 +456,7 @@ function VoiceSettings({ s }) {
   return html`
     <${Setting} title=${str('voice_echo')} text=${s.voiceEcho?.name ?? str('voice_echo_off')} onClick=${() => setPicking(true)} />
     <p class="body-medium supporting" style="padding:8px 16px">${str('voice_echo_text')}</p>
+    <${Toggle} title=${str('read_aloud')} text=${str('read_aloud_text')} checked=${s.readAloud} onChange=${store.setReadAloud} />
     ${picking && html`<${EchoDialog} title=${str('voice_echo_pick')} s=${s} none=${str('voice_echo_off')}
       onDismiss=${() => setPicking(false)} onPick=${(echo) => {
         store.setVoiceEcho(echo);

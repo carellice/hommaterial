@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.SettingsRemote
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.MeetingRoom
 import androidx.compose.material.icons.outlined.DevicesOther
@@ -540,9 +541,25 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
+                Toggle(R.string.read_aloud, R.string.read_aloud_text, state.readAloud, vm::setReadAloud)
             }
 
             Section(R.string.s_assistant, R.string.assistant_text) { AssistantSettings(state, vm) }
+
+            Section(R.string.s_ai_examples, R.string.ai_examples_text) {
+                val configured = state.assistant.configured
+                if (!configured) {
+                    Text(
+                        str(R.string.ai_examples_off),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                for (example in AI_EXAMPLES) {
+                    Setting(title = "“${str(example)}”", onClick = if (configured) ({ vm.ask(str(example)) }) else null)
+                }
+            }
 
             Section(R.string.s_updates) {
                 Toggle(R.string.auto_update, R.string.auto_update_text, state.autoUpdate, vm::setAutoUpdate)
@@ -824,6 +841,7 @@ private fun sectionIcon(@StringRes title: Int): ImageVector? = when (title) {
     R.string.s_switchbot -> Icons.Outlined.SettingsRemote
     R.string.s_lgtv -> Icons.Outlined.Tv
     R.string.s_assistant -> Icons.Outlined.AutoAwesome
+    R.string.s_ai_examples -> Icons.Outlined.Lightbulb
     R.string.s_voice -> Icons.Outlined.RecordVoiceOver
     R.string.s_calendar -> Icons.Outlined.CalendarMonth
     R.string.s_notion -> Icons.Outlined.Description
@@ -1014,6 +1032,12 @@ private fun HapticLevel(level: Int, onChange: (Int) -> Unit) {
         )
     }
 }
+
+/** What can be asked of the assistant, to show it and to try it. */
+private val AI_EXAMPLES = listOf(
+    R.string.ai_example_1, R.string.ai_example_2, R.string.ai_example_3, R.string.ai_example_4, R.string.ai_example_5,
+    R.string.ai_example_6, R.string.ai_example_7, R.string.ai_example_8, R.string.ai_example_9, R.string.ai_example_10,
+)
 
 @Composable
 internal fun Toggle(@StringRes title: Int, @StringRes text: Int, checked: Boolean, onChange: (Boolean) -> Unit) {

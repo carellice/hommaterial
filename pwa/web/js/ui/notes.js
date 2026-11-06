@@ -65,12 +65,12 @@ export function NotesPage({ s }) {
           <span class="texts"><span class="body-large">${note.title}</span>
             ${note.edited > 0 && html`<span class="supporting body-medium">${str('notes_edited', edited(note.edited))}</span>`}</span>
         </div>`)}
-      ${open && html`<${NoteView} note=${open} onDismiss=${() => setOpen(null)} />`}
+      ${open && html`<${NoteView} note=${open} ai=${s.assistant.configured} onDismiss=${() => setOpen(null)} />`}
     </div>`;
 }
 
 /** One note, read from Notion as it is now, with the way to open it there to change it. */
-function NoteView({ note, onDismiss }) {
+function NoteView({ note, ai, onDismiss }) {
   const [blocks, setBlocks] = useState(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -79,8 +79,10 @@ function NoteView({ note, onDismiss }) {
   let number = 0;
   return html`
     <${FullDialog} title=${note.title} onDismiss=${onDismiss} closeLabel=${str('close')}
-      actions=${note.url && html`<a class="icon-btn" href=${note.url} target="_blank" rel="noopener" aria-label=${str('notes_open_notion')}
-        title=${str('notes_open_notion')}><${Icon} name="open_in_new" /></a>`}>
+      actions=${html`${ai && blocks?.length > 0 && html`<${IconButton} icon="summarize" label=${str('ai_summary')}
+        onClick=${() => store.summarizeNote(note.title, blocks.map((b) => b.text).join(' / '))} />`}
+      ${note.url && html`<a class="icon-btn" href=${note.url} target="_blank" rel="noopener" aria-label=${str('notes_open_notion')}
+        title=${str('notes_open_notion')}><${Icon} name="open_in_new" /></a>`}`}>
       ${!blocks && !failed && html`<div style="padding:32px;text-align:center"><${Spinner} big /></div>`}
       ${failed && html`<p class="body-large faint" style="padding:32px;text-align:center">${str('notes_failed')}</p>`}
       ${blocks && !blocks.length && html`<p class="body-large faint" style="padding:32px;text-align:center">${str('notes_empty')}</p>`}

@@ -295,6 +295,30 @@ await test('the assistant knows the home by short ids and asks only about what e
   });
 });
 
+await test('the agent keeps only what names things of the home, by their key', () => {
+  withUser(1, () => {
+    const catalog = new ai.Catalog({
+      devices: [
+        { applianceId: 'lamp', name: 'Lampada', hasPower: true, category: 'LIGHT' },
+        { applianceId: 'temp', name: 'Termometro', isSensor: true, category: 'SENSOR' },
+      ],
+      groups: [{ id: 'g', name: 'Sera', devices: ['lamp'] }],
+      macros: [{ key: 'macro:m', name: 'Notte' }],
+      remotes: [],
+    });
+    const plan = ai.parseAgent({ reply: 'Ok', actions: [
+      { do: 'power', target: 'g1', on: false }, { do: 'power', target: 'd2' }, { do: 'later', target: 'd1', on: false, minutes: 20 },
+      { do: 'automation', sensor: 'd2', when: 'temperatureAbove', threshold: 26, target: 'm1' }, { do: 'run', target: 'd1' },
+      { do: 'list', list: 'Spesa', items: ['uova', ' '] }, { do: 'event', title: 'Dentista', start: '2026-11-12T15:00' },
+    ] }, catalog);
+    assert.deepEqual(plan.actions.map((a) => [a.do, a.key ?? a.list ?? a.title]), [
+      ['power', 'group:g'], ['later', 'lamp'], ['automation', 'macro:m'], ['list', 'Spesa'], ['event', 'Dentista'],
+    ]);
+    assert.equal(ai.parseAgent({ reply: '', alexa: true, actions: [] }, catalog).alexa, true);
+    assert.match(ai.agentPrompt(catalog, '', 'Italian', 'oggi', 'Lists: "Spesa"'), /Answer in Italian\. Now it is oggi\.[\s\S]*d1: device "Lampada"[\s\S]*Lists: "Spesa"$/);
+  });
+});
+
 if (failures) {
   console.log(`${failures} failed`);
   process.exit(1);

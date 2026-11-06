@@ -62,7 +62,6 @@ import app.hommaterial.data.NotionNote
 import app.hommaterial.data.NotionSource
 import app.hommaterial.data.NotionStore
 import app.hommaterial.data.PhraseSuggestions
-import app.hommaterial.data.correctionPrompt
 import app.hommaterial.data.parsePhrases
 import app.hommaterial.data.phrasesPrompt
 import app.hommaterial.data.mapObjects
@@ -79,6 +78,17 @@ import app.hommaterial.quick.Alerts
 import app.hommaterial.quick.Automations
 import app.hommaterial.quick.PowerTile
 import app.hommaterial.quick.Quick
+import app.hommaterial.data.AgentAction
+import app.hommaterial.data.AgentPlan
+import app.hommaterial.data.agentPrompt
+import app.hommaterial.data.parseAgent
+import app.hommaterial.data.historyLine
+import app.hommaterial.data.ACTION_MACRO
+import app.hommaterial.data.ACTION_REMOTE
+import app.hommaterial.data.ACTION_POWER
+import app.hommaterial.quick.clock
+import app.hommaterial.ui.describe
+import app.hommaterial.ui.conditionText
 import app.hommaterial.quick.Schedules
 import app.hommaterial.quick.Timers
 import app.hommaterial.str
@@ -186,8 +196,10 @@ data class UiState(
     val voice: VoiceResult.Ask? = null,
     /** Whether a spoken command is with the assistant, to have its names put right. */
     val correcting: Boolean = false,
-    /** What was last said to Alexa and her answer, shown full screen until closed. */
-    val alexaReply: AlexaReply? = null,
+    /** What was last asked of Alexa or of the assistant and the answer, shown full screen until closed. */
+    val reply: VoiceReply? = null,
+    /** Whether those answers are read aloud at once. */
+    val readAloud: Boolean = false,
     /** The Echo that what is said to the microphone goes to, as if said to it; null when the app understands it by itself. */
     val voiceEcho: Echo? = null,
     /** The calendars chosen on this device, by id; null until the user chooses, showing those the calendar itself shows. */
@@ -258,8 +270,18 @@ data class TvSearch(
     val asking: Boolean = false,
 )
 
-/** What was [said] to Alexa and her [reply], null while [waiting] for it or when she gave none in writing. */
-data class AlexaReply(val said: String, val reply: String? = null, val waiting: Boolean = true)
+/**
+ * What was [said] to Alexa, or asked of the assistant, and the [reply]: null while [waiting] for it,
+ * or when Alexa gave none in writing. [actions] are what the assistant would do, waiting for a yes.
+ */
+data class VoiceReply(
+    val id: Long,
+    val fromAlexa: Boolean,
+    val said: String,
+    val reply: String? = null,
+    val waiting: Boolean = true,
+    val actions: List<AgentAction> = emptyList(),
+)
 
 /** Where the assistant stands: its account and what it was taught. */
 data class AssistantUi(
@@ -379,6 +401,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             alerts = Alerts.all(getApplication()),
             autoUpdate = settings.getBoolean("autoUpdate", true),
             haptics = settings.getBoolean("haptics", true),
+            readAloud = settings.getBoolean("readAloud", false),
             hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
             theme = settings.getInt("theme", 0),
             accent = settings.getString("accent", null) ?: ACCENT_AUTO,
@@ -434,7 +457,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 tvSearch = s.tvSearch,
                 voice = s.voice,
                 correcting = s.correcting,
-                alexaReply = s.alexaReply,
+                reply = s.reply,
                 echos = s.echos,
                 askBackupRestore = s.askBackupRestore,
                 update = s.update,
@@ -699,8 +722,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Acts on what the speech recognizer [heard], its guesses best first. A voice phrase of a custom
      * device runs it; a device, group, custom device or remote of the app named without doubt is
-     * switched here; anything else goes to Alexa, when an Echo was chosen for it. Otherwise what is
-     * not clearly understood goes to the assistant, when there is one, to have the names put right first.
+     * switched here. Anything else goes to the assistant, when there is one, which acts on it or
+     * answers; what is about nothing of the app goes on to Alexa, when an Echo was chosen for it.
      */
     fun onSpeech(heard: List<String>) {
         val s = _state.value
@@ -709,41 +732,24 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             _messages.tryEmit(str(R.string.schedule_run, macro.name))
             return runMacro(macro)
         }
-        val echo = s.voiceEcho
-        val said = heard.firstOrNull { it.isNotBlank() }
-        if (echo != null) {
-            if (said == null) return answer(VoiceResult.Unknown(""))
-            // What the app knows is done here: Alexa does not know the groups of the app, for one.
-            return if (act(heard)) Unit else sayToAlexa(echo, said)
-        }
+        val said = heard.firstOrNull { it.isNotBlank() } ?: return answer(VoiceResult.Unknown(""))
+        // What the app knows without doubt is done here: Alexa does not know the groups of the app, for one.
         if (act(heard)) return
-        val result = parseVoice(heard, voiceDevices())
-        if (!assistantStore.configured || heard.all { it.isBlank() }) return answer(result)
-        _state.update { it.copy(correcting = true) }
+        if (!assistantStore.configured) {
+            s.voiceEcho?.let { return sayToAlexa(it, said) }
+            return answer(parseVoice(heard, voiceDevices()))
+        }
         voiceJob?.cancel()
         voiceJob = viewModelScope.launch {
-            val corrected = try {
-                workersAi.correct(
-                    assistantStore.accountId(),
-                    assistantStore.token(),
-                    assistantStore.model(),
-                    correctionPrompt(assistantCatalog(), assistantStore.house()),
-                    heard.filter { it.isNotBlank() },
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // Without the assistant the sentence is still read as it was heard.
-                android.util.Log.w("Assistant", "Correction failed", e)
-                ""
-            } finally {
-                _state.update { it.copy(correcting = false) }
-            }
-            if (corrected.isEmpty() || !act(listOf(corrected))) {
-                // What was put right is offered first, should it still be understood only in part.
-                val again = if (corrected.isEmpty()) result else parseVoice(listOf(corrected) + heard, voiceDevices())
-                answer(if (again is VoiceResult.Unknown) result else again)
-            }
+            val others = heard.filter { it.isNotBlank() && it != said }
+            val request = if (others.isEmpty()) said else "$said\n(Other guesses of the speech recognizer: ${others.joinToString(" | ")})"
+            val plan = askAssistant(request, said)
+            // What is about nothing of the app, or what the assistant could not answer, goes on to Alexa.
+            if (plan != null && !plan.alexa) return@launch
+            _state.value.voiceEcho?.let { return@launch sayToAlexa(it, said) }
+            if (plan == null) return@launch
+            dismissReply()
+            answer(parseVoice(heard, voiceDevices()))
         }
     }
 
@@ -807,19 +813,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Tells Alexa [said] through [echo], which answers aloud; what she answers is shown full screen too. */
     private fun sayToAlexa(echo: Echo, said: String) {
-        val asked = AlexaReply(said)
-        _state.update { it.copy(alexaReply = asked) }
+        val asked = VoiceReply(System.nanoTime(), fromAlexa = true, said = said)
+        _state.update { it.copy(reply = asked) }
         viewModelScope.launch {
             val since = System.currentTimeMillis()
             val done = guarded { api.say(echo.serial, said) }
             _haptics.tryEmit(if (done) Haptic.Confirm else Haptic.Reject)
             val reply = if (done) alexaReply(echo.serial, since) else null
             // Closed meanwhile, or replaced by a newer question: nothing to show.
-            _state.update { if (it.alexaReply === asked) it.copy(alexaReply = asked.copy(reply = reply, waiting = false)) else it }
+            _state.update { if (it.reply?.id == asked.id) it.copy(reply = asked.copy(reply = reply, waiting = false)) else it }
         }
     }
-
-    fun dismissAlexaReply() = _state.update { it.copy(alexaReply = null) }
 
     /** Waits for the answer of Alexa to reach the voice history, for some seconds at most. */
     private suspend fun alexaReply(serial: String, since: Long): String? {
@@ -1353,6 +1357,187 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private val assistantLanguage: String get() = str(R.string.assistant_language_name)
+
+    // --- the assistant acting on requests in words ------------------------------------------------
+
+    /** What the assistant is told besides the home: the lists, the agenda of the next days, the timers, the history. */
+    private suspend fun agentContext(): String {
+        val s = _state.value
+        val parts = mutableListOf<String>()
+        val lists = (Offline.lists().orEmpty().map { it.name } + notionStore.lists().map { it.name }).distinct()
+        if (lists.isNotEmpty()) parts += "Lists: " + lists.joinToString(", ") { "\"$it\"" }
+        if (calendar.ready) {
+            // Without the agenda the rest is still worth an answer.
+            runCatching {
+                val all = calendar.calendars()
+                val shown = s.calendarShown?.let { chosen -> all.filter { it.id in chosen } } ?: all.filter { it.shown }
+                val from = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                val events = calendar.events(shown.map { it.id }, from, from + 3 * 86_400_000L)
+                val format = java.text.SimpleDateFormat("EEE yyyy-MM-dd HH:mm", java.util.Locale.ROOT)
+                parts += "Calendar, today and the next two days:\n" + events.joinToString("\n") { e ->
+                    "- " + if (e.allDay) "${format.format(e.start).dropLast(6)} (all day): ${e.title}" else "${format.format(e.start)} to ${format.format(e.end).takeLast(5)}: ${e.title}"
+                }.ifEmpty { "- nothing" }
+            }.onFailure { if (it is CancellationException) throw it }
+        }
+        val timers = s.timers.map { (id, at) -> "- ${s.devices.find { it.applianceId == id }?.name ?: id} switches off at ${clock(at)}" } +
+            s.schedules.filter { it.enabled }.map { "- ${it.label} at ${clock(it.at)}" + if (it.days.isNotEmpty()) " (repeats)" else "" }
+        if (timers.isNotEmpty()) parts += "Timers and schedules:\n" + timers.joinToString("\n")
+        val sensors = s.devices.filter { it.applianceId !in s.hidden }
+            .mapNotNull { d -> history.readings(d.applianceId).takeIf { it.isNotEmpty() }?.let { historyLine(d.name, it) } }
+        if (sensors.isNotEmpty()) parts += "Sensor history:\n" + sensors.joinToString("\n")
+        return parts.joinToString("\n")
+    }
+
+    private fun nowText(): String =
+        java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.FULL, java.text.DateFormat.SHORT).format(java.util.Date())
+
+    /**
+     * Has the assistant answer [request] and do what it asks, full screen. Switching one thing is
+     * done at once; anything more waits for the user to confirm. [said] is what is shown as asked,
+     * [extra] more to know (a note to sum up). Gives back what it answered, null when it failed.
+     */
+    private suspend fun askAssistant(request: String, said: String, extra: String = ""): AgentPlan? {
+        val asked = VoiceReply(System.nanoTime(), fromAlexa = false, said = said)
+        _state.update { it.copy(reply = asked) }
+        // Closed meanwhile, or replaced by a newer request: nothing to show.
+        fun show(change: (VoiceReply) -> VoiceReply) =
+            _state.update { if (it.reply?.id == asked.id) it.copy(reply = change(asked.copy(waiting = false))) else it }
+        val plan = try {
+            val catalog = assistantCatalog()
+            val context = listOf(agentContext(), extra).filter { it.isNotBlank() }.joinToString("\n")
+            val prompt = agentPrompt(catalog, assistantStore.house(), assistantLanguage, nowText(), context)
+            parseAgent(workersAi.agent(assistantStore.accountId(), assistantStore.token(), assistantStore.model(), prompt, request), catalog)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: java.io.IOException) {
+            show { it.copy(reply = str(R.string.no_connection)) }
+            return null
+        } catch (e: Exception) {
+            android.util.Log.w("Assistant", "Request failed", e)
+            show { it.copy(reply = e.message ?: str(R.string.something_wrong)) }
+            return null
+        }
+        if (plan.alexa) return plan
+        if (plan.needsConfirm) {
+            show { it.copy(reply = plan.reply.ifEmpty { str(R.string.ai_confirm_text) }, actions = plan.actions) }
+        } else {
+            val done = doAgent(plan.actions)
+            show { it.copy(reply = if (done) plan.reply.ifEmpty { str(R.string.ai_done) } else str(R.string.ai_partly)) }
+        }
+        return plan
+    }
+
+    /** Asks the assistant [request] as it is, from the examples of the settings. */
+    fun ask(request: String) {
+        voiceJob?.cancel()
+        voiceJob = viewModelScope.launch { askAssistant(request, request) }
+    }
+
+    /** Tells what the home looks like today: the brief of the assistant. */
+    fun brief() {
+        voiceJob?.cancel()
+        voiceJob = viewModelScope.launch { askAssistant(str(R.string.ai_brief_request), str(R.string.ai_brief)) }
+    }
+
+    /** Sums up the note called [title], whose [text] is given. */
+    fun summarize(title: String, text: String) {
+        voiceJob?.cancel()
+        voiceJob = viewModelScope.launch {
+            askAssistant(str(R.string.ai_summary_request), str(R.string.ai_summary_of, title), "The note \"$title\":\n${text.take(20_000)}")
+        }
+    }
+
+    /** Does what the assistant offered, once the user confirms it. */
+    fun confirmAgent() {
+        val shown = _state.value.reply ?: return
+        if (shown.actions.isEmpty()) return
+        _state.update { it.copy(reply = shown.copy(actions = emptyList(), waiting = true)) }
+        viewModelScope.launch {
+            val done = doAgent(shown.actions)
+            _state.update {
+                if (it.reply?.id == shown.id) it.copy(reply = shown.copy(actions = emptyList(), waiting = false, reply = str(if (done) R.string.ai_done else R.string.ai_partly))) else it
+            }
+        }
+    }
+
+    fun dismissReply() = _state.update { it.copy(reply = null) }
+
+    fun setReadAloud(on: Boolean) {
+        settings.edit().putBoolean("readAloud", on).apply()
+        _state.update { it.copy(readAloud = on) }
+    }
+
+    /** The actions of the app that switch or run what [key] stands for: a device, a group, a custom device, a remote. */
+    private fun actionsOf(key: String, on: Boolean): List<MacroAction> {
+        val s = _state.value
+        val value = if (on) "on" else "off"
+        s.groups.find { "group:${it.id}" == key }?.let { group ->
+            return s.devices.filter { it.hasPower && it.applianceId in group.devices && it.applianceId !in s.hidden }
+                .map { MacroAction(ACTION_POWER, it.applianceId, value) }
+        }
+        s.macros.find { Quick.macroKey(it.id) == key }?.let { return listOf(MacroAction(ACTION_MACRO, it.id)) }
+        s.remotes.find { Quick.remoteKey(it.id) == key }?.let { return listOf(MacroAction(ACTION_REMOTE, it.id, if (on) "turnOn" else "turnOff")) }
+        return if (s.devices.any { it.applianceId == key }) listOf(MacroAction(ACTION_POWER, key, value)) else emptyList()
+    }
+
+    /** Does at once what is now: switching and running. */
+    private fun runNow(action: MacroAction) {
+        val s = _state.value
+        when (action.type) {
+            ACTION_MACRO -> s.macros.find { it.id == action.target }?.let(::runMacro)
+            ACTION_REMOTE -> s.remotes.find { it.id == action.target }?.let { sendRemote(it, action.value) }
+            else -> s.devices.find { it.applianceId == action.target }?.let { setPower(it, action.value == "on") }
+        }
+    }
+
+    /** Does the actions the assistant chose; false when one of them could not be done. */
+    private suspend fun doAgent(actions: List<AgentAction>): Boolean {
+        var ok = true
+        for (a in actions) {
+            val s = _state.value
+            when (a.kind) {
+                "power", "run" -> actionsOf(a.key, a.on).forEach(::runNow)
+                "later" -> actionsOf(a.key, a.on).forEach { addTimer(it, describe(it, s), a.minutes) }
+                "automation" -> {
+                    val device = s.devices.find { it.applianceId == a.sensor }
+                    val action = actionsOf(a.key, a.on).firstOrNull()
+                    if (device != null && action != null) {
+                        addAutomation(device, a.trigger, a.threshold, action, conditionText(device.name, a.trigger, a.threshold), describe(action, s))
+                    } else {
+                        ok = false
+                    }
+                }
+                "list" -> {
+                    val list = alexaLists()?.find { it.name.trim().equals(a.list, ignoreCase = true) }
+                    if (list == null) {
+                        ok = false
+                    } else {
+                        for (item in a.items) {
+                            if (list.type == LIST_NOTION) ok = addNotionItem(list.id, item) && ok else addAlexaListItem(list.id, item)
+                        }
+                    }
+                }
+                "event" -> {
+                    val writable = calendars().orEmpty().filter { it.writable }
+                    val target = writable.find { it.id == s.calendarDefault } ?: writable.find { it.primary } ?: writable.firstOrNull()
+                    if (target == null) {
+                        ok = false
+                        continue
+                    }
+                    val zone = java.time.ZoneId.systemDefault()
+                    val input = if (a.date.isNotEmpty()) {
+                        val day = java.time.LocalDate.parse(a.date)
+                        EventInput(a.title, "", "", true, day.atStartOfDay(zone).toInstant().toEpochMilli(), day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
+                    } else {
+                        val start = java.time.LocalDateTime.parse(a.start).atZone(zone).toInstant().toEpochMilli()
+                        EventInput(a.title, "", "", false, start, start + a.minutes * 60_000L)
+                    }
+                    ok = saveEvent(null, target.id, input) && ok
+                }
+            }
+        }
+        return ok
+    }
 
     /** Has the assistant look at the home and ask about what it does not understand. */
     fun startTeaching() {

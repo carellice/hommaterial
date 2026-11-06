@@ -144,4 +144,44 @@ class AssistantTest {
         // A wrong account id is not even sent.
         assertEquals(R.string.assistant_bad_account, fails(200, "{}", account = "nope"))
     }
+
+    @Test
+    fun `the agent keeps only what names things of the home, by their key`() {
+        val answer = JSONObject(
+            """{"reply":"Fatto","actions":[
+            {"do":"power","target":"g1","on":false},
+            {"do":"power","target":"d3","on":true},
+            {"do":"later","target":"d1","on":false,"minutes":20},
+            {"do":"run","target":"m1"},
+            {"do":"run","target":"d1"},
+            {"do":"automation","sensor":"d3","when":"temperatureAbove","threshold":26,"target":"r2","on":true},
+            {"do":"automation","sensor":"d3","when":"sometimes","threshold":26,"target":"r2"},
+            {"do":"list","list":"Spesa","items":["uova"," ","guanciale"]},
+            {"do":"event","title":"Dentista","start":"2026-11-12T15:00:00"},
+            {"do":"event","title":"Ferie","date":"2026-12-24"},
+            {"do":"event","title":"Senza data"}]}""",
+        )
+        val plan = parseAgent(answer, catalog())
+        assertEquals(
+            listOf(
+                AgentAction("power", "group:g", "Luci", on = false),
+                AgentAction("later", "lamp", "Luce scrivania", on = false, minutes = 20),
+                AgentAction("run", "macro:m", "Film"),
+                AgentAction("automation", "remote:ac1", "Clima", sensor = "temp", sensorName = "Termometro", trigger = "temperatureAbove", threshold = 26.0),
+                AgentAction("list", list = "Spesa", items = listOf("uova", "guanciale")),
+                AgentAction("event", title = "Dentista", start = "2026-11-12T15:00", minutes = 60),
+                AgentAction("event", title = "Ferie", date = "2026-12-24"),
+            ),
+            plan.actions,
+        )
+        assertTrue(plan.needsConfirm)
+        assertFalse(plan.alexa)
+        // Only a single switch is done without asking; Alexa takes only what has nothing to do.
+        assertFalse(parseAgent(JSONObject("""{"reply":"","actions":[{"do":"power","target":"d1","on":true}]}"""), catalog()).needsConfirm)
+        assertTrue(parseAgent(JSONObject("""{"reply":"","alexa":true,"actions":[]}"""), catalog()).alexa)
+        assertFalse(parseAgent(JSONObject("""{"reply":null,"alexa":true,"actions":[{"do":"power","target":"d1"}]}"""), catalog()).alexa)
+        val day = java.time.ZoneOffset.UTC
+        val line = historyLine("Termometro", listOf(Reading(0, 20.0, 50), Reading(3_600_000, 22.5, null)), day)
+        assertEquals("\"Termometro\" by day (MM-DD min-max): 01-01 20.0-22.5°C 50.0-50.0%", line)
+    }
 }

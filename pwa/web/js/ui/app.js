@@ -1,6 +1,6 @@
 // The app: which screen is shown, the theme, and the panel behaviour of the monitor mode.
 import { html, useState, useEffect, useRef } from '../lib.js';
-import { Dialog, Snackbar, useStore, useNow } from './common.js';
+import { Dialog, FullDialog, Icon, Spinner, Snackbar, useStore, useNow } from './common.js';
 import * as store from '../store.js';
 import { str } from '/shared/i18n.js';
 import { accentCss } from '/shared/accents.js';
@@ -153,7 +153,61 @@ export function App() {
     ${screen}
     ${resting && monitor && html`<${RestScreen} s=${s} night=${night} onWake=${() => setResting(false)} />`}
     ${s.update && s.updatePrompt && html`<${UpdateDialog} version=${s.update.version} />`}
+    ${s.reply && html`<${ReplyScreen} reply=${s.reply} readAloud=${s.readAloud} />`}
     <${Snackbar} />`;
+}
+
+/** The most natural Italian voice of the browser: the online ("Natural", Google) ones sound the most human. */
+function italianVoice() {
+  const voices = speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith('it'));
+  const rank = (v) => (/natural|neural|online/i.test(v.name) ? 2 : /google/i.test(v.name) ? 1 : 0);
+  return voices.sort((a, b) => rank(b) - rank(a))[0] ?? null;
+}
+
+/**
+ * What was asked of Alexa or of the assistant and the answer, full screen, to read at leisure or
+ * to have read aloud; at once when [readAloud]. What the assistant would do waits here for a yes.
+ */
+function ReplyScreen({ reply, readAloud }) {
+  const [speaking, setSpeaking] = useState(false);
+  const canSpeak = 'speechSynthesis' in window;
+  const text = reply.waiting ? null : reply.reply;
+  const read = () => {
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'it-IT';
+    utterance.voice = italianVoice();
+    utterance.onend = utterance.onerror = () => setSpeaking(false);
+    setSpeaking(true);
+    speechSynthesis.speak(utterance);
+  };
+  const stop = () => {
+    speechSynthesis.cancel();
+    setSpeaking(false);
+  };
+  useEffect(() => () => canSpeak && speechSynthesis.cancel(), []);
+  useEffect(() => {
+    if (text && readAloud && canSpeak) read();
+  }, [reply.id, text]);
+  const alexa = reply.from === 'alexa';
+  const waiting = str(alexa ? 'alexa_waiting' : 'ai_thinking');
+  return html`
+    <${FullDialog} title=${alexa ? 'Alexa' : str('ai_title')} onDismiss=${store.dismissReply} closeLabel=${str('close')}>
+      <div class="supporting" style="padding:8px 0 24px">${alexa ? str('voice_to_alexa', reply.said) : `“${reply.said}”`}</div>
+      ${reply.waiting
+        ? html`<div style="display:flex;align-items:center;gap:16px"><${Spinner} /><span class="title-large">${waiting}</span></div>`
+        : html`<div class=${text ? 'headline-medium' : 'title-large'} style="white-space:pre-wrap">${text ?? str('alexa_no_reply')}</div>`}
+      ${reply.actions?.length > 0 && html`
+        <ul class="body-large" style="margin:24px 0 0;padding-left:20px">${reply.actions.map((a) => html`<li style="margin:6px 0">${store.agentLabel(a)}</li>`)}</ul>
+        <div style="display:flex;gap:12px;margin-top:24px">
+          <button class="tonal-btn" style="flex:1" onClick=${store.dismissReply}>${str('cancel')}</button>
+          <button class="filled-btn" style="flex:1" onClick=${store.confirmAgent}>${str('ai_confirm')}</button>
+        </div>`}
+      ${text && canSpeak && html`
+        <button class="filled-btn" style="width:100%;margin-top:32px" onClick=${speaking ? stop : read}>
+          <${Icon} name=${speaking ? 'stop' : 'volume_up'} /> ${str(speaking ? 'alexa_stop_reading' : 'alexa_read')}
+        </button>`}
+    <//>`;
 }
 
 function UpdateDialog({ version }) {
