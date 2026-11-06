@@ -303,7 +303,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                                 Icon(Icons.Outlined.Refresh, contentDescription = str(R.string.refresh_now))
                             }
                         }
-                        VoiceButton(vm, state)
+                        VoiceButton(vm, correcting = state.correcting)
                         OverflowMenu(state, vm, onSettings, onArrange = { arranging = true })
                         return@TopAppBar
                     }
@@ -325,7 +325,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                     IconButton(onClick = { query = "" }) {
                         Icon(Icons.Outlined.Search, contentDescription = str(R.string.search))
                     }
-                    VoiceButton(vm, state)
+                    VoiceButton(vm, correcting = state.correcting)
                     OverflowMenu(state, vm, onSettings, onArrange = { arranging = true })
                 },
             )
@@ -1276,34 +1276,33 @@ private fun ageText(updatedAt: Long, now: Long): String {
 
 /**
  * Asks the phone's speech recognizer for a sentence and passes on what it heard; it spins while
- * the assistant is correcting the names in it. With the wake word on, saying it does the same as a tap.
+ * the assistant is [correcting] the names in it.
  */
 @Composable
-private fun VoiceButton(vm: HomeViewModel, state: UiState) {
-    val correcting = state.correcting
+private fun VoiceButton(vm: HomeViewModel, correcting: Boolean) {
     val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             vm.onSpeech(result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty())
         }
     }
-    val listen = {
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, str(R.string.voice_language))
-            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-            .putExtra(
-                RecognizerIntent.EXTRA_PROMPT,
-                str(if (vm.state.value.voiceEcho != null) R.string.voice_prompt_alexa else R.string.voice_prompt),
-            )
-        try {
-            speech.launch(intent)
-        } catch (e: ActivityNotFoundException) {
-            vm.speechUnavailable()
-        }
-    }
-    val model = state.wakeModel
-    if (state.wakeWord && model != null && !correcting) WakeListener(model, state.wakeSensitivity, onWake = listen)
-    IconButton(onClick = listen, enabled = !correcting) {
+    IconButton(
+        onClick = {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, str(R.string.voice_language))
+                .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+                .putExtra(
+                    RecognizerIntent.EXTRA_PROMPT,
+                    str(if (vm.state.value.voiceEcho != null) R.string.voice_prompt_alexa else R.string.voice_prompt),
+                )
+            try {
+                speech.launch(intent)
+            } catch (e: ActivityNotFoundException) {
+                vm.speechUnavailable()
+            }
+        },
+        enabled = !correcting,
+    ) {
         if (correcting) {
             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         } else {

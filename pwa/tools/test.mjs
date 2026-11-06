@@ -319,41 +319,6 @@ await test('the agent keeps only what names things of the home, by their key', (
   });
 });
 
-// A made-up word of vowel-like sounds, a little faster or slower and higher or lower each time it is said.
-const wake = await import('../web/js/wake.js');
-function sayWord(vowels, speed, pitch) {
-  const out = [];
-  let noise = 7;
-  const hiss = () => ((noise = (noise * 69069 + 1) % 4294967296) / 4294967296 - 0.5) * 0.002;
-  for (let i = 0; i < wake.RATE / 2; i++) out.push(hiss());
-  let t = 0;
-  for (const formant of vowels) {
-    for (let i = 0; i < (0.12 * wake.RATE) / speed; i++, t++) {
-      let x = 0;
-      for (let k = 1; k * pitch < 4000; k++) x += Math.exp(-(((k * pitch - formant) / 250) ** 2)) * Math.sin((2 * Math.PI * k * pitch * t) / wake.RATE);
-      out.push(0.2 * x + hiss());
-    }
-  }
-  for (let i = 0; i < wake.RATE / 2; i++) out.push(hiss());
-  return out;
-}
-const WORD = [700, 1800, 500, 2200, 900];
-await test('the wake word is taught from a few samples and heard again, not other words', () => {
-  const samples = [[0.9, 110], [1, 120], [1.05, 125], [1.1, 115]].map(([speed, pitch]) => wake.trim(new wake.Features().push(sayWord(WORD, speed, pitch))));
-  const model = wake.train(samples);
-  assert.ok(model.threshold > 0);
-  const hears = (vowels, speed, pitch) => {
-    const features = new wake.Features();
-    const detector = new wake.Detector(model, 1);
-    detector.feed(features.push(sayWord([], 1, 100)));
-    return detector.feed(features.push(sayWord(vowels, speed, pitch)));
-  };
-  assert.equal(hears(WORD, 0.95, 122), true);
-  assert.equal(hears([2200, 500, 1800, 900, 700], 1, 120), false);
-  assert.equal(hears([700, 1800], 1, 120), false);
-  assert.equal(wake.trim(new wake.Features().push(sayWord([], 1, 100))), null);
-});
-
 if (failures) {
   console.log(`${failures} failed`);
   process.exit(1);

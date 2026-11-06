@@ -1,5 +1,5 @@
 // Everything the user can manage about the app, in one place.
-import { html, useState, useRef, useEffect } from '../lib.js';
+import { html, useState, useRef } from '../lib.js';
 import {
   Icon, IconButton, Setting, Toggle, Chips, OrderRow, Dialog, ConfirmDialog, Field, PinDialog, useStore, useBack,
 } from './common.js';
@@ -20,7 +20,6 @@ import { SwitchBotDialog } from './remotes.js';
 import { LgTvDialog, LgRenameDialog } from './lgtv.js';
 import { AssistantSettings } from './assistant.js';
 import { AccountSettings } from './account.js';
-import { Detector, Recorder, SAMPLES, trim, train, openMicrophone } from '../wake.js';
 import { HINTS, SignOutDialog } from './home.js';
 
 const SOURCE_URL = 'https://github.com/carellice/hommaterial';
@@ -458,96 +457,9 @@ function VoiceSettings({ s }) {
     <${Setting} title=${str('voice_echo')} text=${s.voiceEcho?.name ?? str('voice_echo_off')} onClick=${() => setPicking(true)} />
     <p class="body-medium supporting" style="padding:8px 16px">${str('voice_echo_text')}</p>
     <${Toggle} title=${str('read_aloud')} text=${str('read_aloud_text')} checked=${s.readAloud} onChange=${store.setReadAloud} />
-    <${WakeSettings} s=${s} />
     ${picking && html`<${EchoDialog} title=${str('voice_echo_pick')} s=${s} none=${str('voice_echo_off')}
       onDismiss=${() => setPicking(false)} onPick=${(echo) => {
         store.setVoiceEcho(echo);
         setPicking(false);
       }} />`}`;
-}
-
-/** The wake word, under the voice (ui/WakeWord.kt). */
-function WakeSettings({ s }) {
-  const [teaching, setTeaching] = useState(false);
-  const taught = !!s.wakeModel;
-  return html`
-    <${Toggle} title=${str('wake_word')} text=${str('wake_word_text')} checked=${s.wakeWord && taught}
-      onChange=${(on) => (!on ? store.setWakeWord(false) : taught ? store.setWakeWord(true) : setTeaching(true))} />
-    <${Setting} title=${str('wake_teach')} text=${str(taught ? 'wake_teach_again' : 'wake_teach_text')} onClick=${() => setTeaching(true)} />
-    ${taught && html`<${Chips} title=${str('wake_sensitivity')}
-      choices=${[[0, str('wake_sensitivity_low')], [1, str('wake_sensitivity_normal')], [2, str('wake_sensitivity_high')]]}
-      selected=${s.wakeSensitivity} onSelect=${store.setWakeSensitivity} />`}
-    ${teaching && html`<${WakeTeachDialog} sensitivity=${s.wakeSensitivity} onDismiss=${() => setTeaching(false)} />`}`;
-}
-
-/**
- * Teaches the wake word: the user says it [SAMPLES] times, each recording is checked, a sample
- * unlike the others is asked again, and then the word can be tried out at once.
- */
-function WakeTeachDialog({ sensitivity, onDismiss }) {
-  const [view, setView] = useState({ count: 0, level: 0, message: null, testing: false, heard: 0, broken: false });
-  useEffect(() => {
-    const samples = Array(SAMPLES).fill(null);
-    const recorder = new Recorder();
-    let detector = null;
-    let heard = 0;
-    let close = null;
-    let gone = false;
-    const show = (change) => setView((it) => ({ ...it, ...change }));
-    openMicrophone((frames) => {
-      if (!frames.length) return;
-      const level = Math.min(1, Math.max(0, frames[frames.length - 1].rel / 40));
-      if (detector) {
-        if (detector.feed(frames)) heard++;
-        show({ level, heard });
-        return;
-      }
-      show({ level });
-      for (const frame of frames) {
-        const recording = recorder.feed(frame);
-        const index = samples.indexOf(null);
-        if (!recording || index < 0) continue;
-        const trimmed = trim(recording);
-        if (!trimmed) {
-          show({ message: str('wake_unclear') });
-          continue;
-        }
-        samples[index] = trimmed;
-        show({ message: null, count: samples.filter(Boolean).length });
-        if (samples.includes(null)) continue;
-        const taught = train(samples);
-        if (taught.bad != null) {
-          samples[taught.bad] = null;
-          show({ message: str('wake_different', taught.bad + 1), count: SAMPLES - 1 });
-        } else {
-          store.setWakeModel(taught);
-          detector = new Detector(taught, sensitivity);
-          show({ testing: true });
-          break;
-        }
-      }
-    }).then((closer) => {
-      if (gone) closer();
-      else close = closer;
-    }, () => show({ broken: true }));
-    return () => {
-      gone = true;
-      close?.();
-    };
-  }, []);
-  const { count, level, message, testing, heard, broken } = view;
-  return html`
-    <${Dialog} title=${str('wake_teach')} onDismiss=${onDismiss}
-      actions=${html`<button class="text-btn" onClick=${onDismiss}>${str(testing ? 'wake_done' : 'cancel')}</button>`}>
-      ${broken ? html`<p>${str('wake_no_microphone')}</p>`
-        : testing ? html`
-          <p>${str('wake_try')}</p>
-          <p class="title-medium" style=${`color:var(${heard ? '--primary' : '--on-surface-variant'})`}>
-            ${heard ? str('wake_try_heard', heard) : str('wake_try_waiting')}</p>`
-        : html`
-          <p>${str('wake_say')}</p>
-          <p class="title-medium">${str('wake_sample', count + 1, SAMPLES)}</p>`}
-      ${!broken && html`<progress max="1" value=${level} style="width:100%"></progress>`}
-      ${message && html`<p style="color:var(--error)">${message}</p>`}
-    <//>`;
 }

@@ -5,7 +5,6 @@ import {
   Card, Chips, OrderRow, useStore, useNow, useWidth, usePress, useBack,
 } from './common.js';
 import * as store from '../store.js';
-import { Detector, openMicrophone } from '../wake.js';
 import { tileSpan } from '/shared/backup.js';
 import { str, plural, clock, dateText, degrees } from '/shared/i18n.js';
 import {
@@ -725,12 +724,9 @@ function ArrangeDialog({ s, onDismiss }) {
 /**
  * Asks the browser's speech recognizer for a sentence and passes on what it heard. The browser
  * shows nothing while it listens, so a panel does: when it is ready, and the words as they come.
- * With the wake word on, saying it does the same as a tap.
  */
 function VoiceButton() {
-  const s = useStore();
   const [session, setSession] = useState(null);
-  const latest = useRef(null);
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const listen = () => {
     if (!Recognition) {
@@ -778,54 +774,11 @@ function VoiceButton() {
       store.speechUnavailable();
     }
   };
-  latest.current = listen;
-  useWakeWord(!!(s.wakeWord && s.wakeModel && Recognition && !session && !s.correcting), s.wakeModel, s.wakeSensitivity, () => latest.current());
   return html`
     <button class=${`icon-btn ${session ? 'listening' : ''}`} aria-label=${str('voice_button')} title=${str('voice_button')}
       aria-pressed=${!!session} onClick=${() => (session ? session.stop() : listen())}>
       <${Icon} name="mic" filled=${!!session} /></button>
     ${session && html`<${OnTop}><${ListeningPanel} session=${session} /><//>`}`;
-}
-
-/**
- * Keeps the microphone open while [on] and the page is in sight, and calls [onWake] when the wake
- * word is said. It closes before calling, so that the speech recognizer has the microphone to itself.
- */
-function useWakeWord(on, model, sensitivity, onWake) {
-  useEffect(() => {
-    if (!on) return undefined;
-    const detector = new Detector(model, sensitivity);
-    let close = null;
-    let opening = false;
-    let done = false;
-    const stop = () => {
-      close?.();
-      close = null;
-    };
-    const start = () => {
-      if (done || close || opening || document.hidden) return;
-      opening = true;
-      openMicrophone((frames) => {
-        if (!close || !detector.feed(frames)) return;
-        done = true;
-        stop();
-        onWake();
-      }).then((closer) => {
-        close = closer;
-        if (done || document.hidden) stop();
-      }, () => {}).finally(() => {
-        opening = false;
-      });
-    };
-    const visibility = () => (document.hidden ? stop() : start());
-    document.addEventListener('visibilitychange', visibility);
-    start();
-    return () => {
-      done = true;
-      document.removeEventListener('visibilitychange', visibility);
-      stop();
-    };
-  }, [on, model, sensitivity]);
 }
 
 /** Shows [children] on top of the whole page, out of the bar that holds the button. */

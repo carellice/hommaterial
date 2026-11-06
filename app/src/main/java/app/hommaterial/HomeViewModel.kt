@@ -14,7 +14,6 @@ import app.hommaterial.R
 import app.hommaterial.data.AcSetting
 import app.hommaterial.data.Alexa
 import app.hommaterial.data.AlexaList
-import app.hommaterial.data.WakeWord
 import app.hommaterial.data.AssistantCatalog
 import app.hommaterial.data.AssistantException
 import app.hommaterial.data.AssistantNote
@@ -201,12 +200,6 @@ data class UiState(
     val reply: VoiceReply? = null,
     /** Whether those answers are read aloud at once. */
     val readAloud: Boolean = false,
-    /** Whether saying the wake word on the home starts listening, as the microphone button does. */
-    val wakeWord: Boolean = false,
-    /** How the user says the wake word on this device; null until taught. */
-    val wakeModel: WakeWord.Model? = null,
-    /** How easily the wake word is heard, an index of [WakeWord.SENSITIVITY]. */
-    val wakeSensitivity: Int = 1,
     /** The Echo that what is said to the microphone goes to, as if said to it; null when the app understands it by itself. */
     val voiceEcho: Echo? = null,
     /** The calendars chosen on this device, by id; null until the user chooses, showing those the calendar itself shows. */
@@ -409,9 +402,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             autoUpdate = settings.getBoolean("autoUpdate", true),
             haptics = settings.getBoolean("haptics", true),
             readAloud = settings.getBoolean("readAloud", false),
-            wakeWord = settings.getBoolean("wakeWord", false),
-            wakeModel = WakeWord.Model.fromJson(settings.getString("wakeModel", null)),
-            wakeSensitivity = settings.getInt("wakeSensitivity", 1),
             hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
             theme = settings.getInt("theme", 0),
             accent = settings.getString("accent", null) ?: ACCENT_AUTO,
@@ -1475,22 +1465,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun setReadAloud(on: Boolean) {
         settings.edit().putBoolean("readAloud", on).apply()
         _state.update { it.copy(readAloud = on) }
-    }
-
-    fun setWakeWord(on: Boolean) {
-        settings.edit().putBoolean("wakeWord", on).apply()
-        _state.update { it.copy(wakeWord = on) }
-    }
-
-    /** Keeps what was just taught and turns the wake word on. */
-    fun setWakeModel(model: WakeWord.Model) {
-        settings.edit().putString("wakeModel", model.toJson()).putBoolean("wakeWord", true).apply()
-        _state.update { it.copy(wakeModel = model, wakeWord = true) }
-    }
-
-    fun setWakeSensitivity(level: Int) {
-        settings.edit().putInt("wakeSensitivity", level).apply()
-        _state.update { it.copy(wakeSensitivity = level) }
     }
 
     /** The actions of the app that switch or run what [key] stands for: a device, a group, a custom device, a remote. */
