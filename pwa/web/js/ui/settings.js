@@ -9,7 +9,7 @@ import { ACCENTS, accentSeed, shownAccent } from '/shared/accents.js';
 import { DEFAULT_MONITOR } from '../store.js';
 import { str, plural, clock, degrees } from '/shared/i18n.js';
 import {
-  LAYOUT_GRID, LAYOUT_LIST, PAGE_ROOM, REST_CLOCK, REST_DATE, REST_POWER, REST_SENSORS, REST_TIMERS,
+  LAYOUT_GRID, LAYOUT_LIST, PAGE_ROOM, REST_CLOCK, REST_DATE, REST_POWER, REST_SENSORS, REST_TIMERS, REST_TEAM, REST_LISTS, REST_CALENDAR,
   macroKey, remoteKey, placed, placeOf, allRooms, macroStatus, availablePages, shownPages, pageLabel, pagePicks,
 } from '/shared/model.js';
 import { RoomPicker, MembersDialog, PicksDialog } from './rooms.js';
@@ -21,6 +21,8 @@ import { LgTvDialog, LgRenameDialog } from './lgtv.js';
 import { AssistantSettings } from './assistant.js';
 import { AccountSettings } from './account.js';
 import { HINTS, SignOutDialog } from './home.js';
+import { TeamSettings } from './team.js';
+import { matches } from '/shared/search.js';
 
 const SOURCE_URL = 'https://github.com/carellice/hommaterial';
 
@@ -28,7 +30,10 @@ const SOURCE_URL = 'https://github.com/carellice/hommaterial';
 // The icon at the head of each section, so that a long list of them is quick to scan.
 const AI_EXAMPLES = Array.from({ length: 10 }, (_, i) => `ai_example_${i + 1}`);
 
-const SECTION_ICONS = { appearance: 'palette', notifications: 'notifications', switchbot: 'settings_remote', lgtv: 'tv', assistant: 'auto_awesome', aiExamples: 'lightbulb', voice: 'record_voice_over', calendar: 'calendar_month', notion: 'description', updates: 'system_update', rooms: 'meeting_room', devices: 'devices_other', groups: 'layers', macros: 'extension', monitor: 'tablet_android', timers: 'timer', alerts: 'warning', backup: 'backup', data: 'storage', account: 'account_circle', server: 'dns', hints: 'tips_and_updates', about: 'info' };
+// The words each section is looked for by, beyond its title: settings_keys_<name>.
+const SEARCH_KEYS = { aiExamples: 'ai_examples' };
+
+const SECTION_ICONS = { appearance: 'palette', notifications: 'notifications', team: 'sports_soccer', switchbot: 'settings_remote', lgtv: 'tv', assistant: 'auto_awesome', aiExamples: 'lightbulb', voice: 'record_voice_over', calendar: 'calendar_month', notion: 'description', updates: 'system_update', rooms: 'meeting_room', devices: 'devices_other', groups: 'layers', macros: 'extension', monitor: 'tablet_android', timers: 'timer', alerts: 'warning', backup: 'backup', data: 'storage', account: 'account_circle', server: 'dns', hints: 'tips_and_updates', about: 'info' };
 
 function Section({ title, text, icon, open, onToggle, children }) {
   return html`
@@ -51,9 +56,23 @@ export function SettingsScreen({ onBack }) {
   const [dialog, setDialog] = useState(null);
   const importInput = useRef(null);
   const close = () => setDialog(null);
-  const section = (key, title, text, children) => html`
-    <${Section} title=${str(title)} text=${text && str(text)} icon=${SECTION_ICONS[key]} open=${open.includes(key)}
+  // What is typed in the search: the sections it finds show open, the others hide.
+  const [query, setQuery] = useState('');
+  const searching = query.trim() !== '';
+  // How many sections the search found, counted as the page is written, in order.
+  let found = 0;
+  const section = (key, title, text, children) => {
+    if (searching) {
+      const about = [str(title), text && str(text), str(`settings_keys_${SEARCH_KEYS[key] ?? key}`)].filter(Boolean).join(' ');
+      if (!matches(query, about)) return null;
+      found++;
+    }
+    return html`
+    <${Section} key=${key} title=${str(title)} text=${text && str(text)} icon=${SECTION_ICONS[key]} open=${searching || open.includes(key)}
       onToggle=${() => setOpen(open.includes(key) ? open.filter((k) => k !== key) : [...open, key])}>${children}<//>`;
+  };
+  // The heading of a few sections that belong together; the search lists what it finds without them.
+  const group = (title) => !searching && html`<div class="title-small settings-group">${str(title)}</div>`;
 
   const all = placed(s);
   const noRoom = str('room_none');
@@ -146,6 +165,12 @@ export function SettingsScreen({ onBack }) {
         <div class="title"><div class="title-large">${str('settings')}</div></div>
       </div>
       <div class="scroll"><div class="narrow">
+        <label class="settings-search"><${Icon} name="search" />
+          <input type="text" enterkeyhint="search" value=${query} placeholder=${str('settings_search_hint')} aria-label=${str('settings_search_hint')}
+            onInput=${(e) => setQuery(e.target.value)} />
+          ${query && html`<${IconButton} icon="close" label=${str('search_close')} onClick=${() => setQuery('')} />`}
+        </label>
+        ${group('settings_group_general')}
         ${section('appearance', 's_appearance', null, html`
           <${Chips} title=${str('theme')} choices=${[[0, str('theme_auto')], [1, str('theme_light')], [2, str('theme_dark')]]}
             selected=${s.theme} onSelect=${store.setTheme} />
@@ -161,6 +186,10 @@ export function SettingsScreen({ onBack }) {
             checked=${notifications} onChange=${(on) => (on ? store.askNotifications() : store.stopNotifications())} />
           ${notifications && html`<${Setting} title=${str('srv_push_test_title')} onClick=${store.testNotification} />`}`)}
 
+        ${section('team', 's_team', 'team_text', html`<${TeamSettings} s=${s} />`)}
+
+        ${group('settings_group_services')}
+        ${section('server', 'srv_s_server', null, html`<${AccountSettings} s=${s} />`)}
         ${section('switchbot', 's_switchbot', 'switchbot_text', s.switchBot
           ? html`
             <${Setting} title=${str('switchbot_linked')} text=${plural('remotes_found', s.remotes.length)} />
@@ -182,6 +211,7 @@ export function SettingsScreen({ onBack }) {
 
         ${section('calendar', 's_calendar', 'calendar_settings_text', html`<${CalendarSettings} s=${s} />`)}
         ${section('notion', 's_notion', 'notion_settings_text', html`<${NotionSettings} s=${s} />`)}
+        ${group('settings_group_voice')}
         ${section('voice', 's_voice', 'voice_settings_text', html`<${VoiceSettings} s=${s} />`)}
         ${section('assistant', 's_assistant', 'srv_assistant_text', html`<${AssistantSettings} s=${s} />`)}
         ${section('aiExamples', 's_ai_examples', 'ai_examples_text', html`
@@ -190,10 +220,7 @@ export function SettingsScreen({ onBack }) {
             <${Setting} key=${key} lead=${html`<${Icon} name="chat_bubble" />`} title=${`“${str(key)}”`}
               onClick=${s.assistant.configured ? () => store.askAssistant(str(key)) : undefined} />`)}`)}
 
-        ${section('updates', 's_updates', null, html`
-          <${Toggle} title=${str('auto_update')} text=${str('pwa_auto_update_text')} checked=${s.autoUpdate} onChange=${store.setAutoUpdate} />
-          <${Setting} title=${str('check_updates')} text=${str('installed_version', store.installedVersion)} onClick=${() => store.checkForUpdate(true)} />`)}
-
+        ${group('settings_group_home')}
         ${s.devices.length > 0 && html`
           ${section('rooms', 's_rooms', 'rooms_text', html`
             ${rooms.map((room) => html`<${Setting} key=${room} title=${room}
@@ -239,6 +266,11 @@ export function SettingsScreen({ onBack }) {
             text=${[alert.above != null && str('alert_above', degrees(alert.above)), alert.below != null && str('alert_below', degrees(alert.below))].filter(Boolean).join(' · ')}
             trailing=${html`<${IconButton} icon="close" label=${str('alert_remove')} onClick=${() => store.clearAlert(id)} />`} />`))}
 
+        ${group('settings_group_system')}
+        ${section('updates', 's_updates', null, html`
+          <${Toggle} title=${str('auto_update')} text=${str('pwa_auto_update_text')} checked=${s.autoUpdate} onChange=${store.setAutoUpdate} />
+          <${Setting} title=${str('check_updates')} text=${str('installed_version', store.installedVersion)} onClick=${() => store.checkForUpdate(true)} />`)}
+
         ${section('backup', 's_backup', 'pwa_backup_text', html`
           <${Setting} title=${str('backup_export')} onClick=${store.exportBackup} />
           <${Setting} title=${str('backup_import')} onClick=${() => importInput.current.click()} />
@@ -254,7 +286,6 @@ export function SettingsScreen({ onBack }) {
         ${section('account', 's_account', null, html`
           <${Setting} title=${str('sign_out')} text=${str('account_marketplace', s.marketplace.domain)} onClick=${() => setDialog({ type: 'signOut' })} />`)}
 
-        ${section('server', 'srv_s_server', null, html`<${AccountSettings} s=${s} />`)}
 
         ${section('hints', 's_hints', 'hints_text', Object.values(HINTS).map((hint) => html`
           <${Setting} key=${hint.icon} lead=${html`<${Icon} name=${hint.icon} />`} title=${str(hint.text)} />`))}
@@ -262,6 +293,7 @@ export function SettingsScreen({ onBack }) {
         ${section('about', 's_about', null, html`
           <${Setting} title=${str('about_source')} text=${str('srv_versions', store.installedVersion, s.serverVersion ?? '…')}
             onClick=${() => window.open(SOURCE_URL, '_blank', 'noopener')} />`)}
+        ${searching && !found && html`<div class="body-large faint settings-nothing">${str('settings_search_nothing', query.trim())}</div>`}
       </div></div>
       ${s.askBackupRestore && html`<${BackupImportDialog} />`}
       ${shownDialog}
@@ -272,7 +304,8 @@ const REFRESH_CHOICES = [30, 60, 120, 300];
 const REST_CHOICES = [1, 2, 5, 10];
 const REST_LABELS = [
   [REST_CLOCK, 'rest_item_clock'], [REST_DATE, 'rest_item_date'], [REST_SENSORS, 'rest_item_sensors'],
-  [REST_POWER, 'rest_item_power'], [REST_TIMERS, 'rest_item_timers'],
+  [REST_POWER, 'rest_item_power'], [REST_TIMERS, 'rest_item_timers'], [REST_TEAM, 'rest_item_team'],
+  [REST_LISTS, 'rest_item_lists'], [REST_CALENDAR, 'rest_item_calendar'],
 ];
 // In percent; 0 leaves the screen as it is.
 const BRIGHTNESS_CHOICES = [[1, 'brightness_lowest'], [15, 'brightness_low'], [40, 'brightness_medium'], [0, 'brightness_same']];
@@ -374,7 +407,8 @@ function MonitorSettings({ s }) {
         onSelect=${(restMinutes) => set({ restMinutes })} />
       <div class="setting-block">
         <div class="body-large">${str('monitor_rest_items')}</div>
-        <div class="chips">${REST_LABELS.map(([item, label]) => {
+        ${/* The team, the lists and the calendar only once there is something of them to show. */ ''}
+        <div class="chips">${REST_LABELS.filter(([item]) => ({ [REST_TEAM]: s.team != null, [REST_LISTS]: s.loggedIn || s.notionLists.length > 0, [REST_CALENDAR]: s.calendar.linked })[item] !== false).map(([item, label]) => {
           const on = monitor.restItems.includes(item);
           return html`<button class=${`chip ${on ? 'selected' : ''}`}
             onClick=${() => set({ restItems: on ? monitor.restItems.filter((i) => i !== item) : [...monitor.restItems, item] })}>

@@ -4,7 +4,12 @@ import { Icon, Field, Spinner, Menu, useNow } from './common.js';
 import * as store from '../store.js';
 import { str, plural, clock, dateText } from '/shared/i18n.js';
 import { MARKETPLACES } from '../store.js';
-import { REST_CLOCK, REST_DATE, REST_POWER, REST_SENSORS, REST_TIMERS, placed, statusText, countdown } from '/shared/model.js';
+import {
+  REST_CLOCK, REST_DATE, REST_POWER, REST_SENSORS, REST_TIMERS, REST_TEAM, REST_LISTS, REST_CALENDAR, placed, statusText, countdown,
+} from '/shared/model.js';
+import { RestTeam } from './team.js';
+import { RestLists } from './lists.js';
+import { RestAgenda } from './calendar.js';
 
 const FEATURES = [
   ['meeting_room', 'feature_1'], ['touch_app', 'feature_2'], ['lightbulb', 'feature_3'],
@@ -129,6 +134,9 @@ export function RestScreen({ s, night, onWake }) {
       <div class="inner" style=${`transform:${shift};opacity:${opacity}`}>
         ${items.includes(REST_CLOCK) && html`<div class="clock">${clock(now)}</div>`}
         ${items.includes(REST_DATE) && html`<div class="headline-small">${dateText(now)}</div>`}
+        ${items.includes(REST_TEAM) && html`<${RestTeam} s=${s} />`}
+        ${items.includes(REST_CALENDAR) && s.calendar.linked && html`<${RestAgenda} s=${s} />`}
+        ${items.includes(REST_LISTS) && s.loggedIn && html`<${RestLists} s=${s} />`}
         ${items.includes(REST_SENSORS) && html`<div class="sensors">${sensors.map((sensor) => html`
           <div><div class="headline-medium">${statusText(sensor, s.states[sensor.applianceId])}</div>
             ${/* The room tells apart sensors with the same name. */ ''}

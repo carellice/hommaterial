@@ -65,6 +65,8 @@ object ServerSync {
         watch("cache", CACHE_KEYS)
         watch("switchbot", SWITCHBOT_KEYS)
         watch("assistant", ASSISTANT_KEYS)
+        watch("notion", NOTION_KEYS)
+        watch("settings", mapOf("listViews" to "listViews"))
     }
 
     val active: Boolean get() = ::store.isInitialized && store.config.value != null
@@ -203,6 +205,25 @@ object ServerSync {
             if (!keep("assistantHouse")) assistant.putString("house", data.optString("assistantHouse"))
             if (!keep("assistantTaught")) assistant.putStringSet("taught", strings(data.optJSONArray("assistantTaught")))
             assistant.commit()
+
+            // The lists and notes of Notion chosen travel with the account; the first device to sync gives its own.
+            val notion = app.getSharedPreferences("notion", Context.MODE_PRIVATE)
+            val chosen = notion.edit()
+            for ((local, server) in NOTION_KEYS) {
+                if (keep(server)) continue
+                val fromServer = data.optJSONArray(server)
+                if (fromServer != null) {
+                    chosen.putString(local, fromServer.toString())
+                } else if (notion.getString(local, "[]") != "[]") {
+                    store.dirty = store.dirty + server
+                }
+            }
+            chosen.commit()
+            if (!keep("listViews")) {
+                val views = data.optJSONObject("listViews")
+                app.getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
+                    .apply { if (views == null) remove("listViews") else putString("listViews", views.toString()) }.commit()
+            }
         } finally {
             applying = false
         }
@@ -334,6 +355,9 @@ object ServerSync {
             "assistantNotes" -> arrayOf(assistant, "notes")
             "assistantHouse" -> assistant.getString("house", "").orEmpty()
             "assistantTaught" -> JSONArray(assistant.getStringSet("taught", emptySet()).orEmpty())
+            "notionLists" -> arrayOf(app.getSharedPreferences("notion", Context.MODE_PRIVATE), "lists")
+            "notionNotes" -> arrayOf(app.getSharedPreferences("notion", Context.MODE_PRIVATE), "notes")
+            "listViews" -> objectOf(app.getSharedPreferences("settings", Context.MODE_PRIVATE), "listViews")
             else -> JSONObject.NULL
         }
     }
@@ -395,4 +419,5 @@ object ServerSync {
     )
     private val SWITCHBOT_KEYS = mapOf("buttons" to "remoteButtons", "hidden" to "hiddenRemotes", "ac" to "acSettings")
     private val ASSISTANT_KEYS = mapOf("notes" to "assistantNotes", "house" to "assistantHouse", "taught" to "assistantTaught")
+    private val NOTION_KEYS = mapOf("lists" to "notionLists", "notes" to "notionNotes")
 }

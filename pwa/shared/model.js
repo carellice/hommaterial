@@ -33,7 +33,12 @@ export const REST_DATE = 'date';
 export const REST_SENSORS = 'sensors';
 export const REST_TIMERS = 'timers';
 export const REST_POWER = 'power';
-export const REST_ITEMS = [REST_CLOCK, REST_DATE, REST_SENSORS, REST_TIMERS, REST_POWER];
+export const REST_TEAM = 'team';
+export const REST_LISTS = 'lists';
+export const REST_CALENDAR = 'calendar';
+export const REST_ITEMS = [REST_CLOCK, REST_DATE, REST_SENSORS, REST_TIMERS, REST_POWER, REST_TEAM, REST_LISTS, REST_CALENDAR];
+// What the rest screen could show before "restSeen" was saved: what came later starts shown.
+export const FIRST_REST_ITEMS = [REST_CLOCK, REST_DATE, REST_SENSORS, REST_TIMERS, REST_POWER];
 
 export const TIMER_CHOICES = [['timer_15', 15], ['timer_30', 30], ['timer_60', 60], ['timer_120', 120]];
 

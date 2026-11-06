@@ -1,5 +1,10 @@
 package app.hommaterial.ui
 
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SportsSoccer
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.style.TextAlign
+import app.hommaterial.data.SettingsSearch
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -391,15 +396,37 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     ) { padding ->
         // The sections that are open, by their title; all closed on arrival.
         var open by rememberSaveable { mutableStateOf(setOf<Int>()) }
+        // What is typed in the search: the sections it finds show open, the others hide.
+        var query by rememberSaveable { mutableStateOf("") }
+        val searching = query.isNotBlank()
+        // How many sections the search found, counted as they compose, in order.
+        var found = 0
 
         @Composable
         fun Section(@StringRes title: Int, @StringRes text: Int? = null, content: @Composable () -> Unit) {
+            if (searching) {
+                val about = listOfNotNull(str(title), text?.let { str(it) }, sectionKeys(title)?.let { str(it) }).joinToString(" ")
+                if (!SettingsSearch.matches(query, about)) return
+                found++
+            }
             Accordion(
                 title = title,
                 text = text,
-                expanded = title in open,
+                expanded = searching || title in open,
                 onToggle = { open = if (title in open) open - title else open + title },
                 content = content,
+            )
+        }
+
+        /** The heading of a few sections that belong together; the search lists what it finds without them. */
+        @Composable
+        fun Group(@StringRes title: Int) {
+            if (searching) return
+            Text(
+                str(title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 8.dp, top = 12.dp),
             )
         }
 
@@ -414,6 +441,8 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            SettingsSearchField(query) { query = it }
+            Group(R.string.settings_group_general)
             Section(R.string.s_appearance) {
                 val themes = listOf(R.string.theme_auto, R.string.theme_light, R.string.theme_dark)
                 Chips(R.string.theme, themes.mapIndexed { i, label -> i to str(label) }, state.theme, vm::setTheme)
@@ -451,6 +480,9 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 )
             }
 
+            Section(R.string.s_team, R.string.team_text) { TeamSettings(state, vm) }
+
+            Group(R.string.settings_group_services)
             Section(R.string.s_server, R.string.server_text) { ServerSettings(state, vm) }
 
             Section(R.string.s_switchbot, R.string.switchbot_text) {
@@ -518,6 +550,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
 
             Section(R.string.s_notion, R.string.notion_settings_text) { NotionSettings(state, vm) }
 
+            Group(R.string.settings_group_voice)
             Section(R.string.s_voice, R.string.voice_settings_text) {
                 var picking by remember { mutableStateOf(false) }
                 if (picking) {
@@ -561,15 +594,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 }
             }
 
-            Section(R.string.s_updates) {
-                Toggle(R.string.auto_update, R.string.auto_update_text, state.autoUpdate, vm::setAutoUpdate)
-                Setting(
-                    title = str(R.string.check_updates),
-                    text = str(R.string.installed_version, vm.installedVersion),
-                    onClick = { vm.checkForUpdate(manual = true) },
-                )
-            }
-
+            Group(R.string.settings_group_home)
             if (state.devices.isNotEmpty()) {
                 Section(R.string.s_rooms, R.string.rooms_text) {
                     for (room in rooms) {
@@ -746,6 +771,16 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 }
             }
 
+            Group(R.string.settings_group_system)
+            Section(R.string.s_updates) {
+                Toggle(R.string.auto_update, R.string.auto_update_text, state.autoUpdate, vm::setAutoUpdate)
+                Setting(
+                    title = str(R.string.check_updates),
+                    text = str(R.string.installed_version, vm.installedVersion),
+                    onClick = { vm.checkForUpdate(manual = true) },
+                )
+            }
+
             Section(R.string.s_backup, R.string.backup_text) {
                 Setting(title = str(R.string.backup_export), onClick = { export.launch(BACKUP_FILE) })
                 Setting(title = str(R.string.backup_import), onClick = { import.launch(BACKUP_TYPES) })
@@ -780,8 +815,69 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                     onClick = { context.open(Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL))) },
                 )
             }
+            if (searching && found == 0) {
+                Text(
+                    str(R.string.settings_search_nothing, query.trim()),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                )
+            }
         }
     }
+}
+
+/** The search at the head of the settings, with a button to empty it. */
+@Composable
+private fun SettingsSearchField(query: String, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onChange,
+        placeholder = { Text(str(R.string.settings_search_hint)) },
+        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onChange("") }) {
+                    Icon(Icons.Outlined.Close, contentDescription = str(R.string.search_close))
+                }
+            }
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(28.dp),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/** The other words a section is looked for by, beyond its title and its text. */
+private fun sectionKeys(@StringRes title: Int): Int? = when (title) {
+    R.string.s_appearance -> R.string.settings_keys_appearance
+    R.string.s_notifications -> R.string.settings_keys_notifications
+    R.string.s_team -> R.string.settings_keys_team
+    R.string.s_server -> R.string.settings_keys_server
+    R.string.s_switchbot -> R.string.settings_keys_switchbot
+    R.string.s_lgtv -> R.string.settings_keys_lgtv
+    R.string.s_calendar -> R.string.settings_keys_calendar
+    R.string.s_notion -> R.string.settings_keys_notion
+    R.string.s_voice -> R.string.settings_keys_voice
+    R.string.s_assistant -> R.string.settings_keys_assistant
+    R.string.s_ai_examples -> R.string.settings_keys_ai_examples
+    R.string.s_updates -> R.string.settings_keys_updates
+    R.string.s_rooms -> R.string.settings_keys_rooms
+    R.string.s_devices -> R.string.settings_keys_devices
+    R.string.s_groups -> R.string.settings_keys_groups
+    R.string.s_macros_settings -> R.string.settings_keys_macros
+    R.string.s_shortcuts -> R.string.settings_keys_shortcuts
+    R.string.s_widget -> R.string.settings_keys_widget
+    R.string.s_monitor -> R.string.settings_keys_monitor
+    R.string.s_tiles -> R.string.settings_keys_tiles
+    R.string.s_timers -> R.string.settings_keys_timers
+    R.string.s_alerts -> R.string.settings_keys_alerts
+    R.string.s_backup -> R.string.settings_keys_backup
+    R.string.s_data -> R.string.settings_keys_data
+    R.string.s_account -> R.string.settings_keys_account
+    R.string.s_hints -> R.string.settings_keys_hints
+    R.string.s_about -> R.string.settings_keys_about
+    else -> null
 }
 
 /** A section of the settings that opens and closes on a tap of its title. */
@@ -837,6 +933,7 @@ private fun Accordion(
 private fun sectionIcon(@StringRes title: Int): ImageVector? = when (title) {
     R.string.s_appearance -> Icons.Outlined.Palette
     R.string.s_notifications -> Icons.Outlined.Notifications
+    R.string.s_team -> Icons.Outlined.SportsSoccer
     R.string.s_server -> Icons.Outlined.Dns
     R.string.s_switchbot -> Icons.Outlined.SettingsRemote
     R.string.s_lgtv -> Icons.Outlined.Tv

@@ -139,6 +139,11 @@ export const DEFAULTS: Record<string, unknown> = {
   autoUpdate: true,
   haptics: true,
   hapticLevel: 70,
+  // The lists and the notes of Notion chosen, the same on every device; null until one chooses.
+  notionLists: null,
+  notionNotes: null,
+  // The names given to the lists in the app and the lists joined into one (shared/lists.js).
+  listViews: { names: {}, merged: [] },
 }
 
 export function get<T>(key: string): T {

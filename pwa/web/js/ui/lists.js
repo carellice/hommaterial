@@ -1,12 +1,13 @@
 // The page of the lists of Alexa, as in its app and on the Echo devices (ui/Lists.kt): a segmented
 // control to choose the list, the list under it, and a swipe sideways to move to the next one.
 import { html, useState, useEffect, useRef } from '../lib.js';
-import { Icon, IconButton, Spinner } from './common.js';
+import { Icon, IconButton, Spinner, Dialog, Setting, Field } from './common.js';
+import { applyViews, members, merge, split, rename, MERGED } from '/shared/lists.js';
 import * as store from '../store.js';
 import { str } from '/shared/i18n.js';
 
 /** What a list is called: the two of Alexa by their name in the app, the others by the one the user gave them. */
-function listName(list) {
+export function listName(list) {
   if (list.type === 'TO_DO' && !list.name) return str('list_todo');
   if (list.type === 'SHOPPING_LIST' && !list.name) return str('list_shopping');
   return list.name || list.type;
@@ -57,7 +58,23 @@ async function refresh(listId) {
   if (read) set({ items: { ...model.items, [listId]: read } });
 }
 
-function add(listId, name) {
+/** The items of a list shown: of all the lists joined in it, undefined until one was read. */
+export function itemsOf(listId) {
+  const parts = members(listId).map((id) => model.items[id]);
+  return parts.every((p) => p === undefined) ? undefined : parts.flatMap((p) => p ?? []);
+}
+
+/** The lists as shown: renamed and joined as chosen in the app (shared/lists.js). */
+export const shownLists = (s) => model.lists && applyViews(model.lists, s.listViews, listName);
+
+/** The list an item of [listId] really is in; what is added goes to the first one. */
+function home(listId, item) {
+  const ids = members(listId);
+  return ids.find((id) => item && model.items[id]?.some((it) => it.id === item.id)) ?? ids[0];
+}
+
+function add(shownId, name) {
+  const listId = home(shownId);
   const item = { id: `${ADDING}${added++}`, name, completed: false, version: 0 };
   set({ items: { ...model.items, [listId]: [item, ...(model.items[listId] ?? [])] } });
   store.addAlexaListItem(listId, name).then(async () => {
@@ -67,7 +84,8 @@ function add(listId, name) {
   });
 }
 
-async function toggle(listId, item) {
+async function toggle(shownId, item) {
+  const listId = home(shownId, item);
   if (item.id.startsWith(ADDING) || model.pending.includes(item.id)) return;
   set({ pending: [...model.pending, item.id] });
   await store.setAlexaListItemDone(listId, item, !item.completed);
@@ -75,7 +93,8 @@ async function toggle(listId, item) {
   set({ pending: model.pending.filter((id) => id !== item.id) });
 }
 
-async function remove(listId, item) {
+async function remove(shownId, item) {
+  const listId = home(shownId, item);
   if (item.id.startsWith(ADDING)) return;
   set({ removing: [...model.removing, item.id] });
   await store.deleteAlexaListItem(listId, item);
@@ -84,7 +103,7 @@ async function remove(listId, item) {
 }
 
 /** How many items are still to do: counted from those read, or as Alexa last said. */
-const active = (list) => model.items[list.id]?.filter((it) => !it.completed).length ?? list.active;
+const active = (list) => itemsOf(list.id)?.filter((it) => !it.completed).length ?? list.active;
 
 export function ListsPage({ s }) {
   const m = useModel();
@@ -111,18 +130,19 @@ export function ListsPage({ s }) {
   }
   if (!m.lists.length) return html`<div class="lists-page"><${EmptyState} title=${str('lists_none')} /></div>`;
 
-  const index = Math.max(0, m.lists.findIndex((l) => l.id === chosen) >= 0
-    ? m.lists.findIndex((l) => l.id === chosen)
-    : m.lists.findIndex((l) => l.type === 'TO_DO'));
-  const list = m.lists[index];
+  const lists = shownLists(s);
+  const index = Math.max(0, lists.findIndex((l) => l.id === chosen) >= 0
+    ? lists.findIndex((l) => l.id === chosen)
+    : lists.findIndex((l) => l.type === 'TO_DO' || members(l.id).some((id) => m.lists.find((x) => x.id === id)?.type === 'TO_DO')));
+  const list = lists[index];
   const go = (to) => {
-    if (to < 0 || to >= m.lists.length || to === index) return;
+    if (to < 0 || to >= lists.length || to === index) return;
     setDirection(to > index ? 1 : -1);
-    setChosen(m.lists[to].id);
+    setChosen(lists[to].id);
   };
   return html`
     <div class="lists-page">
-      <${Segments} names=${m.lists.map((l) => [listName(l), active(l)])} selected=${index} onSelect=${go} />
+      <${Segments} names=${lists.map((l) => [listName(l), active(l)])} selected=${index} onSelect=${go} />
       <${Swipe} onNext=${() => go(index + 1)} onPrevious=${() => go(index - 1)} onPull=${reloadLists} loading=${m.loading}>
         <div class=${`list-content ${direction > 0 ? 'from-right' : direction < 0 ? 'from-left' : ''}`} key=${list.id}>
           <${ListContent} m=${m} list=${list} />
@@ -198,7 +218,7 @@ function Swipe({ onNext, onPrevious, onPull, loading, children }) {
 /** One list: how far along it is, the field to add to it, the items to do, then those done. */
 function ListContent({ m, list }) {
   const [showDone, setShowDone] = useState(false);
-  const items = m.items[list.id];
+  const items = itemsOf(list.id);
   const kept = (items ?? []).filter((it) => !m.removing.includes(it.id));
   // An item being ticked already sits where it will be.
   const done = (it) => (m.pending.includes(it.id) ? !it.completed : it.completed);
@@ -270,4 +290,83 @@ function EmptyState({ title, text }) {
       <div class="title-medium" style="margin-top:16px">${title}</div>
       ${text && html`<div class="body-medium faint" style="margin-top:4px">${text}</div>`}
     </div>`;
+}
+
+/**
+ * The names the lists have in the app and the lists joined into one: Alexa and Notion keep theirs
+ * (ui/Lists.kt). A tap renames a list, the button joins a few, a joined list can be parted again.
+ */
+export function ListsEditDialog({ s, onDismiss }) {
+  const m = useModel();
+  const [renaming, setRenaming] = useState(null);
+  const [merging, setMerging] = useState(null);
+  const views = s.listViews;
+  const source = m.lists ?? [];
+  const shown = shownLists(s) ?? [];
+  if (renaming) {
+    return html`<${RenameDialog} list=${renaming} given=${views.names?.[renaming.id] != null}
+      onSave=${(name) => {
+        store.setListViews(rename(views, renaming.id, name));
+        setRenaming(null);
+      }} onDismiss=${() => setRenaming(null)} />`;
+  }
+  if (merging) {
+    return html`<${Dialog} title=${str('list_merge')} onDismiss=${() => setMerging(null)} actions=${html`
+      <button class="text-btn" onClick=${() => setMerging(null)}>${str('cancel')}</button>
+      <button class="text-btn" disabled=${merging.length < 2} onClick=${() => {
+        store.setListViews(merge(views, merging));
+        setMerging(null);
+      }}>${str('list_merge')}</button>`}>
+      <p class="body-medium faint">${str('list_merge_text')}</p>
+      ${source.map((list) => html`<label class="row" style="padding:8px 0" key=${list.id}>
+        <input type="checkbox" checked=${merging.includes(list.id)}
+          onChange=${(e) => setMerging(e.target.checked ? [...merging, list.id] : merging.filter((id) => id !== list.id))} />
+        <span class="grow" style="padding-left:12px">${listName(list)}</span>
+        ${merging[0] === list.id && html`<${Icon} name="star" cls="faint" />`}
+      </label>`)}
+    <//>`;
+  }
+  return html`<${Dialog} title=${str('lists_edit')} onDismiss=${onDismiss} flush
+    actions=${html`<button class="text-btn" onClick=${onDismiss}>${str('close')}</button>`}>
+    <p class="body-medium faint" style="padding:0 16px">${str('lists_edit_text')}</p>
+    ${shown.map((list) => html`<${Setting} key=${list.id} title=${listName(list)}
+      text=${list.type === MERGED && views.names?.[list.id] ? members(list.id).map((id) => source.find((l) => l.id === id)).filter(Boolean).map(listName).join(' + ') : null}
+      onClick=${() => setRenaming(list)} trailing=${html`
+        ${list.type === MERGED && html`<${IconButton} icon="call_split" label=${str('list_split')}
+          onClick=${(e) => {
+            e.stopPropagation();
+            store.setListViews(split(views, list.id));
+          }} />`}
+        <${Icon} name="edit" cls="faint" />`} />`)}
+    ${source.length >= 2 && html`<div style="padding:12px 16px 0">
+      <button class="tonal-btn" onClick=${() => setMerging([])}><${Icon} name="merge_type" /> ${str('list_merge')}</button></div>`}
+  <//>`;
+}
+
+function RenameDialog({ list, given, onSave, onDismiss }) {
+  const [name, setName] = useState(listName(list));
+  return html`<${Dialog} title=${str('list_rename')} onDismiss=${onDismiss} actions=${html`
+    ${given && html`<button class="text-btn" onClick=${() => onSave('')}>${str('list_name_reset')}</button>`}
+    <button class="text-btn" onClick=${onDismiss}>${str('cancel')}</button>
+    <button class="text-btn" onClick=${() => onSave(name)}>${str('save')}</button>`}>
+    <${Field} label=${str('list_rename_hint')} value=${name} onInput=${setName} onEnter=${() => onSave(name)} autofocus />
+  <//>`;
+}
+
+/** What is left to do in the lists on the rest screen of the monitor: the first lists with something in them. */
+export function RestLists({ s }) {
+  const m = useModel();
+  useEffect(() => {
+    if (!m.lists) reloadLists();
+  }, []);
+  const shown = (shownLists(s) ?? [])
+    .map((list) => [list, (itemsOf(list.id) ?? []).filter((it) => !it.completed)])
+    .filter(([, items]) => items.length)
+    .slice(0, 3);
+  if (!shown.length) return null;
+  return html`<div class="rest-lists">${shown.map(([list, items]) => html`<div key=${list.id}>
+    <div class="title-medium" style="opacity:.7">${listName(list)}</div>
+    ${items.slice(0, 4).map((it) => html`<div class="body-large ellipsis" key=${it.id}>· ${it.name}</div>`)}
+    ${items.length > 4 && html`<div class="body-medium" style="opacity:.6">+${items.length - 4}</div>`}
+  </div>`)}</div>`;
 }

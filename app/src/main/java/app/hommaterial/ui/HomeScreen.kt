@@ -22,6 +22,10 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -111,6 +115,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -217,7 +222,13 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     val opening = remember { mutableStateOf<String?>(null) }
     // The page of the bottom bar, which stays in sight but for the search and the keyboard.
     var tab by rememberSaveable { mutableStateOf(TAB_HOME) }
+    // The page of the favorite team, over everything.
+    var teamOpen by rememberSaveable { mutableStateOf(false) }
+    if (state.team == null) teamOpen = false
     val lists = rememberListsModel(vm)
+    LaunchedEffect(state.listViews) { lists.views = state.listViews }
+    var editingLists by rememberSaveable { mutableStateOf(false) }
+    if (editingLists) ListsEditDialog(lists, state.listViews, vm::setListViews) { editingLists = false }
     val calendar = rememberCalendarModel(vm)
     val notes = rememberNotesModel(vm)
     // The notes have a page once some are chosen; without them it goes back to the home.
@@ -262,6 +273,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
         if (keepOpen) query = null
     }
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -301,6 +313,11 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                                 CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
                                 Icon(Icons.Outlined.Refresh, contentDescription = str(R.string.refresh_now))
+                            }
+                        }
+                        if (tab == TAB_LISTS && lists.source.orEmpty().isNotEmpty()) {
+                            IconButton(onClick = { editingLists = true }) {
+                                Icon(Icons.Outlined.Edit, contentDescription = str(R.string.lists_edit))
                             }
                         }
                         VoiceButton(vm, correcting = state.correcting)
@@ -378,9 +395,16 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                     } else {
                         // The events of today and tomorrow head the page that opens, not a monitor panel.
                         val agenda = state.calendarHome && state.calendarReady && !monitor.enabled
+                        // The next match of the favorite team comes first, above the events.
+                        val team = state.team != null && !monitor.enabled
                         Crossfade(current, label = "page") { shownPage ->
-                            PageGrid(shownPage, state, vm, top = if (agenda && shownPage == pages.first()) {
-                                { HomeAgenda(calendar, state) { tab = TAB_CALENDAR } }
+                            PageGrid(shownPage, state, vm, top = if ((agenda || team) && shownPage == pages.first()) {
+                                {
+                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        if (team) TeamHomeCard(state, vm) { teamOpen = true }
+                                        if (agenda) HomeAgenda(calendar, state) { tab = TAB_CALENDAR }
+                                    }
+                                }
                             } else {
                                 null
                             })
@@ -398,6 +422,14 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
         )
         }
+    }
+    AnimatedVisibility(
+        visible = teamOpen,
+        enter = slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it / 6 } + fadeIn() + scaleIn(initialScale = 0.96f),
+        exit = slideOutVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it / 6 } + fadeOut() + scaleOut(targetScale = 0.96f),
+    ) {
+        TeamScreen(state, vm, onBack = { teamOpen = false })
+    }
     }
 }
 

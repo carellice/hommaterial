@@ -40,6 +40,9 @@ import app.hommaterial.data.REST_DATE
 import app.hommaterial.data.REST_POWER
 import app.hommaterial.data.REST_SENSORS
 import app.hommaterial.data.REST_TIMERS
+import app.hommaterial.data.REST_CALENDAR
+import app.hommaterial.data.REST_LISTS
+import app.hommaterial.data.REST_TEAM
 import app.hommaterial.quick.Quick
 import app.hommaterial.str
 
@@ -51,6 +54,9 @@ private val REST_LABELS = listOf(
     REST_SENSORS to R.string.rest_item_sensors,
     REST_POWER to R.string.rest_item_power,
     REST_TIMERS to R.string.rest_item_timers,
+    REST_TEAM to R.string.rest_item_team,
+    REST_LISTS to R.string.rest_item_lists,
+    REST_CALENDAR to R.string.rest_item_calendar,
 )
 // In percent; 0 leaves the brightness of the tablet alone.
 private val BRIGHTNESS_CHOICES = listOf(
@@ -192,7 +198,9 @@ internal fun MonitorSettings(state: UiState, vm: HomeViewModel) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(str(R.string.monitor_rest_items), style = MaterialTheme.typography.bodyLarge)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for ((item, label) in REST_LABELS) {
+            // The team, the lists and the calendar only once there is something of them to show.
+            val ready = mapOf(REST_TEAM to (state.team != null), REST_LISTS to state.loggedIn, REST_CALENDAR to state.calendarReady)
+            for ((item, label) in REST_LABELS.filter { ready[it.first] != false }) {
                 val shown = item in monitor.restItems
                 FilterChip(
                     selected = shown,

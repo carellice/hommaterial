@@ -6,7 +6,7 @@ import { api, get, post, del, onSessionLost, NotLoggedInError, OfflineError, Ses
 import { str, plural, lang, clock, setLanguage as applyLanguage } from '/shared/i18n.js';
 import { parseVoice, parseExtras, parsePhrase } from './voice.js';
 import {
-  LAYOUT_GRID, REST_ITEMS, emptyState, macroKey, remoteKey, placed, placeOf, shownRemotes, remoteKind, isLg,
+  LAYOUT_GRID, REST_ITEMS, FIRST_REST_ITEMS, emptyState, macroKey, remoteKey, placed, placeOf, shownRemotes, remoteKind, isLg,
   standardCommands, commandLabel, describe, conditionText, ACTION_POWER, ACTION_REMOTE, ACTION_MACRO,
 } from '/shared/model.js';
 import { APP_VERSION } from './version.js';
@@ -69,7 +69,9 @@ function monitorFromJson(o = {}) {
     refreshSeconds: Math.max(30, o.refreshSeconds ?? d.refreshSeconds),
     rest: o.rest ?? d.rest,
     restMinutes: Math.max(1, o.restMinutes ?? d.restMinutes),
-    restItems: strings(o.restItems) ?? d.restItems,
+    restItems: strings(o.restItems)
+      ? [...strings(o.restItems), ...REST_ITEMS.filter((i) => !(strings(o.restSeen) ?? FIRST_REST_ITEMS).includes(i) && !o.restItems.includes(i))]
+      : d.restItems,
     restSensors: strings(o.restSensors),
     restBrightness: clamp(o.restBrightness ?? d.restBrightness, 0, 100),
     night: !!o.night,
@@ -85,6 +87,7 @@ const EMPTY_DATA = {
   tileSpans: {}, macros: [], shortcuts: null, widget: null, tiles: Array(10).fill(null), timers: {}, schedules: [],
   automations: [], alerts: {}, remotes: [], remoteButtons: {}, hiddenRemotes: [], acSettings: {}, lgTvs: [],
   assistantNotes: [], assistantHouse: '', assistantTaught: [], autoUpdate: true, haptics: true, hapticLevel: 70,
+  listViews: { names: {}, merged: [] },
 };
 
 const EMPTY_STATUS = {
@@ -102,9 +105,11 @@ const lgRemote = (tv) => ({ id: tv.id, name: tv.name, type: LG_TYPE });
 
 /** The state of the app for what the server sent: [data] in the format of the Android app. */
 function fromServer(data, status) {
+  // The Notion lists and notes chosen are kept in the browser: applySnapshot takes the server's into it.
+  const { notionLists, notionNotes, ...rest } = data;
   return {
-    ...data,
-    switchBotRemotes: data.remotes,
+    ...rest,
+    switchBotRemotes: rest.remotes,
     remotes: [...data.remotes, ...data.lgTvs.map(lgRemote)],
     loggedIn: status.alexa.loggedIn,
     marketplace: marketOf(status.alexa.marketplace),
@@ -158,6 +163,10 @@ function initialState() {
     notionNotes: settings.get('notionNotes', []),
     calendarDefault: settings.get('calendarDefault', null),
     calendarHome: settings.get('calendarHome', true),
+    // The favorite team of this browser, what was last read of it and whether that failed.
+    team: settings.get('team', null),
+    teamInfo: null,
+    teamFailed: false,
     update: null,
     updatePrompt: false,
     push: pushState(),
@@ -229,7 +238,17 @@ function applySnapshot(answer) {
   // Devices with a command in flight keep their optimistic state.
   const states = { ...next.states };
   for (const id of state.busy) if (state.states[id]) states[id] = state.states[id];
-  update({ ...next, states, synced: true });
+  // The lists and notes of Notion chosen travel with the account; the first device to sync gives its own.
+  const notion = {};
+  for (const key of ['notionLists', 'notionNotes']) {
+    if (Array.isArray(answer.data?.[key]) && !pendingValues.has(key)) {
+      settings.set(key, answer.data[key]);
+      notion[key] = answer.data[key];
+    } else if (answer.data && answer.data[key] == null && state[key].length) {
+      post('/api/data', { values: { [key]: state[key] } }).catch(() => {});
+    }
+  }
+  update({ ...next, ...notion, states, synced: true });
   cache?.set('snapshot', { data: answer.data, status: answer.status });
 }
 
@@ -687,12 +706,15 @@ export const notionSources = () => onList(async () => (await get('/api/notion/so
 
 export function setNotionLists(sources) {
   settings.set('notionLists', sources);
-  update({ notionLists: sources });
+  put({ notionLists: sources });
 }
+
+/** Renames or joins lists in the app; the server gives it to the other devices (shared/lists.js). */
+export const setListViews = (views) => put({ listViews: views });
 
 export function setNotionNotes(sources) {
   settings.set('notionNotes', sources);
-  update({ notionNotes: sources });
+  put({ notionNotes: sources });
 }
 
 export const notionNotes = () => onList(async () => {
@@ -897,6 +919,41 @@ export function setCalendarShown(ids) {
 export function setCalendarDefault(id) {
   settings.set('calendarDefault', id);
   update({ calendarDefault: id });
+}
+
+// ——— The favorite team, read by the server from ESPN (shared/football.js) ———
+
+/** Chooses the favorite team, or none; what was read of the previous one goes. */
+export function setTeam(team) {
+  settings.set('team', team);
+  update({ team, teamInfo: null, teamFailed: false });
+  if (team) loadTeam();
+}
+
+let teamLoading = false;
+
+/** Reads the table and the matches of the team again, unless read less than five minutes ago or [force]. */
+export async function loadTeam(force = false) {
+  const team = state.team;
+  if (!team || teamLoading || (!force && state.teamInfo && Date.now() - state.teamInfo.readAt < 5 * 60_000)) return;
+  teamLoading = true;
+  try {
+    const info = await get(`/api/football/team/${team.league}/${team.id}`);
+    if (state.team?.id === team.id) update({ teamInfo: { ...info, readAt: Date.now() }, teamFailed: false });
+  } catch {
+    if (state.team?.id === team.id) update({ teamFailed: true });
+  } finally {
+    teamLoading = false;
+  }
+}
+
+/** The teams that can be chosen, by league; null when they cannot be read. */
+export async function footballTeams() {
+  try {
+    return (await get('/api/football/teams')).leagues;
+  } catch {
+    return null;
+  }
 }
 
 export function setCalendarHome(on) {
@@ -1403,7 +1460,8 @@ export function setLanguage(language) {
 }
 
 export function setMonitor(monitor) {
-  settings.set('monitor', monitor);
+  // What the rest screen could show when this was saved: what comes later starts shown.
+  settings.set('monitor', { ...monitor, restSeen: REST_ITEMS });
   update({ monitor });
 }
 

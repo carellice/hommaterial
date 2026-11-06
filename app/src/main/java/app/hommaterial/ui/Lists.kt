@@ -83,6 +83,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
@@ -92,6 +93,16 @@ import app.hommaterial.data.AlexaList
 import app.hommaterial.data.LIST_NOTION
 import app.hommaterial.data.ListItem as AlexaItem
 import app.hommaterial.data.NotionSource
+import app.hommaterial.data.ListViews
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.outlined.CallSplit
+import androidx.compose.material.icons.automirrored.outlined.MergeType
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
 import app.hommaterial.str
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
@@ -113,14 +124,32 @@ internal fun listName(list: AlexaList): String = when {
  */
 @Stable
 internal class ListsModel(private val vm: HomeViewModel, private val scope: CoroutineScope) {
-    var lists by mutableStateOf<List<AlexaList>?>(null)
+    /** The lists as Alexa and Notion have them. */
+    var source by mutableStateOf<List<AlexaList>?>(null)
         private set
-    val items = mutableStateMapOf<String, List<AlexaItem>>()
+    private val read = mutableStateMapOf<String, List<AlexaItem>>()
+    /** The names given and the lists joined in the app, followed from the settings. */
+    var views by mutableStateOf(ListViews())
+
+    /** The lists as shown: renamed, those joined as one. */
+    val lists: List<AlexaList>? get() = source?.let { views.apply(it, ::listName) }
     var loading by mutableStateOf(false)
         private set
     /** Whether the last reading of the lists failed: the reason was shown in the snackbar. */
     var failed by mutableStateOf(false)
         private set
+
+    /** The items of a list shown: of all the lists joined in it, null until one was read. */
+    fun itemsOf(listId: String): List<AlexaItem>? {
+        val parts = ListViews.members(listId).map { read[it] }
+        return if (parts.all { it == null }) null else parts.flatMap { it.orEmpty() }
+    }
+
+    /** The list an item of [listId] really is in; what is added goes to the first one. */
+    private fun home(listId: String, item: AlexaItem? = null): String {
+        val members = ListViews.members(listId)
+        return members.firstOrNull { id -> item != null && read[id]?.any { it.id == item.id } == true } ?: members.first()
+    }
 
     fun reload() {
         if (loading) return
@@ -129,39 +158,45 @@ internal class ListsModel(private val vm: HomeViewModel, private val scope: Coro
             val found = vm.alexaLists()
             failed = found == null
             if (found != null) {
-                lists = found
+                source = found
                 // Every list at once, so that swiping to the next one has nothing to wait for.
                 found.map { list -> async { list.id to vm.alexaListItems(list.id) } }.awaitAll()
-                    .forEach { (id, read) -> if (read != null) items[id] = read }
+                    .forEach { (id, items) -> if (items != null) read[id] = items }
             }
             loading = false
         }
     }
 
     private suspend fun refresh(listId: String) {
-        vm.alexaListItems(listId)?.let { items[listId] = it }
+        vm.alexaListItems(listId)?.let { read[listId] = it }
     }
 
     // A change is kept on the phone and shows at once; it goes to Alexa with the reading after it,
     // or, without internet, when the connection comes back. Notion gets it at once, or not at all.
-    fun add(listId: String, name: String) =
+    fun add(shownId: String, name: String) {
+        val listId = home(shownId)
         if (NotionSource.ofList(listId) != null) notion(listId, null) { vm.addNotionItem(listId, name) }
         else changed(listId) { vm.addAlexaListItem(listId, name) }
+    }
 
-    fun toggle(listId: String, item: AlexaItem) =
+    fun toggle(shownId: String, item: AlexaItem) {
+        val listId = home(shownId, item)
         if (NotionSource.ofList(listId) != null) {
             notion(listId, { list -> list.map { if (it.id == item.id) it.copy(completed = !item.completed) else it } }) {
                 vm.setNotionItemDone(listId, item, !item.completed)
             }
         } else changed(listId) { vm.setAlexaListItemDone(listId, item, !item.completed) }
+    }
 
-    fun delete(listId: String, item: AlexaItem) =
+    fun delete(shownId: String, item: AlexaItem) {
+        val listId = home(shownId, item)
         if (NotionSource.ofList(listId) != null) notion(listId, { list -> list.filter { it.id != item.id } }) { vm.deleteNotionItem(listId, item) }
         else changed(listId) { vm.deleteAlexaListItem(listId, item) }
+    }
 
     /** Shows the change at once with [shown], then reads the list again, as Notion has it, whether it went or not. */
     private fun notion(listId: String, shown: ((List<AlexaItem>) -> List<AlexaItem>)?, change: suspend () -> Boolean) {
-        if (shown != null) items[listId]?.let { items[listId] = shown(it) }
+        if (shown != null) read[listId]?.let { read[listId] = shown(it) }
         scope.launch {
             change()
             refresh(listId)
@@ -170,12 +205,12 @@ internal class ListsModel(private val vm: HomeViewModel, private val scope: Coro
 
     private fun changed(listId: String, change: () -> Unit) {
         change()
-        vm.keptListItems(listId)?.let { items[listId] = it }
+        vm.keptListItems(listId)?.let { read[listId] = it }
         scope.launch { refresh(listId) }
     }
 
     /** How many items are still to do: counted from those read, or as Alexa last said. */
-    fun active(list: AlexaList): Int? = items[list.id]?.count { !it.completed } ?: list.active
+    fun active(list: AlexaList): Int? = itemsOf(list.id)?.count { !it.completed } ?: list.active
 }
 
 @Composable
@@ -349,7 +384,7 @@ private fun Segments(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ListContent(model: ListsModel, list: AlexaList, bottomSpace: Int) {
-    val items = model.items[list.id]
+    val items = model.itemsOf(list.id)
     var showDone by rememberSaveable(list.id) { mutableStateOf(false) }
     val todo = items.orEmpty().filter { !it.completed }
     val finished = items.orEmpty().filter { it.completed }
@@ -611,4 +646,139 @@ internal fun EmptyState(title: String, text: String?, modifier: Modifier = Modif
             )
         }
     }
+}
+
+/** What is left to do in the lists on the rest screen of the monitor: the first lists with something in them. */
+@Composable
+internal fun RestLists(model: ListsModel) {
+    LaunchedEffect(Unit) { if (model.lists == null) model.reload() }
+    val shown = model.lists.orEmpty()
+        .map { list -> list to model.itemsOf(list.id).orEmpty().filter { !it.completed } }
+        .filter { it.second.isNotEmpty() }
+        .take(REST_LISTS_SHOWN)
+    if (shown.isEmpty()) return
+    Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(48.dp)) {
+        for ((list, items) in shown) {
+            Column {
+                Text(listName(list), style = MaterialTheme.typography.titleMedium, modifier = Modifier.alpha(0.7f))
+                for (item in items.take(REST_ITEMS_SHOWN)) {
+                    Text("· ${item.name}", style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (items.size > REST_ITEMS_SHOWN) {
+                    Text("+${items.size - REST_ITEMS_SHOWN}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.alpha(0.6f))
+                }
+            }
+        }
+    }
+}
+
+private const val REST_LISTS_SHOWN = 3
+private const val REST_ITEMS_SHOWN = 4
+
+/**
+ * The names the lists have in the app and the lists joined into one: Alexa and Notion keep theirs.
+ * A tap renames a list, the button joins a few, a joined list can be parted again.
+ */
+@Composable
+internal fun ListsEditDialog(model: ListsModel, views: ListViews, onChange: (ListViews) -> Unit, onDismiss: () -> Unit) {
+    var renaming by remember { mutableStateOf<AlexaList?>(null) }
+    var merging by remember { mutableStateOf(false) }
+    val shown = model.lists.orEmpty()
+    val source = model.source.orEmpty()
+    renaming?.let { list ->
+        var name by remember(list.id) { mutableStateOf(views.names[list.id] ?: listName(list)) }
+        AlertDialog(
+            onDismissRequest = { renaming = null },
+            title = { Text(str(R.string.list_rename)) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(str(R.string.list_rename_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { onChange(views.rename(list.id, name)); renaming = null }) { Text(str(R.string.save)) }
+            },
+            dismissButton = {
+                Row {
+                    if (list.id in views.names) {
+                        TextButton(onClick = { onChange(views.rename(list.id, "")); renaming = null }) { Text(str(R.string.list_name_reset)) }
+                    }
+                    TextButton(onClick = { renaming = null }) { Text(str(R.string.cancel)) }
+                }
+            },
+        )
+    }
+    if (merging) {
+        var chosen by remember { mutableStateOf(listOf<String>()) }
+        AlertDialog(
+            onDismissRequest = { merging = false },
+            title = { Text(str(R.string.list_merge)) },
+            text = {
+                Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+                    Text(str(R.string.list_merge_text), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp))
+                    for (list in source) {
+                        val checked = list.id in chosen
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .clickable { chosen = if (checked) chosen - list.id else chosen + list.id }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = checked, onCheckedChange = null, modifier = Modifier.padding(horizontal = 12.dp))
+                            Text(listName(list), modifier = Modifier.weight(1f))
+                            // The first chosen takes what is added.
+                            if (chosen.firstOrNull() == list.id) Icon(Icons.Outlined.Star, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = chosen.size >= 2, onClick = { onChange(views.merge(chosen)); merging = false }) { Text(str(R.string.list_merge)) }
+            },
+            dismissButton = { TextButton(onClick = { merging = false }) { Text(str(R.string.cancel)) } },
+        )
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.lists_edit)) },
+        text = {
+            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                Text(str(R.string.lists_edit_text), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp))
+                for (list in shown) {
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { renaming = list }.padding(start = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
+                            Text(listName(list), style = MaterialTheme.typography.bodyLarge)
+                            if (list.type == ListViews.MERGED && list.id in views.names) {
+                                Text(
+                                    ListViews.members(list.id).mapNotNull { id -> source.find { it.id == id } }.joinToString(" + ") { listName(it) },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        if (list.type == ListViews.MERGED) {
+                            IconButton(onClick = { onChange(views.split(list.id)) }) {
+                                Icon(Icons.AutoMirrored.Outlined.CallSplit, contentDescription = str(R.string.list_split))
+                            }
+                        }
+                        Icon(Icons.Outlined.Edit, contentDescription = str(R.string.list_rename), modifier = Modifier.padding(12.dp).size(20.dp))
+                    }
+                }
+                if (source.size >= 2) {
+                    FilledTonalButton(onClick = { merging = true }, modifier = Modifier.padding(top = 12.dp)) {
+                        Icon(Icons.AutoMirrored.Outlined.MergeType, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text(str(R.string.list_merge), modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str(R.string.close)) } },
+    )
 }

@@ -9,7 +9,12 @@ const val REST_DATE = "date"
 const val REST_SENSORS = "sensors"
 const val REST_TIMERS = "timers"
 const val REST_POWER = "power"
-val REST_ITEMS = listOf(REST_CLOCK, REST_DATE, REST_SENSORS, REST_TIMERS, REST_POWER)
+const val REST_TEAM = "team"
+const val REST_LISTS = "lists"
+const val REST_CALENDAR = "calendar"
+val REST_ITEMS = listOf(REST_CLOCK, REST_DATE, REST_SENSORS, REST_TIMERS, REST_POWER, REST_TEAM, REST_LISTS, REST_CALENDAR)
+// What the rest screen could show before "restSeen" was saved: what came later starts shown.
+private val FIRST_REST_ITEMS = listOf(REST_CLOCK, REST_DATE, REST_SENSORS, REST_TIMERS, REST_POWER)
 
 /**
  * How the app behaves on a tablet left on a wall as the panel of the home. It belongs to the
@@ -56,6 +61,7 @@ data class MonitorConfig(
             .put("rest", rest)
             .put("restMinutes", restMinutes)
             .put("restItems", JSONArray(restItems))
+            .put("restSeen", JSONArray(REST_ITEMS))
             .put("restSensors", restSensors?.let { JSONArray(it) } ?: JSONObject.NULL)
             .put("restBrightness", restBrightness)
             .put("night", night)
@@ -80,7 +86,9 @@ data class MonitorConfig(
                 refreshSeconds = o.optInt("refreshSeconds", defaults.refreshSeconds).coerceAtLeast(30),
                 rest = o.optBoolean("rest", defaults.rest),
                 restMinutes = o.optInt("restMinutes", defaults.restMinutes).coerceAtLeast(1),
-                restItems = strings(o.optJSONArray("restItems"))?.toSet() ?: defaults.restItems,
+                restItems = strings(o.optJSONArray("restItems"))?.toSet()
+                    ?.plus(REST_ITEMS - (strings(o.optJSONArray("restSeen")) ?: FIRST_REST_ITEMS).toSet())
+                    ?: defaults.restItems,
                 restSensors = strings(o.optJSONArray("restSensors")),
                 restBrightness = o.optInt("restBrightness", defaults.restBrightness).coerceIn(0, 100),
                 night = o.optBoolean("night"),

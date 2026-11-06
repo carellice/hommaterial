@@ -319,6 +319,94 @@ await test('the agent keeps only what names things of the home, by their key', (
   });
 });
 
+const football = await import('../shared/football.js');
+const espnTeam = (id, name, extra = {}) => ({ id, displayName: name, shortDisplayName: name, logos: [{ href: `logo${id}` }], ...extra });
+const espnMatch = (id, date, state, home, away, scores = [], extra = {}) => ({
+  id, date, league: { abbreviation: 'Serie A' },
+  competitions: [{ status: { type: { state, shortDetail: state === 'post' ? 'FT' : '' } }, venue: { fullName: 'Stadio' },
+    competitors: [
+      { homeAway: 'home', team: espnTeam(home[0], home[1]), score: scores[0] == null ? undefined : { displayValue: String(scores[0]) }, winner: extra.homeWins === true },
+      { homeAway: 'away', team: espnTeam(away[0], away[1]), score: scores[1] == null ? undefined : { displayValue: String(scores[1]) } },
+    ] }],
+  ...(extra.timeValid === false ? { timeValid: false } : {}),
+});
+
+await test('the teams, the matches and the table of ESPN are read', () => {
+  const teams = football.parseTeams({ sports: [{ leagues: [{ teams: [
+    { team: espnTeam('2', 'Roma', { color: '990a2c' }) }, { team: espnTeam('1', 'Inter', { color: 'zz' }) },
+  ] }] }] });
+  assert.deepEqual(teams.map((t) => [t.id, t.name, t.color]), [['1', 'Inter', null], ['2', 'Roma', '#990a2c']]);
+  const [m] = football.parseMatches({ events: [espnMatch('9', '2026-11-08T19:45Z', 'post', ['1', 'Inter'], ['2', 'Roma'], [2, 1])] });
+  assert.equal(m.home.name, 'Inter');
+  assert.equal(m.away.score, '1');
+  assert.equal(m.competition, 'Serie A');
+  assert.equal(m.venue, 'Stadio');
+  const stats = (rank, points) => [{ name: 'rank', value: rank }, { name: 'points', value: points }, { name: 'wins', value: 3 }, { name: 'ties', value: 1 }, { name: 'losses', value: 0 }];
+  const table = football.parseTable({ children: [{ standings: { entries: [
+    { team: espnTeam('2', 'Roma'), stats: stats(2, 7) },
+    { team: espnTeam('1', 'Inter'), stats: stats(1, 10), note: { description: 'Champions League', color: '#81D6AC' } },
+  ] } }] });
+  assert.deepEqual(table.map((r) => [r.rank, r.name, r.points, r.draws]), [[1, 'Inter', 10, 1], [2, 'Roma', 7, 1]]);
+  assert.equal(table[0].zone, 'Champions League');
+});
+
+await test('the next match, the last five and how each went', () => {
+  const now = Date.parse('2026-11-06T12:00Z');
+  const fixtures = football.parseMatches({ events: [
+    espnMatch('a', '2026-11-20T19:45Z', 'pre', ['1', 'Inter'], ['3', 'Lazio']),
+    espnMatch('b', '2026-11-08T19:45Z', 'pre', ['2', 'Roma'], ['1', 'Inter'], [], { timeValid: false }),
+    espnMatch('old', '2026-10-01T19:45Z', 'pre', ['2', 'Roma'], ['1', 'Inter']),
+  ] });
+  const results = football.parseMatches({ events: [
+    espnMatch('r1', '2026-11-01T19:45Z', 'post', ['1', 'Inter'], ['2', 'Roma'], [2, 0]),
+    espnMatch('r2', '2026-11-04T19:45Z', 'post', ['3', 'Lazio'], ['1', 'Inter'], [1, 1]),
+    espnMatch('r3', '2026-10-20T19:45Z', 'post', ['3', 'Lazio'], ['1', 'Inter'], [1, 1], { homeWins: true }),
+  ] });
+  const info = football.teamSummary('1', { table: [{ id: '1', rank: 1 }], fixtures, results }, now);
+  assert.equal(info.next.id, 'b');
+  assert.equal(info.next.timeValid, false);
+  assert.deepEqual(info.upcoming.map((m) => m.id), ['a']);
+  assert.deepEqual(info.recent.map((m) => m.id), ['r2', 'r1', 'r3']);
+  assert.equal(info.standing.rank, 1);
+  assert.deepEqual(info.recent.map((m) => football.outcome(m, '1')), ['D', 'W', 'L']);
+  assert.equal(football.outcome(fixtures[0], '1'), null);
+});
+
+const { matches } = await import('../shared/search.js');
+await test('the settings are found by part of a word, a synonym or with a typo', () => {
+  const monitor = 'Modalità monitor, tablet, pannello, salvaschermo, luminosità';
+  assert.ok(matches('', monitor));
+  assert.ok(matches('lumin', monitor));
+  assert.ok(matches('luminosita', monitor));
+  assert.ok(matches('pannelo', monitor));
+  assert.ok(matches('schermo', monitor));
+  assert.ok(matches('tablet di casa', 'tablet, casa'));
+  assert.ok(!matches('calcio', monitor));
+  assert.ok(!matches('tab calcio', monitor));
+  assert.ok(matches('squdra', 'Squadra del cuore, calcio'));
+});
+
+const views = await import('../shared/lists.js');
+await test('lists renamed and joined in the app only', () => {
+  const lists = [{ id: 'a', name: 'Spesa', active: 2 }, { id: 'b', name: 'Casa', active: 1 }, { id: 'c', name: 'Lavoro', active: null }];
+  let v = views.rename(views.EMPTY_VIEWS, 'c', '  Ufficio ');
+  assert.deepEqual(views.applyViews(lists, v).map((l) => l.name), ['Spesa', 'Casa', 'Ufficio']);
+  v = views.merge(v, ['b', 'a']);
+  const shown = views.applyViews(lists, v);
+  assert.deepEqual(shown.map((l) => [l.name, l.active]), [['Casa + Spesa', 3], ['Ufficio', null]]);
+  assert.deepEqual(views.members(shown[0].id), ['b', 'a']);
+  v = views.rename(v, shown[0].id, 'Tutto');
+  assert.equal(views.applyViews(lists, v)[0].name, 'Tutto');
+  // A list already joined leaves its old group, which parts once it has one list left.
+  v = views.merge(v, ['a', 'c']);
+  assert.deepEqual(v.merged, [['a', 'c']]);
+  // A list that is gone leaves the group shown as the other list.
+  assert.deepEqual(views.applyViews(lists.slice(1), v).map((l) => l.id), ['b', 'c']);
+  v = views.split(v, views.viewId(['a', 'c']));
+  assert.deepEqual(v.merged, []);
+  assert.equal(views.rename(v, 'c', '').names.c, undefined);
+});
+
 if (failures) {
   console.log(`${failures} failed`);
   process.exit(1);

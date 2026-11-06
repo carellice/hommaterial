@@ -16,7 +16,8 @@ import { RemoteTile } from './remotes.js';
 import { HistoryCharts } from './chart.js';
 import { SchedulesDialog, TimerChoices } from './schedules.js';
 import { AutomationsDialog } from './automations.js';
-import { ListsPage, reloadLists } from './lists.js';
+import { ListsPage, reloadLists, ListsEditDialog } from './lists.js';
+import { TeamHomeCard, TeamScreen } from './team.js';
 import { CalendarPage, HomeAgenda, reloadCalendar } from './calendar.js';
 import { NotesPage, reloadNotes } from './notes.js';
 
@@ -95,6 +96,9 @@ export function HomeScreen({ onSettings }) {
   const current = pages.includes(page) ? page : pages[0];
   const showClock = s.monitor.enabled && s.monitor.clock;
   const [arranging, setArranging] = useState(false);
+  const [editingLists, setEditingLists] = useState(false);
+  // The page of the favorite team, over everything.
+  const [teamOpen, setTeamOpen] = useState(false);
   // The search of the top bar: null while it is closed.
   const [query, setQuery] = useState(null);
   useBack(() => setQuery(null), query != null);
@@ -126,6 +130,8 @@ export function HomeScreen({ onSettings }) {
   };
   // The events of today and tomorrow head the page that opens, not a monitor panel.
   const agenda = s.calendarHome && s.calendar.linked && !s.monitor.enabled;
+  // The next match of the favorite team comes first, above the events.
+  const team = s.team != null && !s.monitor.enabled;
   useBack(() => setTab(TAB_HOME), tab !== TAB_HOME && query == null);
   const typing = useKeyboard();
 
@@ -157,6 +163,7 @@ export function HomeScreen({ onSettings }) {
           : html`<${SearchField} query=${query} onChange=${setQuery} onEnter=${() => found[0] && activate(found[0])} />`}
         ${tab !== TAB_HOME
           ? html`<${RefreshButton} key=${tab} onRefresh=${() => (tab === TAB_LISTS ? reloadLists() : tab === TAB_CALENDAR ? reloadCalendar(s) : reloadNotes())} />
+            ${tab === TAB_LISTS && html`<${IconButton} icon="edit" label=${str('lists_edit')} onClick=${() => setEditingLists(true)} />`}
             <${VoiceButton} /><${OverflowMenu} s=${s} onSettings=${onSettings} onArrange=${() => setArranging(true)} />`
           : query != null
           ? html`<${IconButton} icon="close" label=${str('search_close')} onClick=${() => setQuery(null)} />`
@@ -177,12 +184,16 @@ export function HomeScreen({ onSettings }) {
             ${query != null
               ? html`<${SearchResults} query=${query} found=${found} s=${s} look=${look} />`
               : html`<${PageGrid} page=${current} s=${s} look=${look}
-                  top=${agenda && current === pages[0] ? html`<${HomeAgenda} s=${s} onOpen=${() => setTab(TAB_CALENDAR)} />` : null} />`}
+                  top=${(agenda || team) && current === pages[0] ? html`
+                    ${team && html`<${TeamHomeCard} s=${s} onOpen=${() => setTeamOpen(true)} />`}
+                    ${agenda && html`<${HomeAgenda} s=${s} onOpen=${() => setTab(TAB_CALENDAR)} />`}` : null} />`}
           </div>
         <//>
       </div>`}
       <${BottomBar} current=${tab} visible=${query == null && !typing} notes=${hasNotes} onSelect=${setTab} />
       ${arranging && html`<${ArrangeDialog} s=${s} onDismiss=${() => setArranging(false)} />`}
+      ${editingLists && html`<${ListsEditDialog} s=${s} onDismiss=${() => setEditingLists(false)} />`}
+      ${teamOpen && s.team && html`<${TeamScreen} s=${s} onBack=${() => setTeamOpen(false)} />`}
       ${s.voice && html`<${VoiceDialog} ask=${s.voice} />`}
     </div>`;
 }

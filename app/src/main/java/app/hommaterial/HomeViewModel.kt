@@ -38,6 +38,11 @@ import app.hommaterial.data.Macro
 import app.hommaterial.data.MacroAction
 import app.hommaterial.data.Marketplace
 import app.hommaterial.data.MonitorConfig
+import app.hommaterial.data.FavoriteTeam
+import app.hommaterial.data.Football
+import app.hommaterial.data.ListViews
+import app.hommaterial.data.League
+import app.hommaterial.data.TeamInfo
 import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Reading
 import app.hommaterial.data.Remote
@@ -208,6 +213,14 @@ data class UiState(
     val calendarDefault: String? = null,
     /** Whether the events of today and tomorrow are at the top of the home. */
     val calendarHome: Boolean = true,
+    /** The names given to the lists in the app and the lists joined into one. */
+    val listViews: ListViews = ListViews(),
+    /** The favorite team, whose next match heads the home; null when none was chosen. */
+    val team: FavoriteTeam? = null,
+    /** What was last read of [team]: table, next match, results. */
+    val teamInfo: TeamInfo? = null,
+    /** Whether the last reading of [team] failed. */
+    val teamFailed: Boolean = false,
     /** Where Google Calendar stands on the home server: the keys given, the account linked. */
     val calendarClient: Boolean = false,
     val calendarLinked: Boolean = false,
@@ -314,6 +327,7 @@ private const val BACKUP_APP = "hommaterial"
 const val LAYOUT_GRID = 0
 const val LAYOUT_LIST = 1
 private const val PIN_KEY = "monitorPin"
+private const val TEAM_FRESH_MS = 5 * 60_000L
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 /** What the phone had before it used the home server, to go back to it. */
 private const val BEFORE_SERVER = "dati-prima-del-server.json"
@@ -416,6 +430,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             },
             calendarDefault = settings.getString("calendarDefault", null),
             calendarHome = settings.getBoolean("calendarHome", true),
+            listViews = runCatching { ListViews.fromJson(JSONObject(settings.getString("listViews", "{}")!!)) }.getOrDefault(ListViews()),
+            team = settings.getString("team", null)?.let { runCatching { FavoriteTeam.fromJson(JSONObject(it)) }.getOrNull() },
             calendarClient = ServerSync.calendarClient,
             calendarLinked = ServerSync.calendarLinked,
             calendarAccount = ServerSync.calendarAccount,
@@ -467,6 +483,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 serverBusy = s.serverBusy,
                 serverError = s.serverError,
                 assistant = storedAssistant(s.assistant),
+                teamInfo = s.teamInfo,
+                teamFailed = s.teamFailed,
             )
         }
     }
@@ -2151,6 +2169,38 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         settings.edit().putString("calendarDefault", id).apply()
         _state.update { it.copy(calendarDefault = id) }
     }
+
+    /** Renames or joins lists in the app; on the home server it goes to the other devices. */
+    fun setListViews(views: ListViews) {
+        settings.edit().putString("listViews", views.toJson().toString()).apply()
+        _state.update { it.copy(listViews = views) }
+    }
+
+    /** Chooses the favorite team, or none; what was read of the previous one goes. */
+    fun setTeam(team: FavoriteTeam?) {
+        settings.edit().apply { if (team == null) remove("team") else putString("team", team.toJson().toString()) }.apply()
+        _state.update { it.copy(team = team, teamInfo = null, teamFailed = false) }
+        if (team != null) loadTeam()
+    }
+
+    private var teamLoading = false
+
+    /** Reads the table and the matches of the team again, unless read less than five minutes ago or [force]. */
+    fun loadTeam(force: Boolean = false) {
+        val team = _state.value.team ?: return
+        val read = _state.value.teamInfo
+        if (teamLoading || (!force && read != null && System.currentTimeMillis() - read.readAt < TEAM_FRESH_MS)) return
+        teamLoading = true
+        viewModelScope.launch {
+            val info = runCatching { Football.team(alexa.http, team) }.getOrNull()
+            teamLoading = false
+            if (_state.value.team != team) return@launch
+            _state.update { if (info != null) it.copy(teamInfo = info, teamFailed = false) else it.copy(teamFailed = true) }
+        }
+    }
+
+    /** The teams that can be chosen, by league; null when they cannot be read. */
+    suspend fun footballTeams(): List<Pair<League, List<FavoriteTeam>>>? = runCatching { Football.teams(alexa.http) }.getOrNull()
 
     fun setCalendarHome(on: Boolean) {
         settings.edit().putBoolean("calendarHome", on).apply()

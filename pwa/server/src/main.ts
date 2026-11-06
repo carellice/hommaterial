@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { extname, join, normalize } from 'node:path'
 import { str } from '../../shared/i18n.js'
 import { nextTime } from '../../shared/model.js'
+import * as football from '../../shared/football.js'
 import * as data from './db.ts'
 import * as accounts from './accounts.ts'
 import * as alexa from './alexa.ts'
@@ -229,7 +230,7 @@ route('POST', '/api/language', async (req, res) => {
 const CLIENT_KEYS = new Set([
   'hidden', 'favorites', 'rooms', 'roomList', 'groups', 'order', 'tileSpans', 'macros', 'shortcuts', 'widget', 'tiles',
   'remoteButtons', 'hiddenRemotes', 'acSettings', 'assistantNotes', 'assistantHouse', 'assistantTaught',
-  'autoUpdate', 'haptics', 'hapticLevel',
+  'autoUpdate', 'haptics', 'hapticLevel', 'notionLists', 'notionNotes', 'listViews',
 ])
 
 route('POST', '/api/data', async (req, res) => {
@@ -238,6 +239,49 @@ route('POST', '/api/data', async (req, res) => {
   for (const [key, value] of Object.entries(values ?? {})) if (CLIENT_KEYS.has(key)) accepted[key] = value
   if (Object.keys(accepted).length) data.edit(accepted)
   json(res, 200, { revision: data.revision() })
+})
+
+// --- Favorite team: ESPN, read here because a browser cannot (shared/football.js) ---------------
+
+const ESPN = 'https://site.api.espn.com/apis'
+const espnCache = new Map<string, { at: number; value: unknown }>()
+
+/** A page of ESPN, kept for [ttl] ms and shared by every account; the last copy when ESPN does not answer. */
+async function espn(path: string, ttl: number): Promise<unknown> {
+  const hit = espnCache.get(path)
+  if (hit && Date.now() - hit.at < ttl) return hit.value
+  try {
+    const response = await fetch(ESPN + path, { signal: AbortSignal.timeout(10_000) })
+    if (!response.ok) throw new Error(String(response.status))
+    const value = await response.json()
+    espnCache.set(path, { at: Date.now(), value })
+    return value
+  } catch {
+    if (hit) return hit.value
+    throw new HttpError(502, str('team_unavailable'))
+  }
+}
+
+function league(id: string) {
+  if (!football.LEAGUES.some((l) => l.id === id)) throw new HttpError(404, str('team_unavailable'))
+  return id
+}
+
+route('GET', '/api/football/teams', async (_req, res) => {
+  const leagues = await Promise.all(football.LEAGUES.map(async (l) =>
+    ({ ...l, teams: football.parseTeams(await espn(`/site/v2/sports/soccer/${l.id}/teams`, 12 * 3_600_000)) })))
+  json(res, 200, { leagues })
+})
+
+route('GET', '/api/football/team/:league/:id', async (_req, res, [leagueId, id]) => {
+  if (!/^\d{1,8}$/.test(id)) throw new HttpError(404, str('team_unavailable'))
+  const minutes = 5 * 60_000
+  const [table, fixtures, results] = await Promise.all([
+    espn(`/v2/sports/soccer/${league(leagueId)}/standings`, minutes).then(football.parseTable),
+    espn(`/site/v2/sports/soccer/all/teams/${id}/schedule?fixture=true`, minutes).then(football.parseMatches),
+    espn(`/site/v2/sports/soccer/all/teams/${id}/schedule`, minutes).then(football.parseMatches),
+  ])
+  json(res, 200, football.teamSummary(id, { table, fixtures, results }))
 })
 
 // --- Alexa ---------------------------------------------------------------------------------------

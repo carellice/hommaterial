@@ -159,7 +159,7 @@ class MainActivity : ComponentActivity() {
                 }
                 Crossfade(resting && monitor != null, animationSpec = tween(REST_FADE_MS), label = "rest") { rest ->
                     if (rest) {
-                        RestScreen(state, night, onWake = { resting = false })
+                        RestScreen(state, vm, night, onWake = { resting = false })
                     } else {
                         Screens(state, vm, settings) { settings = it }
                     }

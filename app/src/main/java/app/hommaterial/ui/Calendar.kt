@@ -853,3 +853,28 @@ internal fun Step(title: Int, text: Int, done: Boolean = false, onOpen: (() -> U
         }
     }
 }
+
+/** The events of today and tomorrow on the rest screen of the monitor, a few of them. */
+@Composable
+internal fun RestAgenda(model: CalendarModel, state: UiState) {
+    LaunchedEffect(state.calendarReady, state.calendarShown) { model.reload(state) }
+    val today = LocalDate.now(zone)
+    val until = midnight(today.plusDays(2))
+    val soon = model.events?.filter { it.start < until && it.end > System.currentTimeMillis() }.orEmpty()
+    if (soon.isEmpty()) return
+    Column(Modifier.padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        for (event in soon.take(HOME_EVENTS)) {
+            val tomorrow = listedDay(event, today) != today
+            Text(
+                listOfNotNull(
+                    if (event.allDay) str(R.string.calendar_all_day) else clock(event.start),
+                    event.title.ifBlank { str(R.string.calendar_untitled) },
+                    if (tomorrow) str(R.string.calendar_tomorrow) else null,
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}

@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -24,7 +25,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.hommaterial.HomeViewModel
 import app.hommaterial.R
+import app.hommaterial.data.REST_CALENDAR
+import app.hommaterial.data.REST_LISTS
+import app.hommaterial.data.REST_TEAM
 import app.hommaterial.UiState
 import app.hommaterial.data.REST_CLOCK
 import app.hommaterial.data.REST_DATE
@@ -42,7 +47,7 @@ import app.hommaterial.str
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RestScreen(state: UiState, night: Boolean, onWake: () -> Unit) {
+fun RestScreen(state: UiState, vm: HomeViewModel, night: Boolean, onWake: () -> Unit) {
     val monitor = state.monitor
     val now by rememberNow()
     val items = if (night) setOf(REST_CLOCK) else monitor.restItems
@@ -50,6 +55,9 @@ fun RestScreen(state: UiState, night: Boolean, onWake: () -> Unit) {
     // Moved a little every minute, so that nothing stays lit on the same pixels for days.
     val minute = (now / 60_000).toInt()
     val wide = LocalConfiguration.current.screenWidthDp >= 600
+    val lists = rememberListsModel(vm)
+    LaunchedEffect(state.listViews) { lists.views = state.listViews }
+    val calendar = rememberCalendarModel(vm)
 
     Box(
         Modifier
@@ -68,6 +76,9 @@ fun RestScreen(state: UiState, night: Boolean, onWake: () -> Unit) {
                     Text(clock(now), fontSize = if (wide) 128.sp else 84.sp, fontWeight = FontWeight.Light)
                 }
                 if (REST_DATE in items) Text(dateText(now), style = MaterialTheme.typography.headlineSmall)
+                if (REST_TEAM in items) RestTeam(state, vm)
+                if (REST_CALENDAR in items && state.calendarReady) RestAgenda(calendar, state)
+                if (REST_LISTS in items) RestLists(lists)
                 if (REST_SENSORS in items) {
                     val chosen = monitor.restSensors
                     val sensors = devices.filter {

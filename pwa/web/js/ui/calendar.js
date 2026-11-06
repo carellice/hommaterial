@@ -240,6 +240,20 @@ export function HomeAgenda({ s, onOpen }) {
     </button>`;
 }
 
+/** The events of today and tomorrow on the rest screen of the monitor, a few of them (ui/Calendar.kt). */
+export function RestAgenda({ s }) {
+  const m = useCalendar(s);
+  if (!m.events) return null;
+  const today = startOfDay(new Date());
+  const until = addDays(today, 2);
+  const now = new Date();
+  const soon = m.events.filter((e) => e.from < until && e.to > now).slice(0, HOME_EVENTS);
+  if (!soon.length) return null;
+  return html`<div class="rest-agenda">${soon.map((e) => html`<div class="title-medium" key=${e.key}>
+    ${[e.allDay ? str('calendar_all_day') : clock(e.from), e.title || str('calendar_untitled'),
+      listedDay(e, today).getTime() !== today.getTime() ? str('calendar_tomorrow') : null].filter(Boolean).join(' · ')}</div>`)}</div>`;
+}
+
 // ——— The editor ———
 
 /**
