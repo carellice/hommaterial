@@ -50,6 +50,8 @@ public static class VoiceParser
         }
         if (!off && (on || words.Any(Run.Contains)) && home.Macros.FirstOrDefault(m => Named(m.Name)) is HomeMacro macro)
             return [new("Esegui " + macro.Name, [new("macro", macro.Id)], true, 1)];
+        if ((on || off) && home.Groups.FirstOrDefault(g => Named(g.Name)) is HomeGroup homeGroup)
+            return [new((on ? "Accendi " : "Spegni ") + homeGroup.Name, homeGroup.Devices.Select(id => new HomeAction("power", id, on ? "on" : "off")).ToList(), true, 1)];
         if ((on || off) && home.Remotes.FirstOrDefault(r => Named(r.Name)) is RemoteDevice remote)
             return [new((on ? "Accendi " : "Spegni ") + remote.Name, [new("remote", remote.Id, on ? "turnOn" : "turnOff")], true, 1)];
         return [];

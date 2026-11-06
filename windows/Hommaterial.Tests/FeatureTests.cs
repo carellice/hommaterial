@@ -86,6 +86,9 @@ static class FeatureTests
         check(voice[0].Certain && voice[0].Actions[0].Target == "demo-1", "voce: nome esatto del dispositivo");
         check(!VoiceParser.Parse("spegni tutto in cucina", home)[0].Certain, "voce: stanza intera richiede conferma");
         check(VoiceParser.Parse("turn off the lampada divano please", home)[0].Actions[0].Value == "off", "voce: comandi inglesi");
+        home.Groups.Add(new("g-voce", "Gruppo sera", ["demo-1"]));
+        var grouped = VoiceParser.Parse("accendi gruppo sera", home);
+        check(grouped.Count == 1 && grouped[0].Certain && grouped[0].Actions[0].Target == "demo-1", "voce: gruppo per nome");
         check(SwitchBotClient.Sign("token-abc", "secret-key", "1700000000000", "nonce-1") == "BDFQNBEJWKVP6RHVWLYOXD4M48GPWYEFZM1IASZBWIY=", "firma SwitchBot identica al vettore Android/web");
     }
 }

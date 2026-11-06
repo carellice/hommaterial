@@ -186,6 +186,8 @@ data class UiState(
     val voice: VoiceResult.Ask? = null,
     /** Whether a spoken command is with the assistant, to have its names put right. */
     val correcting: Boolean = false,
+    /** What was last said to Alexa and her answer, shown full screen until closed. */
+    val alexaReply: AlexaReply? = null,
     /** The Echo that what is said to the microphone goes to, as if said to it; null when the app understands it by itself. */
     val voiceEcho: Echo? = null,
     /** The calendars chosen on this device, by id; null until the user chooses, showing those the calendar itself shows. */
@@ -255,6 +257,9 @@ data class TvSearch(
     val pairing: String? = null,
     val asking: Boolean = false,
 )
+
+/** What was [said] to Alexa and her [reply], null while [waiting] for it or when she gave none in writing. */
+data class AlexaReply(val said: String, val reply: String? = null, val waiting: Boolean = true)
 
 /** Where the assistant stands: its account and what it was taught. */
 data class AssistantUi(
@@ -429,6 +434,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 tvSearch = s.tvSearch,
                 voice = s.voice,
                 correcting = s.correcting,
+                alexaReply = s.alexaReply,
                 echos = s.echos,
                 askBackupRestore = s.askBackupRestore,
                 update = s.update,
@@ -692,7 +698,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Acts on what the speech recognizer [heard], its guesses best first. A voice phrase of a custom
-     * device runs it; anything else goes to Alexa, when an Echo was chosen for it. Otherwise what is
+     * device runs it; a device, group, custom device or remote of the app named without doubt is
+     * switched here; anything else goes to Alexa, when an Echo was chosen for it. Otherwise what is
      * not clearly understood goes to the assistant, when there is one, to have the names put right first.
      */
     fun onSpeech(heard: List<String>) {
@@ -704,7 +711,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
         val echo = s.voiceEcho
         val said = heard.firstOrNull { it.isNotBlank() }
-        if (echo != null) return if (said == null) answer(VoiceResult.Unknown("")) else sayToAlexa(echo, said)
+        if (echo != null) {
+            if (said == null) return answer(VoiceResult.Unknown(""))
+            // What the app knows is done here: Alexa does not know the groups of the app, for one.
+            return if (act(heard)) Unit else sayToAlexa(echo, said)
+        }
         if (act(heard)) return
         val result = parseVoice(heard, voiceDevices())
         if (!assistantStore.configured || heard.all { it.isBlank() }) return answer(result)
@@ -749,7 +760,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         // What Alexa does not know is tried when no device of hers was clearly meant.
         // A remote learnt key by key has no power key to be told about.
         val remotes = s.shownRemotes.filter { it.kind != RemoteKind.CUSTOM }
-        when (val extra = parseExtras(heard, s.macros.map { it.id to it.name }, remotes.map { it.id to it.name })) {
+        val extra = parseExtras(
+            heard,
+            s.macros.map { it.id to it.name },
+            remotes.map { it.id to it.name },
+            s.groups.map { it.id to it.name },
+        )
+        when (extra) {
             is ExtraCommand.Run -> {
                 val macro = s.macros.first { it.id == extra.macroId }
                 _messages.tryEmit(str(R.string.schedule_run, macro.name))
@@ -759,6 +776,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 val remote = remotes.first { it.id == extra.remoteId }
                 _messages.tryEmit(str(if (extra.on) R.string.voice_on else R.string.voice_off, remote.name))
                 sendRemote(remote, if (extra.on) "turnOn" else "turnOff")
+            }
+            is ExtraCommand.Group -> {
+                val group = s.groups.first { it.id == extra.groupId }
+                _messages.tryEmit(str(if (extra.on) R.string.voice_on else R.string.voice_off, group.name))
+                setRoomPower(s.devices.filter { it.applianceId in group.devices && it.applianceId !in s.hidden }, extra.on)
             }
             null -> return false
         }
@@ -783,16 +805,21 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Tells Alexa [said] through [echo], which answers aloud; what she answers is shown here too. */
+    /** Tells Alexa [said] through [echo], which answers aloud; what she answers is shown full screen too. */
     private fun sayToAlexa(echo: Echo, said: String) {
-        _messages.tryEmit(str(R.string.voice_to_alexa, said))
+        val asked = AlexaReply(said)
+        _state.update { it.copy(alexaReply = asked) }
         viewModelScope.launch {
             val since = System.currentTimeMillis()
             val done = guarded { api.say(echo.serial, said) }
             _haptics.tryEmit(if (done) Haptic.Confirm else Haptic.Reject)
-            if (done) alexaReply(echo.serial, since)?.let { _messages.tryEmit(str(R.string.voice_alexa_reply, it)) }
+            val reply = if (done) alexaReply(echo.serial, since) else null
+            // Closed meanwhile, or replaced by a newer question: nothing to show.
+            _state.update { if (it.alexaReply === asked) it.copy(alexaReply = asked.copy(reply = reply, waiting = false)) else it }
         }
     }
+
+    fun dismissAlexaReply() = _state.update { it.copy(alexaReply = null) }
 
     /** Waits for the answer of Alexa to reach the voice history, for some seconds at most. */
     private suspend fun alexaReply(serial: String, since: Long): String? {

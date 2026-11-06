@@ -198,6 +198,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
 
     state.voice?.let { VoiceDialog(it, vm) }
+    state.alexaReply?.let { AlexaReplyScreen(it, onDismiss = vm::dismissAlexaReply) }
 
     // A wide screen has room for a side bar that splits the home in pages.
     val width = LocalConfiguration.current.screenWidthDp

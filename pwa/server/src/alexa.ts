@@ -527,7 +527,8 @@ export function replyIn(history: any, serial: string, since: number): string | n
   const words = record.voiceHistoryRecordItems
     .filter((it: any) => it?.recordItemType === 'ALEXA_RESPONSE' || it?.recordItemType === 'TTS_REPLACEMENT_TEXT')
     .map((it: any) => String(it.transcriptText ?? '').trim())
-    .filter((it: string, i: number, all: string[]) => it && all.indexOf(it) === i)
+    // "null" is what the history holds when Alexa only chimed: nothing to show.
+    .filter((it: string, i: number, all: string[]) => it && it.toLowerCase() !== 'null' && all.indexOf(it) === i)
   return words.length ? words.join(' ') : null
 }
 

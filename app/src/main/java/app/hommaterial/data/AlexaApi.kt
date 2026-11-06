@@ -319,8 +319,9 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
      */
     suspend fun reply(serial: String, since: Long): String? {
         if (ServerSync.active) {
-            return ServerSync.call("GET", "/api/alexa/reply?echo=${ServerSync.encode(serial)}&since=$since")
-                .optString("text").ifEmpty { null }
+            val answer = ServerSync.call("GET", "/api/alexa/reply?echo=${ServerSync.encode(serial)}&since=$since")
+            // A JSON null would come back from optString as the word "null".
+            return if (answer.isNull("text")) null else answer.optString("text").ifEmpty { null }
         }
         val path = "/alexa-privacy/apd/rvh/customer-history-records-v2?startTime=${since - 5_000}&endTime=${System.currentTimeMillis() + 60_000}"
         val headers = mapOf("anti-csrftoken-a2z" to historyToken(), "Referer" to "https://www.${auth.marketplace.domain}$HISTORY_PAGE")
@@ -406,7 +407,8 @@ internal fun replyIn(history: JSONObject, serial: String, since: Long): String? 
             (0 until items.length()).mapNotNull { items.optJSONObject(it) }
                 .filter { it.optString("recordItemType") in setOf("ALEXA_RESPONSE", "TTS_REPLACEMENT_TEXT") }
                 .map { it.optString("transcriptText").trim() }
-                .filter { it.isNotEmpty() }
+                // "null" is what the history holds when Alexa only chimed: nothing to show.
+                .filter { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
                 .distinct()
                 .joinToString(" ")
                 .ifEmpty { null }

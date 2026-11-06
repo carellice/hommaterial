@@ -53,9 +53,12 @@ class NotionTest {
             {"recordKey":"a#b#TYPE#ECHO2","timestamp":5000,"voiceHistoryRecordItems":[{"recordItemType":"ALEXA_RESPONSE","transcriptText":"Altro Echo"}]},
             {"recordKey":"a#b#TYPE#ECHO1","timestamp":5000,"voiceHistoryRecordItems":[
               {"recordItemType":"CUSTOMER_TRANSCRIPT","transcriptText":"che tempo fa"},
-              {"recordItemType":"ALEXA_RESPONSE","transcriptText":"Oggi c'è il sole."}]}]}""",
+              {"recordItemType":"ALEXA_RESPONSE","transcriptText":"Oggi c'è il sole."}]},
+            {"recordKey":"a#b#TYPE#ECHO3","timestamp":5000,"voiceHistoryRecordItems":[{"recordItemType":"ALEXA_RESPONSE","transcriptText":"null"}]}]}""",
         )
         assertEquals("Oggi c'è il sole.", replyIn(history, "ECHO1", 4000))
+        // Only a chime: nothing to show.
+        assertNull(replyIn(history, "ECHO3", 4000))
         assertNull(replyIn(history, "ECHO1", 9000))
     }
 

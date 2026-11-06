@@ -57,17 +57,19 @@ private fun score(said: List<String>, name: List<String>, room: List<String>): D
     return named.toDouble() / name.size * explained / said.size
 }
 
-/** What a sentence asks of what Alexa does not know: a custom device to run, a remote to switch. */
+/** What a sentence asks of what Alexa does not know: a custom device to run, a remote or group to switch. */
 sealed interface ExtraCommand {
     data class Run(val macroId: String) : ExtraCommand
 
     data class Remote(val remoteId: String, val on: Boolean) : ExtraCommand
+
+    data class Group(val groupId: String, val on: Boolean) : ExtraCommand
 }
 
 private val RUN_WORDS = setOf("esegui", "avvia", "lancia", "fai", "run", "start", "launch")
 
 /**
- * Looks in what was [heard] for a custom device to run, or a remote to switch on or off. Both are
+ * Looks in what was [heard] for a custom device to run, or a remote or group to switch on or off. All are
  * given as id and name, and the name must be said whole: these are tried only when no device of
  * Alexa was meant, and a loose match would steal sentences from them.
  */
@@ -75,6 +77,7 @@ fun parseExtras(
     heard: List<String>,
     macros: List<Pair<String, String>>,
     remotes: List<Pair<String, String>>,
+    groups: List<Pair<String, String>> = emptyList(),
 ): ExtraCommand? {
     for (sentence in heard) {
         val said = words(sentence)
@@ -88,6 +91,7 @@ fun parseExtras(
         if (verb !in OFF_WORDS) macros.firstOrNull { named(it.second) }?.let { return ExtraCommand.Run(it.first) }
         if (verb !in RUN_WORDS) {
             remotes.firstOrNull { named(it.second) }?.let { return ExtraCommand.Remote(it.first, verb in ON_WORDS) }
+            groups.firstOrNull { named(it.second) }?.let { return ExtraCommand.Group(it.first, verb in ON_WORDS) }
         }
     }
     return null

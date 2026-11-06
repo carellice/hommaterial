@@ -98,6 +98,10 @@ await test('custom devices and remotes are understood by their whole name', () =
   assert.deepEqual(parseExtras(['turn on the tv salotto'], macros, remotes), { type: 'remote', remoteId: 'r1', on: true });
   assert.equal(parseExtras(['spegni postazione'], macros, remotes), null);
   assert.equal(parseExtras(['accendi la tv'], macros, remotes), null);
+  const groups = [['g1', 'Gruppo sera']];
+  assert.deepEqual(parseExtras(['accendi gruppo sera'], macros, remotes, groups), { type: 'group', groupId: 'g1', on: true });
+  assert.deepEqual(parseExtras(['spegni il gruppo sera'], macros, remotes, groups), { type: 'group', groupId: 'g1', on: false });
+  assert.equal(parseExtras(['esegui gruppo sera'], macros, remotes, groups), null);
 });
 await test('voice phrases are understood whole and alone', () => {
   const phrases = [['m1', ['Buonanotte', 'vado a letto']], ['m2', ['Esco di casa']]];

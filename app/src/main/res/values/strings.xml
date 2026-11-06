@@ -795,7 +795,10 @@
     <string name="voice_echo_pick">Which Echo?</string>
     <string name="voice_to_alexa">To Alexa: “%1$s”</string>
     <string name="voice_prompt_alexa">Say it to Alexa…</string>
-    <string name="voice_alexa_reply">Alexa: “%1$s”</string>
+    <string name="alexa_waiting">Waiting for Alexa to answer…</string>
+    <string name="alexa_no_reply">Done. Alexa had nothing else to say.</string>
+    <string name="alexa_read">Read aloud</string>
+    <string name="alexa_stop_reading">Stop reading</string>
     <string name="s_calendar">Calendar</string>
     <string name="calendar_no_client">First add the keys of Google Cloud in Settings › Calendar</string>
     <string name="calendar_not_linked">Link Google Calendar in Settings › Calendar</string>

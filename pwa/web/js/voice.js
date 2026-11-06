@@ -39,11 +39,11 @@ function score(said, name, room) {
 }
 
 /**
- * Looks in what was [heard] for a custom device to run, or a remote to switch on or off. Both are
+ * Looks in what was [heard] for a custom device to run, or a remote or group to switch on or off. All are
  * given as [id, name], and the name must be said whole: these are tried only when no device of
  * Alexa was meant, and a loose match would steal sentences from them.
  */
-export function parseExtras(heard, macros, remotes) {
+export function parseExtras(heard, macros, remotes, groups = []) {
   for (const sentence of heard) {
     const said = words(sentence);
     const verb = said.find((it) => RUN_WORDS.has(it) || ON_WORDS.has(it) || OFF_WORDS.has(it));
@@ -61,6 +61,8 @@ export function parseExtras(heard, macros, remotes) {
     if (!RUN_WORDS.has(verb)) {
       const remote = remotes.find(([, name]) => named(name));
       if (remote) return { type: 'remote', remoteId: remote[0], on: ON_WORDS.has(verb) };
+      const group = groups.find(([, name]) => named(name));
+      if (group) return { type: 'group', groupId: group[0], on: ON_WORDS.has(verb) };
     }
   }
   return null;

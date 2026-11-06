@@ -99,6 +99,10 @@ class VoiceParserTest {
         // A custom device is never "switched off", and half a name is not enough.
         assertEquals(null, parseExtras(listOf("spegni postazione"), macros, remotes))
         assertEquals(null, parseExtras(listOf("accendi la tv"), macros, remotes))
+        val groups = listOf("g1" to "Gruppo sera")
+        assertEquals(ExtraCommand.Group("g1", true), parseExtras(listOf("accendi gruppo sera"), macros, remotes, groups))
+        assertEquals(ExtraCommand.Group("g1", false), parseExtras(listOf("spegni il gruppo sera"), macros, remotes, groups))
+        assertEquals(null, parseExtras(listOf("esegui gruppo sera"), macros, remotes, groups))
     }
 
     @Test

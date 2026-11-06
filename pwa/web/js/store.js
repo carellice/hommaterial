@@ -143,6 +143,8 @@ function initialState() {
     refreshing: false,
     voice: null,
     correcting: false,
+    // What was last said to Alexa and her answer, shown full screen until closed: { said, reply, waiting }.
+    alexaReply: null,
     // The Echo that what is said to the microphone goes to, as if said to it: this browser only.
     voiceEcho: settings.get('voiceEcho', null),
     // The Echo devices of the account, once asked for in the settings; null while they are looked for.
@@ -820,7 +822,8 @@ function act(heard) {
   // What Alexa does not know is tried when no device of hers was clearly meant.
   // A remote learnt key by key has no power key to be told about.
   const remotes = shownRemotes(state).filter((r) => remoteKind(r) !== 'CUSTOM');
-  const extra = parseExtras(heard, state.macros.map((m) => [m.id, m.name]), remotes.map((r) => [r.id, r.name]));
+  const extra = parseExtras(heard, state.macros.map((m) => [m.id, m.name]), remotes.map((r) => [r.id, r.name]),
+    state.groups.map((g) => [g.id, g.name]));
   if (extra?.type === 'run') {
     const macro = state.macros.find((m) => m.id === extra.macroId);
     say(str('schedule_run', macro.name));
@@ -831,6 +834,12 @@ function act(heard) {
     const remote = remotes.find((r) => r.id === extra.remoteId);
     say(str(extra.on ? 'voice_on' : 'voice_off', remote.name));
     sendRemote(remote, extra.on ? 'turnOn' : 'turnOff');
+    return true;
+  }
+  if (extra?.type === 'group') {
+    const group = state.groups.find((g) => g.id === extra.groupId);
+    say(str(extra.on ? 'voice_on' : 'voice_off', group.name));
+    setRoomPower(state.devices.filter((d) => group.devices.includes(d.applianceId) && !state.hidden.includes(d.applianceId)), extra.on);
     return true;
   }
   return false;
@@ -920,12 +929,14 @@ export function setVoiceEcho(echo) {
   update({ voiceEcho: echo });
 }
 
-/** Tells Alexa [said] through [echo], which answers aloud. */
-/** Tells Alexa [said] through [echo], which answers aloud; what she answers is shown here too. */
+/** Tells Alexa [said] through [echo], which answers aloud; what she answers is shown full screen too. */
 async function sayToAlexa(echo, said) {
-  say(str('voice_to_alexa', said));
+  const asked = { said, reply: null, waiting: true };
+  update({ alexaReply: asked });
+  // Closed meanwhile, or replaced by a newer question: nothing to show.
+  const show = (reply) => update((s) => (s.alexaReply === asked ? { alexaReply: { said, reply, waiting: false } } : {}));
   const since = Date.now();
-  if (!(await guarded(() => post('/api/alexa/say', { echo: echo.serial, text: said })))) return;
+  if (!(await guarded(() => post('/api/alexa/say', { echo: echo.serial, text: said })))) return show(null);
   // The answer reaches the voice history of Amazon some seconds later, if at all.
   for (const wait of [3000, 3000, 4000, 5000]) {
     await new Promise((done) => setTimeout(done, wait));
@@ -934,15 +945,19 @@ async function sayToAlexa(echo, said) {
       ({ text } = await get(`/api/alexa/reply?echo=${encodeURIComponent(echo.serial)}&since=${since}`));
     } catch {
       // Without the history Alexa has still answered aloud.
-      return;
+      return show(null);
     }
-    if (text) return say(str('voice_alexa_reply', text));
+    if (text) return show(text);
   }
+  show(null);
 }
+
+export const dismissAlexaReply = () => update({ alexaReply: null });
 
 /**
  * Acts on what the speech recognizer [heard], its guesses best first. A voice phrase of a custom
- * device runs it; anything else goes to Alexa, when an Echo was chosen for it. Otherwise what is
+ * device runs it; a device, group, custom device or remote of the app named without doubt is
+ * switched here; anything else goes to Alexa, when an Echo was chosen for it. Otherwise what is
  * not clearly understood goes to the assistant, when there is one, to have the names put right first.
  */
 export async function onSpeech(heard) {
@@ -953,7 +968,11 @@ export async function onSpeech(heard) {
     return runMacro(macro);
   }
   const said = heard.find((it) => it.trim());
-  if (state.voiceEcho) return said ? sayToAlexa(state.voiceEcho, said) : answer({ type: 'unknown', heard: '' });
+  if (state.voiceEcho) {
+    if (!said) return answer({ type: 'unknown', heard: '' });
+    // What the app knows is done here: Alexa does not know the groups of the app, for one.
+    return act(heard) ? undefined : sayToAlexa(state.voiceEcho, said);
+  }
   if (act(heard)) return;
   const result = parseVoice(heard, voiceDevices());
   if (!state.assistant.configured || heard.every((it) => !it.trim())) return answer(result);
