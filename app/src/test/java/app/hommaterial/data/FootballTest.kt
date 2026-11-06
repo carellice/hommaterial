@@ -121,4 +121,26 @@ class FootballTest {
         val saved = MonitorConfig.fromJson(old.copy(restItems = setOf(REST_CLOCK, REST_LISTS)).toJson())
         assertEquals(setOf(REST_CLOCK, REST_LISTS), saved.restItems)
     }
+
+    @Test
+    fun matchKeptForTheWidgetReadsBackTheSame() {
+        val match = Match(
+            "1", 1_700_000_000_000L, true, "Serie A", "pre", "", "Olimpico",
+            Side("10", "Roma", "https://a/logo.png", null, false), Side("11", "Lazio", "", "2", true),
+        )
+        assertEquals(match, Match.fromJson(JSONObject(match.toJson().toString())))
+    }
+
+    @Test
+    fun weatherIsReadFromOpenMeteo() {
+        val json = JSONObject("""{"current":{"temperature_2m":12.4,"apparent_temperature":10.1,"relative_humidity_2m":80,
+            "weather_code":61,"is_day":0,"wind_speed_10m":7.2},"daily":{"time":["2026-11-06","2026-11-07"],"weather_code":[61,3],
+            "temperature_2m_max":[14.0,15.5],"temperature_2m_min":[8.0,9.0],"precipitation_probability_max":[90,null]}}""")
+        val w = Weather.parse(json)
+        assertEquals(61, w.code)
+        assertEquals(false, w.day)
+        assertEquals(2, w.days.size)
+        assertEquals(90, w.days[0].rain)
+        assertEquals(null, w.days[1].rain)
+    }
 }

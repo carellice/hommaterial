@@ -1,7 +1,7 @@
 // The favorite team (ui/Team.kt): its next match at the top of the home, a page with its place,
 // record, matches and the whole table, the choice of it in the settings and a line on the rest screen.
 import { html, useState, useEffect } from '../lib.js';
-import { Icon, IconButton, Dialog, Setting, Spinner, useBack } from './common.js';
+import { Icon, IconButton, Dialog, Setting, Spinner, Chips, useBack } from './common.js';
 import * as store from '../store.js';
 import { str, clock, dateText, locale } from '/shared/i18n.js';
 import { LEAGUES, outcome } from '/shared/football.js';
@@ -54,6 +54,10 @@ function dayOf(match) {
 export const matchWhen = (match) => `${dayOf(match)} · ${match.timeValid ? clock(match.date) : str('team_time_tbd')}`;
 
 const RESULT = { W: 'team_result_w', D: 'team_result_d', L: 'team_result_l' };
+
+/** How long before a match its reminder can come, in minutes. */
+export const REMINDERS = [[0, 'team_reminder_off'], [15, 'team_reminder_15'], [30, 'team_reminder_30'], [60, 'team_reminder_60'],
+  [180, 'team_reminder_180'], [1440, 'team_reminder_1440']];
 
 /** Reads the team when it first shows, and again when it is older than five minutes. */
 function useTeam(s) {
@@ -153,7 +157,8 @@ export function TeamScreen({ s, onBack }) {
             ${info.next && html`
               <div class="title-medium team-title">${str(info.next.state === 'in' ? 'team_live' : 'team_next')}</div>
               <div class="team-box rise" style="--i:2"><${Versus} match=${info.next} size=${56} />
-                ${info.next.venue && html`<div class="body-small faint" style="text-align:center;margin-top:12px">${info.next.venue}</div>`}</div>`}
+                ${info.next.venue && html`<div class="body-small faint" style="text-align:center;margin-top:12px">${info.next.venue}</div>`}
+                ${info.next.state === 'pre' && html`<${MatchActions} s=${s} match=${info.next} />`}</div>`}
             ${info.recent.length > 0 && html`
               <div class="title-medium team-title">${str('team_form')}</div>
               <div class="form-row">${[...info.recent].reverse().map((m, i) => {
@@ -169,6 +174,27 @@ export function TeamScreen({ s, onBack }) {
         </div>
       </div>
     </div>`;
+}
+
+/** Under the next match: the reminder of the matches, to choose, and the match to add to the calendar. */
+function MatchActions({ s, match }) {
+  const [choosing, setChoosing] = useState(false);
+  const reminder = REMINDERS.find(([m]) => m === s.teamReminder) ?? REMINDERS[0];
+  return html`
+    <div class="match-actions">
+      <button class="tonal-btn" onClick=${() => setChoosing(true)}>
+        <${Icon} name=${s.teamReminder ? 'notifications_active' : 'notifications'} />${s.teamReminder ? str(reminder[1]) : str('team_reminder')}
+      </button>
+      <button class="tonal-btn" onClick=${() => store.matchCalendarFile(match)}><${Icon} name="event" />${str('team_add_calendar')}</button>
+    </div>
+    ${choosing && html`<${Dialog} title=${str('team_reminder')} onDismiss=${() => setChoosing(false)}
+      actions=${html`<button class="text-btn" onClick=${() => setChoosing(false)}>${str('close')}</button>`}>
+      <div class="body-medium faint">${str('team_reminder_hint')}</div>
+      <${Chips} choices=${REMINDERS.map(([m, label]) => [m, str(label)])} selected=${s.teamReminder} onSelect=${(m) => {
+        store.setTeamReminder(m);
+        setChoosing(false);
+      }} />
+    <//>`}`;
 }
 
 /** Won, drawn and lost: counted up, with a bar that fills in their proportions. */
@@ -236,6 +262,9 @@ export function TeamSettings({ s }) {
     ${team ? html`
       <${Setting} lead=${html`<${Logo} url=${team.logo} size=${40} />`} title=${team.name} text=${leagueName(team.league)}
         onClick=${() => setPicking(true)} trailing=${html`<span class="label-large primary-text" onClick=${() => setPicking(true)}>${str('team_change')}</span>`} />
+      <${Chips} title=${str('team_reminder')} choices=${REMINDERS.map(([m, label]) => [m, str(label)])} selected=${s.teamReminder}
+        onSelect=${store.setTeamReminder} />
+      <div class="supporting" style="padding:0 16px 8px">${str('team_reminder_hint')}</div>
       <${Setting} title=${str('team_remove')} onClick=${() => store.setTeam(null)} />`
     : html`<${Setting} title=${str('team_choose')} text=${str('team_none')} onClick=${() => setPicking(true)} />`}
     ${picking && html`<${TeamPicker} current=${team} onDismiss=${() => setPicking(false)} onPick=${(picked) => {

@@ -22,6 +22,7 @@ import { AssistantSettings } from './assistant.js';
 import { AccountSettings } from './account.js';
 import { HINTS, SignOutDialog } from './home.js';
 import { TeamSettings } from './team.js';
+import { WeatherSettings } from './weather.js';
 import { matches } from '/shared/search.js';
 
 const SOURCE_URL = 'https://github.com/carellice/hommaterial';
@@ -33,7 +34,7 @@ const AI_EXAMPLES = Array.from({ length: 10 }, (_, i) => `ai_example_${i + 1}`);
 // The words each section is looked for by, beyond its title: settings_keys_<name>.
 const SEARCH_KEYS = { aiExamples: 'ai_examples' };
 
-const SECTION_ICONS = { appearance: 'palette', notifications: 'notifications', team: 'sports_soccer', switchbot: 'settings_remote', lgtv: 'tv', assistant: 'auto_awesome', aiExamples: 'lightbulb', voice: 'record_voice_over', calendar: 'calendar_month', notion: 'description', updates: 'system_update', rooms: 'meeting_room', devices: 'devices_other', groups: 'layers', macros: 'extension', monitor: 'tablet_android', timers: 'timer', alerts: 'warning', backup: 'backup', data: 'storage', account: 'account_circle', server: 'dns', hints: 'tips_and_updates', about: 'info' };
+const SECTION_ICONS = { appearance: 'palette', notifications: 'notifications', team: 'sports_soccer', weather: 'partly_cloudy_day', switchbot: 'settings_remote', lgtv: 'tv', assistant: 'auto_awesome', aiExamples: 'lightbulb', voice: 'record_voice_over', calendar: 'calendar_month', notion: 'description', updates: 'system_update', rooms: 'meeting_room', devices: 'devices_other', groups: 'layers', macros: 'extension', monitor: 'tablet_android', timers: 'timer', alerts: 'warning', backup: 'backup', data: 'storage', account: 'account_circle', server: 'dns', hints: 'tips_and_updates', about: 'info' };
 
 function Section({ title, text, icon, open, onToggle, children }) {
   return html`
@@ -186,6 +187,7 @@ export function SettingsScreen({ onBack }) {
             checked=${notifications} onChange=${(on) => (on ? store.askNotifications() : store.stopNotifications())} />
           ${notifications && html`<${Setting} title=${str('srv_push_test_title')} onClick=${store.testNotification} />`}`)}
 
+        ${section('weather', 's_weather', 'weather_text', html`<${WeatherSettings} s=${s} />`)}
         ${section('team', 's_team', 'team_text', html`<${TeamSettings} s=${s} />`)}
 
         ${group('settings_group_services')}

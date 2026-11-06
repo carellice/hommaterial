@@ -272,31 +272,61 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
         return knownEchos
     }
 
-    /** Tells Alexa [text] through the Echo [serial], as if it had been said to it. */
-    suspend fun say(serial: String, text: String) {
-        if (ServerSync.active) {
-            ServerSync.call("POST", "/api/alexa/say", JSONObject().put("echo", serial).put("text", text))
-            return
-        }
-        val echo = knownEchos.find { it.serial == serial } ?: echos().find { it.serial == serial }
-            ?: throw Exception(str(R.string.echo_gone))
-        val payload = JSONObject()
+    private suspend fun echo(serial: String): Echo =
+        knownEchos.find { it.serial == serial } ?: echos().find { it.serial == serial } ?: throw Exception(str(R.string.echo_gone))
+
+    private fun node(echo: Echo, type: String, payload: JSONObject, skillId: String? = null): JSONObject {
+        payload
             .put("deviceType", echo.type)
             .put("deviceSerialNumber", echo.serial)
             .put("locale", auth.marketplace.locale)
             .put("customerId", echo.customer)
-            .put("text", text.trim().lowercase())
-        val node = JSONObject()
+        return JSONObject()
             .put("@type", "com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode")
-            .put("type", "Alexa.TextCommand")
-            .put("skillId", "amzn1.ask.1p.tellalexa")
+            .put("type", type)
+            .apply { if (skillId != null) put("skillId", skillId) }
             .put("operationPayload", payload)
-        val sequence = JSONObject().put("@type", "com.amazon.alexa.behaviors.model.Sequence").put("startNode", node)
+    }
+
+    private suspend fun runSequence(startNode: JSONObject) {
+        val sequence = JSONObject().put("@type", "com.amazon.alexa.behaviors.model.Sequence").put("startNode", startNode)
         call(
             "POST",
             "/api/behaviors/preview",
             JSONObject().put("behaviorId", "PREVIEW").put("sequenceJson", sequence.toString()).put("status", "ENABLED"),
         )
+    }
+
+    private fun volumeNode(echo: Echo, value: Int) = node(echo, "Alexa.DeviceControls.Volume", JSONObject().put("value", value))
+
+    /**
+     * Tells Alexa [text] through the Echo [serial], as if it had been said to it; when [quiet], with the
+     * volume of the Echo at zero first, so that it does not answer aloud in the house: [volume] brings it back.
+     */
+    suspend fun say(serial: String, text: String, quiet: Boolean = false) {
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/alexa/say", JSONObject().put("echo", serial).put("text", text).put("quiet", quiet))
+            return
+        }
+        val echo = echo(serial)
+        val command = node(echo, "Alexa.TextCommand", JSONObject().put("text", text.trim().lowercase()), "amzn1.ask.1p.tellalexa")
+        runSequence(
+            if (!quiet) {
+                command
+            } else {
+                JSONObject().put("@type", "com.amazon.alexa.behaviors.model.SerialNode")
+                    .put("nodesToExecute", org.json.JSONArray().put(volumeNode(echo, 0)).put(command))
+            },
+        )
+    }
+
+    /** Sets the volume of the Echo [serial], 0 to 100. */
+    suspend fun volume(serial: String, value: Int) {
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/alexa/volume", JSONObject().put("echo", serial).put("value", value))
+            return
+        }
+        runSequence(volumeNode(echo(serial), value.coerceIn(0, 100)))
     }
 
     // The answer of Alexa is read back from the voice history of the account, as alexa-remote does:

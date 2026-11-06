@@ -45,10 +45,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SportsSoccer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -185,6 +189,59 @@ private fun resultLetter(result: Char?) = when (result) {
 }
 
 private fun leagueName(id: String) = LEAGUES.find { it.id == id }?.name.orEmpty()
+
+/** How long before a match its reminder can come, in minutes. */
+private val REMINDERS = listOf(
+    0 to R.string.team_reminder_off, 15 to R.string.team_reminder_15, 30 to R.string.team_reminder_30,
+    60 to R.string.team_reminder_60, 180 to R.string.team_reminder_180, 1440 to R.string.team_reminder_1440,
+)
+
+/** The choices of the reminder as chips. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReminderChips(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        for ((minutes, label) in REMINDERS) {
+            FilterChip(selected = selected == minutes, onClick = { onSelect(minutes) }, label = { Text(str(label)) })
+        }
+    }
+}
+
+/** Under the next match: the reminder of the matches, to choose, and the match to add to the calendar. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MatchActions(state: UiState, vm: HomeViewModel, match: Match) {
+    var choosing by remember { mutableStateOf(false) }
+    FlowRow(
+        Modifier.fillMaxWidth().padding(top = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+    ) {
+        FilledTonalButton(onClick = { choosing = true }) {
+            Icon(if (state.teamReminder > 0) Icons.Outlined.NotificationsActive else Icons.Outlined.Notifications, null, Modifier.size(18.dp))
+            Text(
+                str(REMINDERS.find { it.first == state.teamReminder }?.takeIf { it.first > 0 }?.second ?: R.string.team_reminder),
+                Modifier.padding(start = 8.dp),
+            )
+        }
+        FilledTonalButton(onClick = { vm.addMatchToCalendar(match) }) {
+            Icon(Icons.Outlined.Event, null, Modifier.size(18.dp))
+            Text(str(R.string.team_add_calendar), Modifier.padding(start = 8.dp))
+        }
+    }
+    if (choosing) {
+        AlertDialog(
+            onDismissRequest = { choosing = false },
+            title = { Text(str(R.string.team_reminder)) },
+            text = {
+                Column {
+                    Text(str(R.string.team_reminder_hint), style = MaterialTheme.typography.bodyMedium)
+                    ReminderChips(state.teamReminder, { vm.setTeamReminder(it); choosing = false }, Modifier.padding(top = 12.dp))
+                }
+            },
+            confirmButton = { TextButton(onClick = { choosing = false }) { Text(str(R.string.close)) } },
+        )
+    }
+}
 
 /** The zones of the table in the language of the app; the names of the cups stay as they are. */
 private fun zoneLabel(zone: String): String {
@@ -431,6 +488,7 @@ internal fun TeamScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                                     )
                                 }
+                                if (next.state == "pre") MatchActions(state, vm, next)
                             }
                         }
                     }
@@ -669,6 +727,11 @@ internal fun TeamSettings(state: UiState, vm: HomeViewModel) {
             Text(leagueName(team.league), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(str(R.string.team_change), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    }
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(str(R.string.team_reminder), style = MaterialTheme.typography.bodyLarge)
+        Text(str(R.string.team_reminder_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ReminderChips(state.teamReminder, vm::setTeamReminder, Modifier.padding(top = 8.dp))
     }
     Setting(title = str(R.string.team_remove), onClick = { vm.setTeam(null) })
 }

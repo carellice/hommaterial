@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto'
 import { extname, join, normalize } from 'node:path'
 import { str } from '../../shared/i18n.js'
 import { nextTime } from '../../shared/model.js'
-import * as football from '../../shared/football.js'
 import * as data from './db.ts'
 import * as accounts from './accounts.ts'
 import * as alexa from './alexa.ts'
@@ -13,6 +12,7 @@ import * as assistant from './assistant.ts'
 import * as calendar from './calendar.ts'
 import * as notion from './notion.ts'
 import * as engine from './engine.ts'
+import * as football from './football.ts'
 import { HttpError, setAccountLanguage } from './errors.ts'
 import * as lgtv from './lgtv.ts'
 import { send as push, subscribe, unsubscribe, vapidPublicKey } from './push.ts'
@@ -230,7 +230,7 @@ route('POST', '/api/language', async (req, res) => {
 const CLIENT_KEYS = new Set([
   'hidden', 'favorites', 'rooms', 'roomList', 'groups', 'order', 'tileSpans', 'macros', 'shortcuts', 'widget', 'tiles',
   'remoteButtons', 'hiddenRemotes', 'acSettings', 'assistantNotes', 'assistantHouse', 'assistantTaught',
-  'autoUpdate', 'haptics', 'hapticLevel', 'notionLists', 'notionNotes', 'listViews',
+  'autoUpdate', 'haptics', 'hapticLevel', 'notionLists', 'notionNotes', 'listViews', 'team', 'teamReminder', 'weather',
 ])
 
 route('POST', '/api/data', async (req, res) => {
@@ -241,48 +241,11 @@ route('POST', '/api/data', async (req, res) => {
   json(res, 200, { revision: data.revision() })
 })
 
-// --- Favorite team: ESPN, read here because a browser cannot (shared/football.js) ---------------
+// --- Favorite team: ESPN, read here because a browser cannot (football.ts) ----------------------
 
-const ESPN = 'https://site.api.espn.com/apis'
-const espnCache = new Map<string, { at: number; value: unknown }>()
+route('GET', '/api/football/teams', async (_req, res) => json(res, 200, { leagues: await football.teams() }))
 
-/** A page of ESPN, kept for [ttl] ms and shared by every account; the last copy when ESPN does not answer. */
-async function espn(path: string, ttl: number): Promise<unknown> {
-  const hit = espnCache.get(path)
-  if (hit && Date.now() - hit.at < ttl) return hit.value
-  try {
-    const response = await fetch(ESPN + path, { signal: AbortSignal.timeout(10_000) })
-    if (!response.ok) throw new Error(String(response.status))
-    const value = await response.json()
-    espnCache.set(path, { at: Date.now(), value })
-    return value
-  } catch {
-    if (hit) return hit.value
-    throw new HttpError(502, str('team_unavailable'))
-  }
-}
-
-function league(id: string) {
-  if (!football.LEAGUES.some((l) => l.id === id)) throw new HttpError(404, str('team_unavailable'))
-  return id
-}
-
-route('GET', '/api/football/teams', async (_req, res) => {
-  const leagues = await Promise.all(football.LEAGUES.map(async (l) =>
-    ({ ...l, teams: football.parseTeams(await espn(`/site/v2/sports/soccer/${l.id}/teams`, 12 * 3_600_000)) })))
-  json(res, 200, { leagues })
-})
-
-route('GET', '/api/football/team/:league/:id', async (_req, res, [leagueId, id]) => {
-  if (!/^\d{1,8}$/.test(id)) throw new HttpError(404, str('team_unavailable'))
-  const minutes = 5 * 60_000
-  const [table, fixtures, results] = await Promise.all([
-    espn(`/v2/sports/soccer/${league(leagueId)}/standings`, minutes).then(football.parseTable),
-    espn(`/site/v2/sports/soccer/all/teams/${id}/schedule?fixture=true`, minutes).then(football.parseMatches),
-    espn(`/site/v2/sports/soccer/all/teams/${id}/schedule`, minutes).then(football.parseMatches),
-  ])
-  json(res, 200, football.teamSummary(id, { table, fixtures, results }))
-})
+route('GET', '/api/football/team/:league/:id', async (_req, res, [leagueId, id]) => json(res, 200, await football.team(leagueId, id)))
 
 // --- Alexa ---------------------------------------------------------------------------------------
 
@@ -399,10 +362,17 @@ route('POST', '/api/alexa/control', async (req, res) => {
 route('GET', '/api/alexa/echos', async (_req, res) => json(res, 200, { echos: await alexa.echos() }))
 
 route('POST', '/api/alexa/say', async (req, res) => {
-  const body = await readJson<{ echo?: string; text?: string }>(req)
+  const body = await readJson<{ echo?: string; text?: string; quiet?: boolean }>(req)
   const said = text(body.text, 300).trim()
   if (!said) throw new HttpError(400, str('something_wrong'))
-  await alexa.say(text(body.echo, 200), said)
+  await alexa.say(text(body.echo, 200), said, body.quiet === true)
+  ok(res)
+})
+
+route('POST', '/api/alexa/volume', async (req, res) => {
+  const body = await readJson<{ echo?: string; value?: number }>(req)
+  if (!Number.isFinite(body.value)) throw new HttpError(400, str('something_wrong'))
+  await alexa.volume(text(body.echo, 200), Number(body.value))
   ok(res)
 })
 

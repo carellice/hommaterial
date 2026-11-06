@@ -3,6 +3,7 @@ package app.hommaterial
 import app.hommaterial.quick.Boards
 import app.hommaterial.ui.ACCENT_AUTO
 import android.app.Application
+import android.content.Intent
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -43,6 +44,10 @@ import app.hommaterial.data.Football
 import app.hommaterial.data.ListViews
 import app.hommaterial.data.League
 import app.hommaterial.data.TeamInfo
+import app.hommaterial.data.Weather
+import app.hommaterial.data.WeatherInfo
+import app.hommaterial.data.WeatherPlace
+import app.hommaterial.quick.TeamBoard
 import app.hommaterial.data.NotLoggedInException
 import app.hommaterial.data.Reading
 import app.hommaterial.data.Remote
@@ -221,6 +226,12 @@ data class UiState(
     val teamInfo: TeamInfo? = null,
     /** Whether the last reading of [team] failed. */
     val teamFailed: Boolean = false,
+    /** How many minutes before every match of the team its reminder comes; 0 for none. */
+    val teamReminder: Int = 0,
+    /** The place of the weather at the top of the home; null when it is not shown. */
+    val weather: WeatherPlace? = null,
+    val weatherInfo: WeatherInfo? = null,
+    val weatherFailed: Boolean = false,
     /** Where Google Calendar stands on the home server: the keys given, the account linked. */
     val calendarClient: Boolean = false,
     val calendarLinked: Boolean = false,
@@ -328,6 +339,9 @@ const val LAYOUT_GRID = 0
 const val LAYOUT_LIST = 1
 private const val PIN_KEY = "monitorPin"
 private const val TEAM_FRESH_MS = 5 * 60_000L
+private const val WEATHER_FRESH_MS = 15 * 60_000L
+// The volume the Echo goes back to after answering in silence.
+private const val ECHO_VOLUME = 40
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 /** What the phone had before it used the home server, to go back to it. */
 private const val BEFORE_SERVER = "dati-prima-del-server.json"
@@ -432,6 +446,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             calendarHome = settings.getBoolean("calendarHome", true),
             listViews = runCatching { ListViews.fromJson(JSONObject(settings.getString("listViews", "{}")!!)) }.getOrDefault(ListViews()),
             team = settings.getString("team", null)?.let { runCatching { FavoriteTeam.fromJson(JSONObject(it)) }.getOrNull() },
+            teamReminder = settings.getInt("teamReminder", 0),
+            weather = settings.getString("weather", null)?.let { runCatching { WeatherPlace.fromJson(JSONObject(it)) }.getOrNull() },
             calendarClient = ServerSync.calendarClient,
             calendarLinked = ServerSync.calendarLinked,
             calendarAccount = ServerSync.calendarAccount,
@@ -483,10 +499,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 serverBusy = s.serverBusy,
                 serverError = s.serverError,
                 assistant = storedAssistant(s.assistant),
-                teamInfo = s.teamInfo,
-                teamFailed = s.teamFailed,
+                // The team may have been changed on another device.
+                teamInfo = s.teamInfo.takeIf { fresh.team == s.team },
+                teamFailed = s.teamFailed && fresh.team == s.team,
+                weatherInfo = s.weatherInfo.takeIf { fresh.weather == s.weather },
+                weatherFailed = s.weatherFailed && fresh.weather == s.weather,
             )
         }
+        val now = _state.value
+        if (now.team != null && now.teamInfo == null) loadTeam()
+        if (now.weather != null && now.weatherInfo == null) loadWeather()
+        TeamBoard.arm(getApplication())
     }
 
     private fun updateAssistant(change: (AssistantUi) -> AssistantUi) =
@@ -835,11 +858,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(reply = asked) }
         viewModelScope.launch {
             val since = System.currentTimeMillis()
-            val done = guarded { api.say(echo.serial, said) }
+            // The Echo answers with its volume at zero, not to startle who is at home: the answer is read here.
+            val done = guarded { api.say(echo.serial, said, quiet = true) }
             _haptics.tryEmit(if (done) Haptic.Confirm else Haptic.Reject)
             val reply = if (done) alexaReply(echo.serial, since) else null
             // Closed meanwhile, or replaced by a newer question: nothing to show.
             _state.update { if (it.reply?.id == asked.id) it.copy(reply = asked.copy(reply = reply, waiting = false)) else it }
+            // Long answers take a while to be said: the volume comes back once it is likely over.
+            Quick.scope.launch {
+                delay(if (reply == null) 0L else (reply.length * 60L).coerceIn(1_500L, 20_000L))
+                runCatching { api.volume(echo.serial, ECHO_VOLUME) }
+            }
         }
     }
 
@@ -2180,8 +2209,58 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun setTeam(team: FavoriteTeam?) {
         settings.edit().apply { if (team == null) remove("team") else putString("team", team.toJson().toString()) }.apply()
         _state.update { it.copy(team = team, teamInfo = null, teamFailed = false) }
-        if (team != null) loadTeam()
+        if (team != null) loadTeam() else TeamBoard.update(getApplication())
     }
+
+    /** How many minutes before every match of the team its reminder comes; 0 for none. */
+    fun setTeamReminder(minutes: Int) {
+        settings.edit().putInt("teamReminder", minutes).apply()
+        _state.update { it.copy(teamReminder = minutes) }
+        TeamBoard.arm(getApplication())
+    }
+
+    /** Opens the calendar of the phone with the match ready to be added. */
+    fun addMatchToCalendar(match: app.hommaterial.data.Match) {
+        val intent = Intent(Intent.ACTION_INSERT)
+            .setData(android.provider.CalendarContract.Events.CONTENT_URI)
+            .putExtra(android.provider.CalendarContract.Events.TITLE, "${match.home.name} – ${match.away.name}")
+            .putExtra(android.provider.CalendarContract.Events.DESCRIPTION, match.competition)
+            .putExtra(android.provider.CalendarContract.Events.EVENT_LOCATION, match.venue)
+            .putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, match.at)
+            .putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, match.at + 2 * 3_600_000L)
+            .putExtra(android.provider.CalendarContract.EXTRA_EVENT_ALL_DAY, !match.timeValid)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { getApplication<Application>().startActivity(intent) }
+            .onFailure { _messages.tryEmit(str(R.string.something_wrong)) }
+    }
+
+    /** Chooses the place of the weather at the top of the home, or none to hide it. */
+    fun setWeather(chosen: WeatherPlace?) {
+        // Only what is kept: the same place read back compares equal.
+        val place = chosen?.copy(detail = "")
+        settings.edit().apply { if (place == null) remove("weather") else putString("weather", place.toJson().toString()) }.apply()
+        _state.update { it.copy(weather = place, weatherInfo = null, weatherFailed = false) }
+        if (place != null) loadWeather()
+    }
+
+    private var weatherLoading = false
+
+    /** Reads the weather again, unless read less than fifteen minutes ago or [force]. */
+    fun loadWeather(force: Boolean = false) {
+        val place = _state.value.weather ?: return
+        val read = _state.value.weatherInfo
+        if (weatherLoading || (!force && read != null && System.currentTimeMillis() - read.readAt < WEATHER_FRESH_MS)) return
+        weatherLoading = true
+        viewModelScope.launch {
+            val info = runCatching { Weather.forecast(alexa.http, place) }.getOrNull()
+            weatherLoading = false
+            if (_state.value.weather != place) return@launch
+            _state.update { if (info != null) it.copy(weatherInfo = info, weatherFailed = false) else it.copy(weatherFailed = true) }
+        }
+    }
+
+    /** The towns called like [query], to choose the place of the weather; null when they cannot be read. */
+    suspend fun weatherPlaces(query: String): List<WeatherPlace>? = runCatching { Weather.places(alexa.http, query) }.getOrNull()
 
     private var teamLoading = false
 
@@ -2196,6 +2275,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             teamLoading = false
             if (_state.value.team != team) return@launch
             _state.update { if (info != null) it.copy(teamInfo = info, teamFailed = false) else it.copy(teamFailed = true) }
+            // The widget and the reminder go by what was just read.
+            if (info != null) TeamBoard.save(getApplication(), team, info)
         }
     }
 

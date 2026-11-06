@@ -1227,3 +1227,117 @@ fieldset.plain { border: none; margin: 0; padding: 0; min-width: 0; display: fle
 }
 .team-hero-logo { padding: 14px; }
 .rest-team .team-logo { padding: 6px; background: rgba(255, 255, 255, 0.85); }
+
+/* Under the next match of the team: reminder and calendar (ui/team.js) */
+.match-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+.match-actions .tonal-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; }
+.match-actions .icon { font-size: 18px; }
+
+/* The weather at the top of the home (ui/weather.js) */
+.weather-card {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 12px;
+  margin-top: 4px; padding: 16px; border-radius: 24px; color: #fff; --on-team: #fff;
+  --sky-a: #4f8fe8; --sky-b: #1f4fa8;
+  background: linear-gradient(150deg, var(--sky-a), var(--sky-b));
+  animation: team-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.weather-card.sky-sun { --sky-a: #5aa9f5; --sky-b: #2560c4; }
+.weather-card.sky-night { --sky-a: #2c3a6b; --sky-b: #0d1330; }
+.weather-card.sky-cloud { --sky-a: #8796ab; --sky-b: #4b586c; }
+.weather-card.sky-rain { --sky-a: #5d7491; --sky-b: #2a3a52; }
+.weather-card.sky-snow { --sky-a: #a9c2dc; --sky-b: #5f7f9f; }
+.weather-card.sky-storm { --sky-a: #5b4f86; --sky-b: #221b3d; }
+.weather-watermark { position: absolute; right: -30px; top: 50%; transform: translateY(-50%); font-size: 170px !important; opacity: 0.12; pointer-events: none; }
+.weather-head { display: flex; align-items: center; gap: 8px; position: relative; min-width: 0; }
+.weather-head .icon { font-size: 20px; }
+.weather-now { display: flex; align-items: center; gap: 12px; position: relative; }
+.weather-icon { font-size: 56px !important; animation: weather-float 4s ease-in-out infinite; }
+.weather-facts { display: flex; flex-direction: column; margin-left: auto; text-align: right; gap: 2px; }
+.weather-days { display: flex; gap: 8px; position: relative; }
+.weather-day {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px;
+  border-radius: 16px; background: rgba(255, 255, 255, 0.14);
+  animation: rise-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i) * 60ms + 120ms);
+}
+.weather-day .icon { font-size: 24px; }
+@keyframes weather-float { 50% { transform: translateY(-4px); } }
+.place-list { margin: 8px -24px 0; max-height: 50vh; overflow-y: auto; }
+
+/* Many lists: the one shown, to choose it from a sheet (ui/lists.js) */
+.list-picker {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 6px 16px 6px 6px; min-height: 52px;
+  border: none; border-radius: 26px; background: var(--surface-container-high); color: var(--on-surface); text-align: left;
+}
+.list-picker:active { transform: scale(0.99); }
+.list-picker-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--primary); color: var(--on-primary); }
+.list-picker .title-medium { animation: fade 0.25s; }
+.list-picker .segment-count, .list-choice .segment-count { margin: 0; }
+.list-choices { display: flex; flex-direction: column; gap: 4px; padding: 0 8px 16px; }
+.list-choice {
+  display: flex; align-items: center; gap: 16px; min-height: 56px; padding: 0 16px; border: none; border-radius: 28px;
+  background: transparent; color: var(--on-surface); text-align: left;
+  animation: rise-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i) * 30ms);
+}
+.list-choice:hover { background: var(--surface-container-high); }
+.list-choice.selected { background: var(--secondary-container); color: var(--on-secondary-container); }
+
+/* The answer of Alexa or of the assistant (ui/app.js) */
+.reply-screen { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; background: var(--surface); overflow: hidden; animation: fade 0.2s; }
+.reply-glow {
+  position: absolute; left: 50%; top: -30%; width: 140vmax; height: 80vmax; transform: translateX(-50%);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 26%, transparent), color-mix(in srgb, var(--tertiary) 10%, transparent) 60%, transparent);
+  pointer-events: none; transition: opacity 0.6s; opacity: 0.6;
+}
+.reply-glow.busy { opacity: 1; animation: glow-breathe 3s ease-in-out infinite; }
+@keyframes glow-breathe { 50% { transform: translateX(-50%) scale(1.08); } }
+.reply-top { position: relative; display: flex; align-items: center; padding: max(8px, env(safe-area-inset-top)) 8px 0 16px; }
+.reply-source { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 10px; border-radius: 20px; background: var(--secondary-container); color: var(--on-secondary-container); }
+.reply-source .icon { font-size: 18px; }
+.reply-body { position: relative; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; padding: 24px 24px 16px; max-width: 720px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.reply-said {
+  align-self: flex-end; max-width: 85%; display: flex; flex-direction: column; gap: 2px; padding: 12px 16px;
+  border-radius: 24px 24px 6px 24px; background: var(--primary-container); color: var(--on-primary-container);
+  transform-origin: right bottom; animation: said-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+.reply-said .label-medium { opacity: 0.7; }
+@keyframes said-in { from { opacity: 0; transform: translateY(16px) scale(0.92); } }
+.reply-answer { white-space: pre-wrap; line-height: 1.4; animation: answer-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes answer-in { from { opacity: 0; transform: translateY(20px); filter: blur(6px); } }
+.reply-actions { display: flex; flex-direction: column; gap: 8px; }
+.reply-action { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 16px; background: var(--surface-container-high); animation: rise-in 0.4s both; animation-delay: calc(var(--i) * 70ms + 200ms); }
+.reply-action .icon { color: var(--primary); }
+.reply-bottom { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 12px 24px max(16px, env(safe-area-inset-bottom)); max-width: 720px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.reply-read { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; border-radius: 26px; }
+.eq { display: inline-flex; align-items: flex-end; gap: 3px; height: 18px; }
+.eq span { width: 3px; height: 100%; border-radius: 2px; background: currentColor; animation: eq 0.9s ease-in-out infinite; transform-origin: bottom; }
+.eq span:nth-child(2) { animation-delay: -0.3s; }
+.eq span:nth-child(3) { animation-delay: -0.6s; }
+.eq span:nth-child(4) { animation-delay: -0.15s; }
+@keyframes eq { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+.thinking { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; min-height: 240px; animation: fade 0.4s; }
+.orb { position: relative; width: 120px; height: 120px; }
+.orb-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, var(--primary), var(--tertiary), var(--secondary), color-mix(in srgb, var(--primary) 30%, transparent), var(--primary));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  animation: spin 1.4s linear infinite; filter: drop-shadow(0 0 12px color-mix(in srgb, var(--primary) 50%, transparent));
+}
+.orb-core {
+  position: absolute; inset: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--primary) 70%, white), var(--primary) 60%, color-mix(in srgb, var(--primary) 60%, black));
+  color: var(--on-primary); box-shadow: 0 8px 32px color-mix(in srgb, var(--primary) 45%, transparent);
+  animation: core-breathe 1.6s ease-in-out infinite;
+}
+.orb-core .icon { font-size: 40px; }
+@keyframes core-breathe { 50% { transform: scale(0.9); } }
+.thinking-label { color: var(--on-surface-variant); }
+.dots span { animation: dot 1.2s infinite; opacity: 0.2; }
+.dots span:nth-child(2) { animation-delay: 0.2s; }
+.dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dot { 30% { opacity: 1; } 60%, 100% { opacity: 0.2; } }
+@media (prefers-reduced-motion: reduce) {
+  .weather-card, .weather-icon, .weather-day, .list-choice, .reply-glow.busy, .reply-said, .reply-answer, .reply-action,
+  .eq span, .orb-ring, .orb-core, .dots span { animation: none; }
+}
+.weather-temp { font-size: 45px; line-height: 52px; font-weight: 400; }

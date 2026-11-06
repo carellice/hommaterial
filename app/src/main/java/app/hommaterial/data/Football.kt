@@ -34,7 +34,9 @@ data class FavoriteTeam(val league: String, val id: String, val name: String, va
     }
 }
 
-data class Side(val id: String, val name: String, val logo: String, val score: String?, val winner: Boolean)
+data class Side(val id: String, val name: String, val logo: String, val score: String?, val winner: Boolean) {
+    companion object
+}
 
 data class Match(
     val id: String,
@@ -49,7 +51,24 @@ data class Match(
     val venue: String,
     val home: Side,
     val away: Side,
-)
+) {
+    /** Kept for the widget and the reminder, which show it without reading ESPN again. */
+    fun toJson(): JSONObject = JSONObject().put("id", id).put("at", at).put("timeValid", timeValid).put("competition", competition)
+        .put("state", state).put("detail", detail).put("venue", venue).put("home", home.toJson()).put("away", away.toJson())
+
+    companion object {
+        fun fromJson(o: JSONObject) = Match(
+            o.getString("id"), o.getLong("at"), o.optBoolean("timeValid", true), o.optString("competition"), o.optString("state"),
+            o.optString("detail"), o.optString("venue"), Side.fromJson(o.getJSONObject("home")), Side.fromJson(o.getJSONObject("away")),
+        )
+    }
+}
+
+private fun Side.toJson(): JSONObject = JSONObject().put("id", id).put("name", name).put("logo", logo)
+    .put("score", score ?: JSONObject.NULL).put("winner", winner)
+
+private fun Side.Companion.fromJson(o: JSONObject) =
+    Side(o.optString("id"), o.optString("name"), o.optString("logo"), if (o.isNull("score")) null else o.optString("score"), o.optBoolean("winner"))
 
 data class TableRow(
     val rank: Int,

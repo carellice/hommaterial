@@ -1,6 +1,12 @@
 package app.hommaterial.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.automirrored.outlined.List
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.UnfoldMore
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -262,12 +268,22 @@ internal fun ListsPage(model: ListsModel, bottomSpace: Int) {
 
     Column(Modifier.fillMaxSize()) {
         OfflineBanner()
-        Segments(
-            all.map { listName(it) to model.active(it) },
-            position = { pager.currentPage + pager.currentPageOffsetFraction },
-            onSelect = { scope.launch { pager.animateScrollToPage(it) } },
-            modifier = Modifier.wrapContentWidth().widthIn(max = 720.dp).padding(horizontal = 16.dp, vertical = 4.dp),
-        )
+        // A few lists fit side by side; more are chosen from a sheet.
+        if (all.size <= 3) {
+            Segments(
+                all.map { listName(it) to model.active(it) },
+                position = { pager.currentPage + pager.currentPageOffsetFraction },
+                onSelect = { scope.launch { pager.animateScrollToPage(it) } },
+                modifier = Modifier.wrapContentWidth().widthIn(max = 720.dp).padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        } else {
+            ListPicker(
+                all.map { listName(it) to model.active(it) },
+                selected = pager.currentPage,
+                onSelect = { scope.launch { pager.animateScrollToPage(it) } },
+                modifier = Modifier.wrapContentWidth().widthIn(max = 720.dp).padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
         PullToRefreshBox(
             isRefreshing = model.loading,
             onRefresh = model::reload,
@@ -277,6 +293,93 @@ internal fun ListsPage(model: ListsModel, bottomSpace: Int) {
                 ListContent(model, all[page], bottomSpace)
             }
         }
+    }
+}
+
+/** The list shown, with its place among the others: a tap opens all of them, in a sheet, to choose one. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ListPicker(lists: List<Pair<String, Int?>>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    var open by remember { mutableStateOf(false) }
+    val (name, count) = lists[selected.coerceIn(0, lists.size - 1)]
+    Surface(onClick = { open = true }, shape = CircleShape, color = colors.surfaceContainerHigh, modifier = modifier.fillMaxWidth()) {
+        Row(Modifier.padding(start = 6.dp, end = 12.dp).height(52.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(40.dp).clip(CircleShape).background(colors.primary), contentAlignment = Alignment.Center) {
+                Icon(Icons.AutoMirrored.Outlined.List, contentDescription = null, tint = colors.onPrimary)
+            }
+            AnimatedContent(name, label = "list", modifier = Modifier.weight(1f).padding(start = 12.dp)) { shown ->
+                Text(shown, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (count != null && count > 0) CountBadge(count, selected = false)
+            Text(
+                str(R.string.lists_position, selected + 1, lists.size),
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+            Icon(Icons.Outlined.UnfoldMore, contentDescription = str(R.string.lists_choose), tint = colors.onSurfaceVariant)
+        }
+    }
+    if (open) {
+        ModalBottomSheet(onDismissRequest = { open = false }) {
+            Text(str(R.string.lists_choose), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 24.dp, bottom = 12.dp))
+            LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp)) {
+                itemsIndexed(lists) { index, (listName, listCount) ->
+                    val chosen = index == selected
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp)
+                            .clip(CircleShape)
+                            .background(if (chosen) colors.secondaryContainer else Color.Transparent)
+                            .clickable {
+                                onSelect(index)
+                                open = false
+                            }
+                            .padding(horizontal = 16.dp)
+                            .height(56.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            if (chosen) Icons.Filled.CheckCircle else Icons.AutoMirrored.Outlined.List,
+                            contentDescription = null,
+                            tint = if (chosen) colors.onSecondaryContainer else colors.onSurfaceVariant,
+                        )
+                        Text(
+                            listName,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (chosen) colors.onSecondaryContainer else colors.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f).padding(start = 16.dp),
+                        )
+                        if (listCount != null && listCount > 0) CountBadge(listCount, selected = false)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CountBadge(count: Int, selected: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    Box(
+        Modifier
+            .padding(start = 8.dp)
+            .heightIn(min = 20.dp)
+            .widthIn(min = 20.dp)
+            .clip(CircleShape)
+            .background(if (selected) colors.onPrimary.copy(alpha = 0.2f) else colors.secondaryContainer)
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            count.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) colors.onPrimary else colors.onSecondaryContainer,
+        )
     }
 }
 

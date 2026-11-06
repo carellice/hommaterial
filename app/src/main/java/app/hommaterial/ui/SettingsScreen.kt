@@ -2,6 +2,7 @@ package app.hommaterial.ui
 
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SportsSoccer
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.text.style.TextAlign
 import app.hommaterial.data.SettingsSearch
@@ -480,6 +481,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 )
             }
 
+            Section(R.string.s_weather, R.string.weather_text) { WeatherSettings(state, vm) }
             Section(R.string.s_team, R.string.team_text) { TeamSettings(state, vm) }
 
             Group(R.string.settings_group_services)
@@ -853,6 +855,7 @@ private fun sectionKeys(@StringRes title: Int): Int? = when (title) {
     R.string.s_appearance -> R.string.settings_keys_appearance
     R.string.s_notifications -> R.string.settings_keys_notifications
     R.string.s_team -> R.string.settings_keys_team
+    R.string.s_weather -> R.string.settings_keys_weather
     R.string.s_server -> R.string.settings_keys_server
     R.string.s_switchbot -> R.string.settings_keys_switchbot
     R.string.s_lgtv -> R.string.settings_keys_lgtv
@@ -934,6 +937,7 @@ private fun sectionIcon(@StringRes title: Int): ImageVector? = when (title) {
     R.string.s_appearance -> Icons.Outlined.Palette
     R.string.s_notifications -> Icons.Outlined.Notifications
     R.string.s_team -> Icons.Outlined.SportsSoccer
+    R.string.s_weather -> Icons.Outlined.WbSunny
     R.string.s_server -> Icons.Outlined.Dns
     R.string.s_switchbot -> Icons.Outlined.SettingsRemote
     R.string.s_lgtv -> Icons.Outlined.Tv

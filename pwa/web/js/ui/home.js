@@ -18,6 +18,7 @@ import { SchedulesDialog, TimerChoices } from './schedules.js';
 import { AutomationsDialog } from './automations.js';
 import { ListsPage, reloadLists, ListsEditDialog } from './lists.js';
 import { TeamHomeCard, TeamScreen } from './team.js';
+import { WeatherHomeCard } from './weather.js';
 import { CalendarPage, HomeAgenda, reloadCalendar } from './calendar.js';
 import { NotesPage, reloadNotes } from './notes.js';
 
@@ -132,6 +133,8 @@ export function HomeScreen({ onSettings }) {
   const agenda = s.calendarHome && s.calendar.linked && !s.monitor.enabled;
   // The next match of the favorite team comes first, above the events.
   const team = s.team != null && !s.monitor.enabled;
+  // The weather comes above the team, when switched on in the settings.
+  const weather = s.weather != null && !s.monitor.enabled;
   useBack(() => setTab(TAB_HOME), tab !== TAB_HOME && query == null);
   const typing = useKeyboard();
 
@@ -184,7 +187,8 @@ export function HomeScreen({ onSettings }) {
             ${query != null
               ? html`<${SearchResults} query=${query} found=${found} s=${s} look=${look} />`
               : html`<${PageGrid} page=${current} s=${s} look=${look}
-                  top=${(agenda || team) && current === pages[0] ? html`
+                  top=${(agenda || team || weather) && current === pages[0] ? html`
+                    ${weather && html`<${WeatherHomeCard} s=${s} />`}
                     ${team && html`<${TeamHomeCard} s=${s} onOpen=${() => setTeamOpen(true)} />`}
                     ${agenda && html`<${HomeAgenda} s=${s} onOpen=${() => setTab(TAB_CALENDAR)} />`}` : null} />`}
           </div>

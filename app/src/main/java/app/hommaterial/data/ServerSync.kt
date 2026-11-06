@@ -66,7 +66,7 @@ object ServerSync {
         watch("switchbot", SWITCHBOT_KEYS)
         watch("assistant", ASSISTANT_KEYS)
         watch("notion", NOTION_KEYS)
-        watch("settings", mapOf("listViews" to "listViews"))
+        watch("settings", SETTINGS_KEYS)
     }
 
     val active: Boolean get() = ::store.isInitialized && store.config.value != null
@@ -219,11 +219,25 @@ object ServerSync {
                 }
             }
             chosen.commit()
+            val settings = app.getSharedPreferences("settings", Context.MODE_PRIVATE)
+            val shared = settings.edit()
             if (!keep("listViews")) {
                 val views = data.optJSONObject("listViews")
-                app.getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
-                    .apply { if (views == null) remove("listViews") else putString("listViews", views.toString()) }.commit()
+                if (views == null) shared.remove("listViews") else shared.putString("listViews", views.toString())
             }
+            // The favorite team and the place of the weather: null on the server until a device chooses,
+            // false for none; the first device gives its own.
+            for (name in listOf("team", "weather")) {
+                if (keep(name)) continue
+                val value = data.opt(name)
+                when {
+                    value is JSONObject -> shared.putString(name, value.toString())
+                    value == false -> shared.remove(name)
+                    settings.contains(name) -> store.dirty = store.dirty + name
+                }
+            }
+            if (!keep("teamReminder")) shared.putInt("teamReminder", data.optInt("teamReminder", 0))
+            shared.commit()
         } finally {
             applying = false
         }
@@ -358,6 +372,8 @@ object ServerSync {
             "notionLists" -> arrayOf(app.getSharedPreferences("notion", Context.MODE_PRIVATE), "lists")
             "notionNotes" -> arrayOf(app.getSharedPreferences("notion", Context.MODE_PRIVATE), "notes")
             "listViews" -> objectOf(app.getSharedPreferences("settings", Context.MODE_PRIVATE), "listViews")
+            "team", "weather" -> app.getSharedPreferences("settings", Context.MODE_PRIVATE).getString(name, null)?.let { JSONObject(it) } ?: false
+            "teamReminder" -> app.getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("teamReminder", 0)
             else -> JSONObject.NULL
         }
     }
@@ -420,4 +436,5 @@ object ServerSync {
     private val SWITCHBOT_KEYS = mapOf("buttons" to "remoteButtons", "hidden" to "hiddenRemotes", "ac" to "acSettings")
     private val ASSISTANT_KEYS = mapOf("notes" to "assistantNotes", "house" to "assistantHouse", "taught" to "assistantTaught")
     private val NOTION_KEYS = mapOf("lists" to "notionLists", "notes" to "notionNotes")
+    private val SETTINGS_KEYS = mapOf("listViews" to "listViews", "team" to "team", "teamReminder" to "teamReminder", "weather" to "weather")
 }

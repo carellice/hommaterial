@@ -1,7 +1,7 @@
 // The page of the lists of Alexa, as in its app and on the Echo devices (ui/Lists.kt): a segmented
 // control to choose the list, the list under it, and a swipe sideways to move to the next one.
 import { html, useState, useEffect, useRef } from '../lib.js';
-import { Icon, IconButton, Spinner, Dialog, Setting, Field } from './common.js';
+import { Icon, IconButton, Spinner, Dialog, Details, Setting, Field } from './common.js';
 import { applyViews, members, merge, split, rename, MERGED } from '/shared/lists.js';
 import * as store from '../store.js';
 import { str } from '/shared/i18n.js';
@@ -142,7 +142,10 @@ export function ListsPage({ s }) {
   };
   return html`
     <div class="lists-page">
-      <${Segments} names=${lists.map((l) => [listName(l), active(l)])} selected=${index} onSelect=${go} />
+      ${/* A few lists fit side by side; more are chosen from a sheet. */ ''}
+      ${lists.length <= 3
+        ? html`<${Segments} names=${lists.map((l) => [listName(l), active(l)])} selected=${index} onSelect=${go} />`
+        : html`<${ListPicker} names=${lists.map((l) => [listName(l), active(l)])} selected=${index} onSelect=${go} />`}
       <${Swipe} onNext=${() => go(index + 1)} onPrevious=${() => go(index - 1)} onPull=${reloadLists} loading=${m.loading}>
         <div class=${`list-content ${direction > 0 ? 'from-right' : direction < 0 ? 'from-left' : ''}`} key=${list.id}>
           <${ListContent} m=${m} list=${list} />
@@ -178,6 +181,35 @@ function Segments({ names, selected, onSelect }) {
           </button>`)}
       </div>
     </div>`;
+}
+
+/** The list shown, with its place among the others: a tap opens all of them to choose one. */
+function ListPicker({ names, selected, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const [name, count] = names[selected];
+  return html`
+    <div class="segments-wrap">
+      <button class="list-picker" aria-haspopup="dialog" onClick=${() => setOpen(true)}>
+        <span class="list-picker-icon"><${Icon} name="checklist" /></span>
+        <span class="title-medium ellipsis grow" key=${selected}>${name}</span>
+        ${count > 0 && html`<span class="segment-count">${count}</span>`}
+        <span class="label-medium faint">${str('lists_position', selected + 1, names.length)}</span>
+        <${Icon} name="unfold_more" />
+      </button>
+    </div>
+    ${open && html`<${Details} onDismiss=${() => setOpen(false)}>
+      <div class="title-large" style="padding:8px 16px 12px">${str('lists_choose')}</div>
+      <div class="list-choices">${names.map(([n, c], i) => html`
+        <button key=${i} class=${`list-choice ${i === selected ? 'selected' : ''}`} style=${`--i:${Math.min(i, 12)}`} onClick=${() => {
+          onSelect(i);
+          setOpen(false);
+        }}>
+          <${Icon} name=${i === selected ? 'check_circle' : 'format_list_bulleted'} filled=${i === selected} />
+          <span class="body-large ellipsis grow">${n}</span>
+          ${c > 0 && html`<span class="segment-count">${c}</span>`}
+        </button>`)}
+      </div>
+    <//>`}`;
 }
 
 /** The list scrolls up and down; a swipe sideways moves to the next list, a pull from the top reads them again. */

@@ -3,6 +3,7 @@ import { ACTION_ALEXA, ACTION_MACRO, ACTION_POWER, ACTION_REMOTE, ACTION_WAIT, h
 import { userIds } from './accounts.ts'
 import * as alexa from './alexa.ts'
 import * as assistant from './assistant.ts'
+import * as football from './football.ts'
 import { type Device, type DeviceState, emptyState } from './alexa.ts'
 import { currentUserId, edit, get, getSecret, record, setSecret, withUser } from './db.ts'
 import { HttpError, NotLoggedInError, OfflineError } from './errors.ts'
@@ -406,6 +407,32 @@ async function fireSchedule(schedule: Schedule) {
   }
 }
 
+// --- the reminder of the matches of the favorite team ------------------------------------------
+// A push to the browsers only: the Android app sets its own alarm (quick/TeamWidget.kt).
+
+const teamChecked = new Map<number, number>()
+
+async function remindTeam(userId: number) {
+  const minutes = Number(get<number>('teamReminder')) || 0
+  const team = get<{ league: string; id: string } | null | false>('team')
+  const now = Date.now()
+  if (!minutes || !team || now - (teamChecked.get(userId) ?? 0) < 60_000) return
+  teamChecked.set(userId, now)
+  const next = (await football.team(team.league, team.id)).next
+  if (!next || next.state !== 'pre' || !next.timeValid) return
+  const at = Date.parse(next.date)
+  if (now < at - minutes * 60_000 || now >= at) return
+  const sent = getSecret<string[]>('teamReminded', [])
+  if (sent.includes(next.id)) return
+  setSecret('teamReminded', [...sent, next.id].slice(-20))
+  await push({
+    title: `${next.home.name} – ${next.away.name}`,
+    body: str('team_reminder_text', clock(at), next.competition),
+    tag: `team|${next.id}`,
+    url: '/',
+  })
+}
+
 // --- the loop ------------------------------------------------------------------------------------
 
 const lastPoll = new Map<number, number>()
@@ -426,6 +453,7 @@ export function polled() {
 }
 
 function step(userId: number) {
+  remindTeam(userId).catch((e) => console.warn(`Promemoria della partita non riuscito (account ${userId}):`, (e as Error).message))
   if (!alexa.isLoggedIn()) return
   tick()
   const every = watchEvery()

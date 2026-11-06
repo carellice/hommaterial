@@ -87,7 +87,7 @@ const EMPTY_DATA = {
   tileSpans: {}, macros: [], shortcuts: null, widget: null, tiles: Array(10).fill(null), timers: {}, schedules: [],
   automations: [], alerts: {}, remotes: [], remoteButtons: {}, hiddenRemotes: [], acSettings: {}, lgTvs: [],
   assistantNotes: [], assistantHouse: '', assistantTaught: [], autoUpdate: true, haptics: true, hapticLevel: 70,
-  listViews: { names: {}, merged: [] },
+  listViews: { names: {}, merged: [] }, teamReminder: 0,
 };
 
 const EMPTY_STATUS = {
@@ -106,7 +106,8 @@ const lgRemote = (tv) => ({ id: tv.id, name: tv.name, type: LG_TYPE });
 /** The state of the app for what the server sent: [data] in the format of the Android app. */
 function fromServer(data, status) {
   // The Notion lists and notes chosen are kept in the browser: applySnapshot takes the server's into it.
-  const { notionLists, notionNotes, ...rest } = data;
+  // So is the favorite team, the same on every device.
+  const { notionLists, notionNotes, team, weather, ...rest } = data;
   return {
     ...rest,
     switchBotRemotes: rest.remotes,
@@ -163,8 +164,12 @@ function initialState() {
     notionNotes: settings.get('notionNotes', []),
     calendarDefault: settings.get('calendarDefault', null),
     calendarHome: settings.get('calendarHome', true),
-    // The favorite team of this browser, what was last read of it and whether that failed.
+    // The favorite team, what was last read of it and whether that failed.
     team: settings.get('team', null),
+    // The weather at the top of the home: the place chosen, null for none, and what was read of it.
+    weather: settings.get('weather', null),
+    weatherInfo: null,
+    weatherFailed: false,
     teamInfo: null,
     teamFailed: false,
     update: null,
@@ -248,7 +253,31 @@ function applySnapshot(answer) {
       post('/api/data', { values: { [key]: state[key] } }).catch(() => {});
     }
   }
+  // The favorite team too: null on the server until a device chooses, false for none.
+  const fromServer = answer.data?.team;
+  if (fromServer != null && !pendingValues.has('team')) {
+    const team = fromServer || null;
+    settings.set('team', team);
+    notion.team = team;
+    if (team?.id !== state.team?.id) Object.assign(notion, { teamInfo: null, teamFailed: false });
+  } else if (answer.data && fromServer == null && state.team) {
+    post('/api/data', { values: { team: state.team } }).catch(() => {});
+  }
+  // The place of the weather the same way.
+  const place = answer.data?.weather;
+  if (place != null && !pendingValues.has('weather')) {
+    const weather = place || null;
+    settings.set('weather', weather);
+    notion.weather = weather;
+    if (weather?.lat !== state.weather?.lat || weather?.lon !== state.weather?.lon) Object.assign(notion, { weatherInfo: null, weatherFailed: false });
+  } else if (answer.data && place == null && state.weather) {
+    post('/api/data', { values: { weather: state.weather } }).catch(() => {});
+  }
+  const teamChanged = 'teamInfo' in notion && notion.team;
+  const weatherChanged = 'weatherInfo' in notion && notion.weather;
   update({ ...next, ...notion, states, synced: true });
+  if (teamChanged) loadTeam();
+  if (weatherChanged) loadWeather();
   cache?.set('snapshot', { data: answer.data, status: answer.status });
 }
 
@@ -926,8 +955,99 @@ export function setCalendarDefault(id) {
 /** Chooses the favorite team, or none; what was read of the previous one goes. */
 export function setTeam(team) {
   settings.set('team', team);
+  // On the server "none" is false; here it is null.
+  put({ team: team ?? false });
   update({ team, teamInfo: null, teamFailed: false });
   if (team) loadTeam();
+}
+
+/** How many minutes before every match of the team the server sends a reminder; 0 for none. */
+export const setTeamReminder = (minutes) => put({ teamReminder: minutes });
+
+/** A calendar file with the match, for the calendar of the device to add it. */
+export function matchCalendarFile(match) {
+  const stamp = (ms) => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const escape = (text) => String(text).replace(/[\\;,]/g, (c) => `\\${c}`);
+  const start = Date.parse(match.date);
+  const day = (ms) => stamp(ms).slice(0, 8);
+  const when = match.timeValid
+    ? [`DTSTART:${stamp(start)}`, `DTEND:${stamp(start + 2 * 3_600_000)}`]
+    : [`DTSTART;VALUE=DATE:${day(start)}`, `DTEND;VALUE=DATE:${day(start + 86_400_000)}`];
+  const text = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Hommaterial//IT', 'BEGIN:VEVENT',
+    `UID:match-${match.id}@hommaterial`, `DTSTAMP:${stamp(Date.now())}`, ...when,
+    `SUMMARY:${escape(`${match.home.name} – ${match.away.name}`)}`,
+    `DESCRIPTION:${escape(match.competition)}`,
+    match.venue && `LOCATION:${escape(match.venue)}`,
+    'END:VEVENT', 'END:VCALENDAR',
+  ].filter(Boolean).join('\r\n');
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([text], { type: 'text/calendar' }));
+  link.download = `${match.home.name}-${match.away.name}.ics`.replace(/[^\w.-]+/g, '_');
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
+}
+
+// ——— The weather at the top of the home: Open-Meteo, which asks for no key ———
+
+/** Chooses the place of the weather, or none to hide it. */
+export function setWeather(place) {
+  settings.set('weather', place);
+  // On the server "none" is false; here it is null.
+  put({ weather: place ?? false });
+  update({ weather: place, weatherInfo: null, weatherFailed: false });
+  if (place) loadWeather();
+}
+
+let weatherLoading = false;
+
+/** Reads the weather again, unless read less than fifteen minutes ago or [force]. */
+export async function loadWeather(force = false) {
+  const place = state.weather;
+  if (!place || weatherLoading || (!force && state.weatherInfo && Date.now() - state.weatherInfo.readAt < 15 * 60_000)) return;
+  weatherLoading = true;
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}`
+      + '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day,wind_speed_10m'
+      + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=5';
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(String(response.status));
+    const json = await response.json();
+    if (state.weather?.lat !== place.lat) return;
+    const d = json.daily ?? {};
+    update({
+      weatherInfo: {
+        readAt: Date.now(),
+        temperature: json.current.temperature_2m,
+        feels: json.current.apparent_temperature,
+        humidity: json.current.relative_humidity_2m,
+        wind: json.current.wind_speed_10m,
+        code: json.current.weather_code,
+        day: json.current.is_day === 1,
+        days: (d.time ?? []).map((date, i) => ({
+          date, code: d.weather_code[i], max: d.temperature_2m_max[i], min: d.temperature_2m_min[i], rain: d.precipitation_probability_max?.[i] ?? null,
+        })),
+      },
+      weatherFailed: false,
+    });
+  } catch {
+    if (state.weather?.lat === place.lat) update({ weatherFailed: true });
+  } finally {
+    weatherLoading = false;
+  }
+}
+
+/** The towns called like [query], to choose the place of the weather; null when they cannot be read. */
+export async function searchPlaces(query) {
+  try {
+    const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=8&language=${lang()}&format=json`);
+    if (!response.ok) return null;
+    return ((await response.json()).results ?? []).map((r) => ({
+      name: r.name, detail: [r.admin1, r.country].filter(Boolean).join(', '), lat: r.latitude, lon: r.longitude,
+    }));
+  } catch {
+    return null;
+  }
 }
 
 let teamLoading = false;
@@ -990,26 +1110,41 @@ export function setVoiceEcho(echo) {
 }
 
 /** Tells Alexa [said] through [echo], which answers aloud; what she answers is shown full screen too. */
+// The volume the Echo goes back to after answering in silence.
+const ECHO_VOLUME = 40;
+
 async function sayToAlexa(echo, said) {
   const asked = { id: Date.now(), from: 'alexa', said, reply: null, waiting: true, actions: [] };
   update({ reply: asked });
   // Closed meanwhile, or replaced by a newer question: nothing to show.
   const show = (reply) => update((s) => (s.reply?.id === asked.id ? { reply: { ...asked, reply, waiting: false } } : {}));
   const since = Date.now();
-  if (!(await guarded(() => post('/api/alexa/say', { echo: echo.serial, text: said })))) return show(null);
+  // The Echo answers with its volume at zero, not to startle who is at home: the answer is read here.
+  if (!(await guarded(() => post('/api/alexa/say', { echo: echo.serial, text: said, quiet: true })))) {
+    show(null);
+    return restoreVolume(echo, 0);
+  }
   // The answer reaches the voice history of Amazon some seconds later, if at all.
+  let text = null;
   for (const wait of [3000, 3000, 4000, 5000]) {
     await new Promise((done) => setTimeout(done, wait));
-    let text = null;
     try {
       ({ text } = await get(`/api/alexa/reply?echo=${encodeURIComponent(echo.serial)}&since=${since}`));
     } catch {
-      // Without the history Alexa has still answered aloud.
-      return show(null);
+      // Without the history Alexa has still answered.
+      break;
     }
-    if (text) return show(text);
+    if (text) break;
   }
-  show(null);
+  show(text);
+  // Long answers take a while to be said: the volume comes back once it is likely over.
+  restoreVolume(echo, text ? Math.min(20_000, Math.max(1500, text.length * 60)) : 0);
+}
+
+/** Brings the volume of the Echo back, [after] ms from now. */
+async function restoreVolume(echo, after) {
+  await new Promise((done) => setTimeout(done, after));
+  await post('/api/alexa/volume', { echo: echo.serial, value: ECHO_VOLUME }).catch(() => {});
 }
 
 

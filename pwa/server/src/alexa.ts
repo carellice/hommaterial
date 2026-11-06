@@ -483,21 +483,43 @@ export async function echos(): Promise<Echo[]> {
   return knownEchos
 }
 
-/** Tells Alexa [text] through the Echo [serial], as if it had been said to it. */
-export async function say(serial: string, text: string) {
-  const echo = knownEchos.find((it) => it.serial === serial) ?? (await echos()).find((it) => it.serial === serial)
-  if (!echo) throw new HttpError(404, str('echo_gone'))
-  const node = {
+async function echo(serial: string): Promise<Echo> {
+  const found = knownEchos.find((it) => it.serial === serial) ?? (await echos()).find((it) => it.serial === serial)
+  if (!found) throw new HttpError(404, str('echo_gone'))
+  return found
+}
+
+function node(echo: Echo, type: string, payload: Record<string, unknown>, skillId?: string) {
+  return {
     '@type': 'com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode',
-    type: 'Alexa.TextCommand',
-    skillId: 'amzn1.ask.1p.tellalexa',
+    type,
+    ...(skillId ? { skillId } : {}),
     operationPayload: {
-      deviceType: echo.type, deviceSerialNumber: echo.serial, locale: marketplace().locale, customerId: echo.customer,
-      text: text.trim().toLowerCase(),
+      deviceType: echo.type, deviceSerialNumber: echo.serial, locale: marketplace().locale, customerId: echo.customer, ...payload,
     },
   }
-  const sequence = { '@type': 'com.amazon.alexa.behaviors.model.Sequence', startNode: node }
+}
+
+async function run(startNode: unknown) {
+  const sequence = { '@type': 'com.amazon.alexa.behaviors.model.Sequence', startNode }
   await api('POST', '/api/behaviors/preview', { behaviorId: 'PREVIEW', sequenceJson: JSON.stringify(sequence), status: 'ENABLED' })
+}
+
+const volumeNode = (target: Echo, value: number) => node(target, 'Alexa.DeviceControls.Volume', { value })
+
+/**
+ * Tells Alexa [text] through the Echo [serial], as if it had been said to it; when [quiet], with the
+ * volume of the Echo at zero first, so that it does not answer aloud in the house: [volume] brings it back.
+ */
+export async function say(serial: string, text: string, quiet = false) {
+  const target = await echo(serial)
+  const command = node(target, 'Alexa.TextCommand', { text: text.trim().toLowerCase() }, 'amzn1.ask.1p.tellalexa')
+  await run(quiet ? { '@type': 'com.amazon.alexa.behaviors.model.SerialNode', nodesToExecute: [volumeNode(target, 0), command] } : command)
+}
+
+/** Sets the volume of the Echo [serial], 0 to 100. */
+export async function volume(serial: string, value: number) {
+  await run(volumeNode(await echo(serial), Math.max(0, Math.min(100, Math.round(value)))))
 }
 
 // The answer of Alexa is read back from the voice history of the account, as alexa-remote does:

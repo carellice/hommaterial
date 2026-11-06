@@ -245,7 +245,13 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     // A widget opens the app on its own page.
     val asked by requestedTab.collectAsState()
     LaunchedEffect(asked) {
-        asked?.let { tab = it }
+        // The widget of the team opens its page, over the home.
+        if (asked == "team") {
+            tab = TAB_HOME
+            teamOpen = state.team != null
+        } else {
+            asked?.let { tab = it }
+        }
         requestedTab.value = null
     }
     // The lists chosen of Notion come and go with the settings: read again when they change.
@@ -397,10 +403,13 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                         val agenda = state.calendarHome && state.calendarReady && !monitor.enabled
                         // The next match of the favorite team comes first, above the events.
                         val team = state.team != null && !monitor.enabled
+                        // The weather comes above the team, when switched on in the settings.
+                        val weather = state.weather != null && !monitor.enabled
                         Crossfade(current, label = "page") { shownPage ->
-                            PageGrid(shownPage, state, vm, top = if ((agenda || team) && shownPage == pages.first()) {
+                            PageGrid(shownPage, state, vm, top = if ((agenda || team || weather) && shownPage == pages.first()) {
                                 {
                                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        if (weather) WeatherHomeCard(state, vm)
                                         if (team) TeamHomeCard(state, vm) { teamOpen = true }
                                         if (agenda) HomeAgenda(calendar, state) { tab = TAB_CALENDAR }
                                     }

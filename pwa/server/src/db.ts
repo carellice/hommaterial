@@ -144,6 +144,12 @@ export const DEFAULTS: Record<string, unknown> = {
   notionNotes: null,
   // The names given to the lists in the app and the lists joined into one (shared/lists.js).
   listViews: { names: {}, merged: [] },
+  // The favorite team, the same on every device: null until one chooses, false for none.
+  team: null,
+  // How many minutes before a match of the team its reminder comes; 0 for none.
+  teamReminder: 0,
+  // The place of the weather at the top of the home, the same on every device: null until one chooses, false for none.
+  weather: null,
 }
 
 export function get<T>(key: string): T {

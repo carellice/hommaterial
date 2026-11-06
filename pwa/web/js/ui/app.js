@@ -1,6 +1,6 @@
 // The app: which screen is shown, the theme, and the panel behaviour of the monitor mode.
 import { html, useState, useEffect, useRef } from '../lib.js';
-import { Dialog, FullDialog, Icon, Spinner, Snackbar, useStore, useNow } from './common.js';
+import { Dialog, Icon, IconButton, Snackbar, useStore, useNow, useBack } from './common.js';
 import * as store from '../store.js';
 import { str } from '/shared/i18n.js';
 import { accentCss } from '/shared/accents.js';
@@ -189,25 +189,49 @@ function ReplyScreen({ reply, readAloud }) {
   useEffect(() => {
     if (text && readAloud && canSpeak) read();
   }, [reply.id, text]);
+  useBack(store.dismissReply);
   const alexa = reply.from === 'alexa';
   const waiting = str(alexa ? 'alexa_waiting' : 'ai_thinking');
   return html`
-    <${FullDialog} title=${alexa ? 'Alexa' : str('ai_title')} onDismiss=${store.dismissReply} closeLabel=${str('close')}>
-      <div class="supporting" style="padding:8px 0 24px">${alexa ? str('voice_to_alexa', reply.said) : `“${reply.said}”`}</div>
-      ${reply.waiting
-        ? html`<div style="display:flex;align-items:center;gap:16px"><${Spinner} /><span class="title-large">${waiting}</span></div>`
-        : html`<div class=${text ? 'headline-medium' : 'title-large'} style="white-space:pre-wrap">${text ?? str('alexa_no_reply')}</div>`}
-      ${reply.actions?.length > 0 && html`
-        <ul class="body-large" style="margin:24px 0 0;padding-left:20px">${reply.actions.map((a) => html`<li style="margin:6px 0">${store.agentLabel(a)}</li>`)}</ul>
-        <div style="display:flex;gap:12px;margin-top:24px">
-          <button class="tonal-btn" style="flex:1" onClick=${store.dismissReply}>${str('cancel')}</button>
-          <button class="filled-btn" style="flex:1" onClick=${store.confirmAgent}>${str('ai_confirm')}</button>
-        </div>`}
-      ${text && canSpeak && html`
-        <button class="filled-btn" style="width:100%;margin-top:32px" onClick=${speaking ? stop : read}>
-          <${Icon} name=${speaking ? 'stop' : 'volume_up'} /> ${str(speaking ? 'alexa_stop_reading' : 'alexa_read')}
-        </button>`}
-    <//>`;
+    <div class="reply-screen" role="dialog" aria-modal="true" aria-label=${alexa ? 'Alexa' : str('ai_title')}>
+      <div class=${`reply-glow ${reply.waiting ? 'busy' : ''}`}></div>
+      <div class="reply-top">
+        <span class="reply-source label-large"><${Icon} name=${alexa ? 'speaker' : 'auto_awesome'} filled />${alexa ? 'Alexa' : str('ai_title')}</span>
+        <span class="grow"></span>
+        <${IconButton} icon="close" label=${str('close')} onClick=${store.dismissReply} />
+      </div>
+      <div class="reply-body">
+        <div class="reply-said body-large"><span class="label-medium">${str('reply_you')}</span>${reply.said}</div>
+        ${reply.waiting
+          ? html`<${Thinking} icon=${alexa ? 'speaker' : 'auto_awesome'} label=${waiting} />`
+          : html`<div class=${`reply-answer ${text ? 'headline-small' : 'title-large faint'}`} key=${reply.id}>${text ?? str('alexa_no_reply')}</div>`}
+        ${!reply.waiting && reply.actions?.length > 0 && html`
+          <div class="reply-actions">${reply.actions.map((a, i) => html`
+            <div key=${i} class="reply-action body-large" style=${`--i:${i}`}><${Icon} name="task_alt" />${store.agentLabel(a)}</div>`)}
+          </div>`}
+      </div>
+      <div class="reply-bottom">
+        ${reply.actions?.length > 0 && html`
+          <div style="display:flex;gap:12px">
+            <button class="tonal-btn" style="flex:1" onClick=${store.dismissReply}>${str('cancel')}</button>
+            <button class="filled-btn" style="flex:1" onClick=${store.confirmAgent}>${str('ai_confirm')}</button>
+          </div>`}
+        ${text && canSpeak && html`
+          <button class=${`filled-btn reply-read ${speaking ? 'speaking' : ''}`} onClick=${speaking ? stop : read}>
+            ${speaking ? html`<span class="eq"><span></span><span></span><span></span><span></span></span>` : html`<${Icon} name="volume_up" />`}
+            ${str(speaking ? 'alexa_stop_reading' : 'alexa_read')}
+          </button>`}
+      </div>
+    </div>`;
+}
+
+/** While the answer comes: a ring of colors turning around a breathing core, and dots that bounce. */
+function Thinking({ icon, label }) {
+  return html`
+    <div class="thinking" role="status">
+      <div class="orb"><span class="orb-ring"></span><span class="orb-core"><${Icon} name=${icon} filled /></span></div>
+      <div class="thinking-label title-medium">${label.replace(/…$/, '')}<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+    </div>`;
 }
 
 function UpdateDialog({ version }) {
