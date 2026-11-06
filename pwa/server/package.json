@@ -1,6 +1,6 @@
 {
   "name": "hommaterial-server",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "description": "Server di Hommaterial: account, sessione Alexa, SwitchBot, TV LG, assistente, lavori in sottofondo e notifiche push.",
