@@ -410,6 +410,21 @@ class AlexaApi(private val auth: AlexaAuth, private val http: OkHttpClient) {
         call("PUT", "$LISTS/${listId.encoded()}/items/${item.id.encoded()}?version=${item.version}", body, site = "www")
     }
 
+    /** Gives an item a new name; Amazon wants the version last read. */
+    suspend fun renameListItem(listId: String, item: ListItem, name: String) {
+        if (ServerSync.active) {
+            ServerSync.call(
+                "PUT",
+                "/api/lists/${ServerSync.encode(listId)}/items/${ServerSync.encode(item.id)}",
+                JSONObject().put("version", item.version).put("name", name),
+            )
+            return
+        }
+        val itemName = JSONObject().put("type", "itemName").put("value", name)
+        val body = JSONObject().put("itemAttributesToUpdate", JSONArray().put(itemName)).put("itemAttributesToRemove", JSONArray())
+        call("PUT", "$LISTS/${listId.encoded()}/items/${item.id.encoded()}?version=${item.version}", body, site = "www")
+    }
+
     suspend fun deleteListItem(listId: String, item: ListItem) {
         if (ServerSync.active) {
             ServerSync.call("DELETE", "/api/lists/${ServerSync.encode(listId)}/items/${ServerSync.encode(item.id)}?version=${item.version}")

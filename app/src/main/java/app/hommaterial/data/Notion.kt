@@ -196,6 +196,19 @@ class Notion(private val http: OkHttpClient, private val store: NotionStore) {
         call("PATCH", "/pages/${item.id}", JSONObject().put("properties", change))
     }
 
+    suspend fun rename(source: NotionSource, item: ListItem, name: String) {
+        if (ServerSync.active) {
+            ServerSync.call("PUT", "${serverList(source)}/items/${ServerSync.encode(item.id)}", JSONObject().put("name", name))
+            return
+        }
+        if (!source.isDatabase) {
+            call("PATCH", "/blocks/${item.id}", JSONObject().put("to_do", JSONObject().put("rich_text", richText(name))))
+            return
+        }
+        val properties = JSONObject().put(schema(source.id).title, JSONObject().put("title", richText(name)))
+        call("PATCH", "/pages/${item.id}", JSONObject().put("properties", properties))
+    }
+
     suspend fun delete(source: NotionSource, item: ListItem) {
         if (ServerSync.active) {
             ServerSync.call("DELETE", "${serverList(source)}/items/${ServerSync.encode(item.id)}")

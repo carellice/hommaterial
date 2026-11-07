@@ -127,6 +127,9 @@ object Offline {
                 is Change.ListDone -> if (change.listId == listId) {
                     shown = shown.map { if (it.id == change.itemId) it.copy(completed = change.completed, waiting = true) else it }
                 }
+                is Change.ListRename -> if (change.listId == listId) {
+                    shown = shown.map { if (it.id == change.itemId) it.copy(name = change.name, waiting = true) else it }
+                }
                 is Change.ListDelete -> if (change.listId == listId) shown = shown.filter { it.id != change.itemId }
                 else -> Unit
             }
@@ -169,11 +172,21 @@ object Offline {
         }
     }
 
+    fun renameItem(listId: String, item: ListItem, name: String) = change { list ->
+        val added = list.find { it is Change.ListAdd && it.id == item.id }
+        if (added is Change.ListAdd) {
+            list.map { if (it === added) added.copy(name = name) else it }
+        } else {
+            list.filterNot { it is Change.ListRename && it.listId == listId && it.itemId == item.id } + Change.ListRename(listId, item.id, item.version, name)
+        }
+    }
+
     fun deleteItem(listId: String, item: ListItem) = change { list ->
         if (list.any { it is Change.ListAdd && it.id == item.id }) {
             list.filterNot { it is Change.ListAdd && it.id == item.id }
         } else {
-            list.filterNot { it is Change.ListDone && it.listId == listId && it.itemId == item.id } + Change.ListDelete(listId, item.id, item.version)
+            list.filterNot { (it is Change.ListDone && it.listId == listId && it.itemId == item.id) || (it is Change.ListRename && it.listId == listId && it.itemId == item.id) } +
+                Change.ListDelete(listId, item.id, item.version)
         }
     }
 
@@ -258,6 +271,11 @@ object Offline {
                 val item = ListItem(change.itemId, "", !change.completed, change.version)
                 api.setListItemDone(change.listId, item, change.completed)
             }
+            is Change.ListRename -> {
+                // A tick sent just before changed the version: Amazon wants the one it has now.
+                val version = api.listItems(change.listId).find { it.id == change.itemId }?.version ?: change.version
+                api.renameListItem(change.listId, ListItem(change.itemId, "", false, version), change.name)
+            }
             is Change.ListDelete -> api.deleteListItem(change.listId, ListItem(change.itemId, "", false, change.version))
             is Change.EventCreate -> calendar.create(change.calendar, change.input)
             is Change.EventUpdate -> calendar.update(event(change.calendar, change.eventId), change.input, change.moveTo)
@@ -270,6 +288,7 @@ object Offline {
         when (change) {
             is Change.ListAdd -> items(change.listId)?.let { putItems(change.listId, listOf(ListItem(change.id, change.name, change.completed, 0)) + it) }
             is Change.ListDone -> items(change.listId)?.let { list -> putItems(change.listId, list.map { if (it.id == change.itemId) it.copy(completed = change.completed) else it }) }
+            is Change.ListRename -> items(change.listId)?.let { list -> putItems(change.listId, list.map { if (it.id == change.itemId) it.copy(name = change.name) else it }) }
             is Change.ListDelete -> items(change.listId)?.let { list -> putItems(change.listId, list.filter { it.id != change.itemId }) }
             else -> keptEvents()?.let { (range, events) ->
                 val next = when (change) {
@@ -316,6 +335,12 @@ sealed interface Change {
         override fun label() = Offline.items(listId)?.find { it.id == itemId }?.name ?: itemId
     }
 
+    data class ListRename(val listId: String, val itemId: String, val version: Long, val name: String) : Change {
+        override fun toJson(): JSONObject = JSONObject().put("kind", "listRename").put("listId", listId).put("itemId", itemId)
+            .put("version", version).put("name", name)
+        override fun label() = name
+    }
+
     data class ListDelete(val listId: String, val itemId: String, val version: Long) : Change {
         override fun toJson(): JSONObject = JSONObject().put("kind", "listDelete").put("listId", listId).put("itemId", itemId).put("version", version)
         override fun label() = Offline.items(listId)?.find { it.id == itemId }?.name ?: itemId
@@ -341,6 +366,7 @@ sealed interface Change {
         fun fromJson(o: JSONObject): Change = when (o.getString("kind")) {
             "listAdd" -> ListAdd(o.getString("id"), o.getString("listId"), o.getString("name"), o.optBoolean("completed"))
             "listDone" -> ListDone(o.getString("listId"), o.getString("itemId"), o.optLong("version", 1), o.optBoolean("completed"), o.optBoolean("original"))
+            "listRename" -> ListRename(o.getString("listId"), o.getString("itemId"), o.optLong("version", 1), o.getString("name"))
             "listDelete" -> ListDelete(o.getString("listId"), o.getString("itemId"), o.optLong("version", 1))
             "eventCreate" -> EventCreate(o.getString("id"), o.getString("calendar"), inputFromJson(o.getJSONObject("input")))
             "eventUpdate" -> EventUpdate(o.getString("calendar"), o.getString("eventId"), inputFromJson(o.getJSONObject("input")),

@@ -163,6 +163,15 @@ export async function setDone(kind: string, id: string, item: string, done: bool
   await api('PATCH', `/pages/${item}`, { properties: change })
 }
 
+export async function rename(kind: string, id: string, item: string, name: string) {
+  if (kind !== 'database') {
+    await api('PATCH', `/blocks/${item}`, { to_do: { rich_text: richText(name) } })
+    return
+  }
+  const s = await schema(id)
+  await api('PATCH', `/pages/${item}`, { properties: { [s.title]: { title: richText(name) } } })
+}
+
 export async function remove(kind: string, item: string) {
   if (kind === 'database') await api('PATCH', `/pages/${item}`, { archived: true })
   else await api('DELETE', `/blocks/${item}`)

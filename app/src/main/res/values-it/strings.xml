@@ -735,6 +735,12 @@
     <string name="list_add">Aggiungi</string>
     <string name="list_empty">Non c\'è niente da fare</string>
     <string name="list_delete">Elimina</string>
+    <string name="list_item_edit">Modifica elemento</string>
+    <string name="list_item_name">Nome</string>
+    <string name="list_toggle">Segna come fatto o da fare</string>
+    <string name="list_clear_done">Rimuovi completate</string>
+    <string name="list_clear_done_title">Rimuovere le attività completate?</string>
+    <string name="list_clear_done_text">Le %1$d attività completate verranno eliminate da questa lista.</string>
     <string name="list_done_show">Mostra le completate (%1$d)</string>
     <string name="list_done_hide">Nascondi le completate (%1$d)</string>
     <string name="nav_home">Casa</string>

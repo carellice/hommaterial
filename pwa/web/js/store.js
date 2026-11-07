@@ -771,6 +771,13 @@ export async function setAlexaListItemDone(listId, item, completed) {
   return (await onList(() => api('PUT', path, { version: item.version, completed }))) != null;
 }
 
+export async function renameAlexaListItem(listId, item, name) {
+  const notion = notionPath(listId);
+  if (notion) return (await onList(() => api('PUT', `${notion}/items/${encodeURIComponent(item.id)}`, { name }))) != null;
+  const path = `/api/lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(item.id)}`;
+  return (await onList(() => api('PUT', path, { version: item.version, name }))) != null;
+}
+
 export async function deleteAlexaListItem(listId, item) {
   const notion = notionPath(listId);
   if (notion) return (await onList(() => del(`${notion}/items/${encodeURIComponent(item.id)}`))) != null;

@@ -2050,6 +2050,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         return guarded { notion.setDone(source, item, completed) }
     }
 
+    suspend fun renameNotionItem(listId: String, item: ListItem, name: String): Boolean {
+        val source = NotionSource.ofList(listId) ?: return false
+        return guarded { notion.rename(source, item, name) }
+    }
+
     suspend fun deleteNotionItem(listId: String, item: ListItem): Boolean {
         val source = NotionSource.ofList(listId) ?: return false
         return guarded { notion.delete(source, item) }
@@ -2129,6 +2134,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _haptics.tryEmit(if (completed) Haptic.On else Haptic.Off)
         Offline.setItemDone(listId, item, completed)
     }
+
+    fun renameAlexaListItem(listId: String, item: ListItem, name: String) = Offline.renameItem(listId, item, name)
 
     fun deleteAlexaListItem(listId: String, item: ListItem) = Offline.deleteItem(listId, item)
 

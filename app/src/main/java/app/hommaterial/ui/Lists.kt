@@ -49,6 +49,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.CircularProgressIndicator
@@ -192,6 +193,21 @@ internal class ListsModel(private val vm: HomeViewModel, private val scope: Coro
                 vm.setNotionItemDone(listId, item, !item.completed)
             }
         } else changed(listId) { vm.setAlexaListItemDone(listId, item, !item.completed) }
+    }
+
+    fun rename(shownId: String, item: AlexaItem, name: String) {
+        if (name == item.name) return
+        val listId = home(shownId, item)
+        if (NotionSource.ofList(listId) != null) {
+            notion(listId, { list -> list.map { if (it.id == item.id) it.copy(name = name) else it } }) {
+                vm.renameNotionItem(listId, item, name)
+            }
+        } else changed(listId) { vm.renameAlexaListItem(listId, item, name) }
+    }
+
+    /** Deletes every item done of the list shown. */
+    fun clearDone(shownId: String) {
+        itemsOf(shownId).orEmpty().filter { it.completed }.forEach { delete(shownId, it) }
     }
 
     fun delete(shownId: String, item: AlexaItem) {
@@ -511,7 +527,7 @@ private fun ListContent(model: ListsModel, list: AlexaList, bottomSpace: Int) {
         itemsGrouped(todo, model, list)
         if (finished.isNotEmpty()) {
             item(key = "done header") {
-                DoneHeader(finished.size, showDone, Modifier.animateItem()) { showDone = !showDone }
+                DoneHeader(finished.size, showDone, Modifier.animateItem(), onClear = { model.clearDone(list.id) }) { showDone = !showDone }
             }
             if (showDone) itemsGrouped(finished, model, list)
         }
@@ -616,27 +632,40 @@ private fun AddField(onAdd: (String) -> Unit) {
     )
 }
 
-/** An item: a touch ticks it, the cross deletes it. Swiping sideways moves to the next list. */
+/** An item: the circle ticks it, a touch elsewhere edits it, the cross deletes it. Swiping sideways moves to the next list. */
 @Composable
 private fun ItemRow(item: AlexaItem, model: ListsModel, list: AlexaList, shape: RoundedCornerShape) {
     val colors = MaterialTheme.colorScheme
     val completed = item.completed
+    var editing by remember { mutableStateOf(false) }
+    if (editing) {
+        ItemEditDialog(item.name, onSave = { model.rename(list.id, item, it) }, onDismiss = { editing = false })
+    }
     Surface(
         shape = shape,
         color = colors.surfaceContainer,
-        modifier = Modifier.fillMaxWidth().clip(shape).clickable { model.toggle(list.id, item) },
+        modifier = Modifier.fillMaxWidth().clip(shape).clickable { editing = true },
     ) {
         Row(
-            Modifier.heightIn(min = 60.dp).padding(start = 16.dp, end = 4.dp),
+            Modifier.heightIn(min = 60.dp).padding(start = 4.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CheckCircle(completed)
+            // A touch target of its own around the circle, so that only it ticks the item.
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .clickable(onClickLabel = str(R.string.list_toggle)) { model.toggle(list.id, item) },
+                contentAlignment = Alignment.Center,
+            ) {
+                CheckCircle(completed)
+            }
             Text(
                 item.name,
                 style = MaterialTheme.typography.bodyLarge,
                 textDecoration = if (completed) TextDecoration.LineThrough else null,
                 color = if (completed) colors.onSurfaceVariant else colors.onSurface,
-                modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.weight(1f).padding(start = 4.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
             )
             // Changed here and not yet sent: it goes as soon as there is internet.
             if (item.waiting) {
@@ -655,6 +684,35 @@ private fun ItemRow(item: AlexaItem, model: ListsModel, list: AlexaList, shape: 
             }
         }
     }
+}
+
+/** The name of an item, to change. */
+@Composable
+private fun ItemEditDialog(name: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var typed by remember { mutableStateOf(name) }
+    val ready = typed.isNotBlank()
+    fun save() {
+        if (!ready) return
+        onSave(typed.trim())
+        onDismiss()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.list_item_edit)) },
+        text = {
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it },
+                label = { Text(str(R.string.list_item_name)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { save() }),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = { TextButton(enabled = ready, onClick = ::save) { Text(str(R.string.save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
+    )
 }
 
 /** The round tick of an item, which fills with a little bounce when it is done. */
@@ -687,8 +745,20 @@ private fun CheckCircle(checked: Boolean) {
 }
 
 @Composable
-private fun DoneHeader(count: Int, open: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun DoneHeader(count: Int, open: Boolean, modifier: Modifier, onClear: () -> Unit, onClick: () -> Unit) {
     val turn by animateFloatAsState(if (open) 180f else 0f, label = "chevron")
+    var confirming by remember { mutableStateOf(false) }
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text(str(R.string.list_clear_done_title)) },
+            text = { Text(str(R.string.list_clear_done_text, count)) },
+            confirmButton = {
+                TextButton(onClick = { confirming = false; onClear() }) { Text(str(R.string.list_clear_done)) }
+            },
+            dismissButton = { TextButton(onClick = { confirming = false }) { Text(str(R.string.cancel)) } },
+        )
+    }
     Row(
         modifier
             .fillMaxWidth()
@@ -709,6 +779,12 @@ private fun DoneHeader(count: Int, open: Boolean, modifier: Modifier, onClick: (
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
+        IconButton(
+            onClick = { confirming = true },
+            colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+        ) {
+            Icon(Icons.Outlined.DeleteSweep, contentDescription = str(R.string.list_clear_done))
+        }
         Icon(
             Icons.Outlined.ExpandMore,
             contentDescription = str(if (open) R.string.list_done_hide else R.string.list_done_show, count),

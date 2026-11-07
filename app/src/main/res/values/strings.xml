@@ -745,6 +745,12 @@
     <string name="list_add">Add</string>
     <string name="list_empty">Nothing left to do</string>
     <string name="list_delete">Delete</string>
+    <string name="list_item_edit">Edit item</string>
+    <string name="list_item_name">Name</string>
+    <string name="list_toggle">Mark as done or to do</string>
+    <string name="list_clear_done">Remove completed</string>
+    <string name="list_clear_done_title">Remove completed items?</string>
+    <string name="list_clear_done_text">The %1$d completed items will be deleted from this list.</string>
     <string name="list_done_show">Show the completed ones (%1$d)</string>
     <string name="list_done_hide">Hide the completed ones (%1$d)</string>
     <string name="nav_home">Home</string>

@@ -1,7 +1,7 @@
 // The page of the lists of Alexa, as in its app and on the Echo devices (ui/Lists.kt): a segmented
 // control to choose the list, the list under it, and a swipe sideways to move to the next one.
 import { html, useState, useEffect, useRef } from '../lib.js';
-import { Icon, IconButton, Spinner, Dialog, Details, Setting, Field } from './common.js';
+import { Icon, IconButton, Spinner, Dialog, Details, Setting, Field, ConfirmDialog } from './common.js';
 import { applyViews, members, merge, split, rename, MERGED } from '/shared/lists.js';
 import * as store from '../store.js';
 import { str } from '/shared/i18n.js';
@@ -91,6 +91,20 @@ async function toggle(shownId, item) {
   await store.setAlexaListItemDone(listId, item, !item.completed);
   await refresh(listId);
   set({ pending: model.pending.filter((id) => id !== item.id) });
+}
+
+async function renameItem(shownId, item, name) {
+  const listId = home(shownId, item);
+  if (item.id.startsWith(ADDING) || name === item.name) return;
+  // Shown at once with the new name; the list read again says how it went.
+  set({ items: { ...model.items, [listId]: (model.items[listId] ?? []).map((it) => (it.id === item.id ? { ...it, name } : it)) } });
+  await store.renameAlexaListItem(listId, item, name);
+  await refresh(listId);
+}
+
+/** Deletes every item done of the list shown, one after the other: Alexa wants each with its version. */
+async function clearDone(shownId) {
+  for (const item of (itemsOf(shownId) ?? []).filter((it) => it.completed)) await remove(shownId, item);
 }
 
 async function remove(shownId, item) {
@@ -250,6 +264,7 @@ function Swipe({ onNext, onPrevious, onPull, loading, children }) {
 /** One list: how far along it is, the field to add to it, the items to do, then those done. */
 function ListContent({ m, list }) {
   const [showDone, setShowDone] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const items = itemsOf(list.id);
   const kept = (items ?? []).filter((it) => !m.removing.includes(it.id));
   // An item being ticked already sits where it will be.
@@ -272,8 +287,13 @@ function ListContent({ m, list }) {
         aria-label=${str(showDone ? 'list_done_hide' : 'list_done_show', finished.length)}>
         <span class="title-small primary-text">${str('list_done')}</span>
         <span class="title-small faint grow" style="white-space:pre">${` · ${finished.length}`}</span>
+        <span onClick=${(e) => e.stopPropagation()}>
+          <${IconButton} icon="delete_sweep" cls="faint" label=${str('list_clear_done')} onClick=${() => setClearing(true)} />
+        </span>
         <${Icon} name="expand_more" cls="chevron faint" />
       </button>
+      ${clearing && html`<${ConfirmDialog} title=${str('list_clear_done_title')} text=${str('list_clear_done_text', finished.length)}
+        confirm=${str('list_clear_done')} onConfirm=${() => clearDone(list.id)} onDismiss=${() => setClearing(false)} />`}
       ${showDone && html`<div class="item-group appear-down">${finished.map((it) => html`<${ItemRow} key=${it.id} item=${it} m=${m} list=${list} />`)}</div>`}`}
     <div class="body-small faint lists-footnote">${str(list.type === store.LIST_NOTION ? 'lists_notion_text' : 'lists_text')}</div>`;
 }
@@ -298,21 +318,44 @@ function AddField({ onAdd }) {
     </div>`;
 }
 
-/** An item: a touch ticks it, the cross deletes it. Swiping sideways moves to the next list. */
+/** An item: the circle ticks it, a touch elsewhere edits it, the cross deletes it. Swiping sideways moves to the next list. */
 function ItemRow({ item, m, list }) {
+  const [editing, setEditing] = useState(false);
   const adding = item.id.startsWith(ADDING);
   const busy = m.pending.includes(item.id) || adding;
   const completed = m.pending.includes(item.id) ? !item.completed : item.completed;
+  const edit = () => !adding && setEditing(true);
   return html`
     <div class=${`item-row ${completed ? 'checked' : ''} ${adding ? 'adding' : ''}`}
-      role="button" tabindex="0" onClick=${() => !busy && toggle(list.id, item)}
-      onKeyDown=${(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), !busy && toggle(list.id, item))}>
-      <span class="check-circle"><${Icon} name="check" /></span>
+      role="button" tabindex="0" aria-label=${`${str('list_item_edit')}: ${item.name}`} onClick=${edit}
+      onKeyDown=${(e) => e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), edit())}>
+      <button class="check-hit" aria-label=${str('list_toggle')} aria-pressed=${completed} disabled=${busy}
+        onClick=${(e) => {
+          e.stopPropagation();
+          toggle(list.id, item);
+        }}><span class="check-circle"><${Icon} name="check" /></span></button>
       <span class="item-name body-large">${item.name}</span>
       <span onClick=${(e) => e.stopPropagation()}>
         <${IconButton} icon="close" cls="faint" label=${str('list_delete')} disabled=${busy} onClick=${() => remove(list.id, item)} />
       </span>
-    </div>`;
+    </div>
+    ${editing && html`<${ItemEditDialog} name=${item.name} onSave=${(name) => renameItem(list.id, item, name)} onDismiss=${() => setEditing(false)} />`}`;
+}
+
+/** The name of an item, to change. */
+function ItemEditDialog({ name, onSave, onDismiss }) {
+  const [typed, setTyped] = useState(name);
+  const ready = typed.trim().length > 0;
+  const save = () => {
+    if (!ready) return;
+    onSave(typed.trim());
+    onDismiss();
+  };
+  return html`<${Dialog} title=${str('list_item_edit')} onDismiss=${onDismiss} actions=${html`
+    <button class="text-btn" onClick=${onDismiss}>${str('cancel')}</button>
+    <button class="text-btn" disabled=${!ready} onClick=${save}>${str('save')}</button>`}>
+    <${Field} label=${str('list_item_name')} value=${typed} onInput=${setTyped} onEnter=${save} autofocus />
+  <//>`;
 }
 
 function EmptyState({ title, text }) {

@@ -689,8 +689,16 @@ route('POST', '/api/notion/lists/:kind/:id/items', async (req, res, [kind, id]) 
 })
 
 route('PUT', '/api/notion/lists/:kind/:id/items/:item', async (req, res, [kind, id, item]) => {
-  const { completed } = await readJson<{ completed?: boolean }>(req)
-  await notion.setDone(notionKind(kind), decodeURIComponent(id), decodeURIComponent(item), completed === true)
+  const { name, completed } = await readJson<{ name?: string; completed?: boolean }>(req)
+  if (name != null) {
+    const value = text(name, 500).trim()
+    if (!value) throw new HttpError(400, str('something_wrong'))
+    await notion.rename(notionKind(kind), decodeURIComponent(id), decodeURIComponent(item), value)
+  }
+  // A rename alone leaves the tick as it is.
+  if (typeof completed === 'boolean' || name == null) {
+    await notion.setDone(notionKind(kind), decodeURIComponent(id), decodeURIComponent(item), completed === true)
+  }
   ok(res)
 })
 
