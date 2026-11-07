@@ -2,7 +2,7 @@
 // control to choose the list, the list under it, and a swipe sideways to move to the next one.
 import { html, useState, useEffect, useRef } from '../lib.js';
 import { Icon, IconButton, Spinner, Dialog, Details, Setting, Field, ConfirmDialog } from './common.js';
-import { applyViews, members, merge, split, rename, MERGED } from '/shared/lists.js';
+import { applyViews, members, merge, split, rename, move, MERGED } from '/shared/lists.js';
 import * as store from '../store.js';
 import { str } from '/shared/i18n.js';
 
@@ -348,13 +348,15 @@ function ItemEditDialog({ name, onSave, onDismiss }) {
   const ready = typed.trim().length > 0;
   const save = () => {
     if (!ready) return;
-    onSave(typed.trim());
+    // A name stays on one line: the newlines typed in the bigger field become spaces.
+    onSave(typed.replace(/\s*\n\s*/g, ' ').trim());
     onDismiss();
   };
   return html`<${Dialog} title=${str('list_item_edit')} onDismiss=${onDismiss} actions=${html`
     <button class="text-btn" onClick=${onDismiss}>${str('cancel')}</button>
     <button class="text-btn" disabled=${!ready} onClick=${save}>${str('save')}</button>`}>
-    <${Field} label=${str('list_item_name')} value=${typed} onInput=${setTyped} onEnter=${save} autofocus />
+    ${/* Long names wrap in the field, so that all of the text shows. */ ''}
+    <${Field} label=${str('list_item_name')} value=${typed} onInput=${setTyped} multiline autofocus />
   <//>`;
 }
 
@@ -404,7 +406,7 @@ export function ListsEditDialog({ s, onDismiss }) {
   return html`<${Dialog} title=${str('lists_edit')} onDismiss=${onDismiss} flush
     actions=${html`<button class="text-btn" onClick=${onDismiss}>${str('close')}</button>`}>
     <p class="body-medium faint" style="padding:0 16px">${str('lists_edit_text')}</p>
-    ${shown.map((list) => html`<${Setting} key=${list.id} title=${listName(list)}
+    ${shown.map((list, i) => html`<${Setting} key=${list.id} title=${listName(list)}
       text=${list.type === MERGED && views.names?.[list.id] ? members(list.id).map((id) => source.find((l) => l.id === id)).filter(Boolean).map(listName).join(' + ') : null}
       onClick=${() => setRenaming(list)} trailing=${html`
         ${list.type === MERGED && html`<${IconButton} icon="call_split" label=${str('list_split')}
@@ -412,6 +414,17 @@ export function ListsEditDialog({ s, onDismiss }) {
             e.stopPropagation();
             store.setListViews(split(views, list.id));
           }} />`}
+        ${/* The order of the pages of the lists, the first one shown first. */ ''}
+        <${IconButton} icon="keyboard_arrow_up" label=${str('list_move_up')} disabled=${i === 0}
+          onClick=${(e) => {
+            e.stopPropagation();
+            store.setListViews(move(views, shown.map((l) => l.id), i, i - 1));
+          }} />
+        <${IconButton} icon="keyboard_arrow_down" label=${str('list_move_down')} disabled=${i === shown.length - 1}
+          onClick=${(e) => {
+            e.stopPropagation();
+            store.setListViews(move(views, shown.map((l) => l.id), i, i + 1));
+          }} />
         <${Icon} name="edit" cls="faint" />`} />`)}
     ${source.length >= 2 && html`<div style="padding:12px 16px 0">
       <button class="tonal-btn" onClick=${() => setMerging([])}><${Icon} name="merge_type" /> ${str('list_merge')}</button></div>`}

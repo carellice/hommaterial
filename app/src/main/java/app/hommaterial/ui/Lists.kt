@@ -107,6 +107,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.outlined.CallSplit
 import androidx.compose.material.icons.automirrored.outlined.MergeType
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
@@ -693,7 +695,8 @@ private fun ItemEditDialog(name: String, onSave: (String) -> Unit, onDismiss: ()
     val ready = typed.isNotBlank()
     fun save() {
         if (!ready) return
-        onSave(typed.trim())
+        // A name stays on one line: the newlines typed in the bigger field become spaces.
+        onSave(typed.replace(Regex("\\s*\\n\\s*"), " ").trim())
         onDismiss()
     }
     AlertDialog(
@@ -704,7 +707,9 @@ private fun ItemEditDialog(name: String, onSave: (String) -> Unit, onDismiss: ()
                 value = typed,
                 onValueChange = { typed = it },
                 label = { Text(str(R.string.list_item_name)) },
-                singleLine = true,
+                // Long names wrap and the field grows, so that all of the text shows.
+                minLines = 2,
+                maxLines = 8,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { save() }),
                 modifier = Modifier.fillMaxWidth(),
@@ -927,7 +932,8 @@ internal fun ListsEditDialog(model: ListsModel, views: ListViews, onChange: (Lis
         text = {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
                 Text(str(R.string.lists_edit_text), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp))
-                for (list in shown) {
+                val ids = shown.map { it.id }
+                for ((index, list) in shown.withIndex()) {
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { renaming = list }.padding(start = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -946,6 +952,13 @@ internal fun ListsEditDialog(model: ListsModel, views: ListViews, onChange: (Lis
                             IconButton(onClick = { onChange(views.split(list.id)) }) {
                                 Icon(Icons.AutoMirrored.Outlined.CallSplit, contentDescription = str(R.string.list_split))
                             }
+                        }
+                        // The order of the pages of the lists, the first one shown first.
+                        IconButton(enabled = index > 0, onClick = { onChange(views.move(ids, index, index - 1)) }) {
+                            Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = str(R.string.list_move_up))
+                        }
+                        IconButton(enabled = index < shown.lastIndex, onClick = { onChange(views.move(ids, index, index + 1)) }) {
+                            Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = str(R.string.list_move_down))
                         }
                         Icon(Icons.Outlined.Edit, contentDescription = str(R.string.list_rename), modifier = Modifier.padding(12.dp).size(20.dp))
                     }

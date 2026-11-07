@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * How the lists show in the app only: names given here, and lists joined into one. Alexa and Notion
+ * How the lists show in the app only: names given here, lists joined into one, and their order. Alexa and Notion
  * never see it. On the home server it is the same on every device. The web app does the same in
  * pwa/shared/lists.js: keep them alike.
  */
@@ -13,10 +13,13 @@ data class ListViews(
     val names: Map<String, String> = emptyMap(),
     /** The lists joined, each group by the ids of its lists, the first one taking what is added. */
     val merged: List<List<String>> = emptyList(),
+    /** The ids of the lists shown, in the order chosen; those not in it follow, as Alexa gives them. */
+    val order: List<String> = emptyList(),
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("names", JSONObject(names))
         .put("merged", JSONArray(merged.map { JSONArray(it) }))
+        .put("order", JSONArray(order))
 
     /** The lists as shown: renamed, those joined as one in the place of the first of them. */
     fun apply(lists: List<AlexaList>, nameOf: (AlexaList) -> String): List<AlexaList> {
@@ -36,7 +39,14 @@ data class ListViews(
             val active = members.map { it.active }.takeIf { counts -> counts.all { it != null } }?.sumOf { it!! }
             out += AlexaList(id, names[id] ?: members.joinToString(" + ") { nameOf(it) }, MERGED, active)
         }
-        return out
+        return out.sortedBy { list -> order.indexOf(list.id).takeIf { it >= 0 } ?: Int.MAX_VALUE }
+    }
+
+    /** Moves the list at [from] of those [shown] to [to]. */
+    fun move(shown: List<String>, from: Int, to: Int): ListViews {
+        if (from !in shown.indices || to !in shown.indices) return this
+        val next = shown.toMutableList().apply { add(to, removeAt(from)) }
+        return copy(order = next)
     }
 
     /** Joins [ids] into one list; a list already joined leaves its old group. */
@@ -64,11 +74,13 @@ data class ListViews(
             if (o == null) return ListViews()
             val names = o.optJSONObject("names") ?: JSONObject()
             val merged = o.optJSONArray("merged") ?: JSONArray()
+            val order = o.optJSONArray("order") ?: JSONArray()
             return ListViews(
                 names.keys().asSequence().associateWith { names.optString(it) }.filterValues { it.isNotBlank() },
                 (0 until merged.length()).mapNotNull { i ->
                     merged.optJSONArray(i)?.let { a -> (0 until a.length()).map { a.optString(it) } }?.takeIf { it.size >= 2 }
                 },
+                (0 until order.length()).map { order.optString(it) }.filter { it.isNotBlank() },
             )
         }
     }

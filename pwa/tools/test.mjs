@@ -405,6 +405,11 @@ await test('lists renamed and joined in the app only', () => {
   v = views.split(v, views.viewId(['a', 'c']));
   assert.deepEqual(v.merged, []);
   assert.equal(views.rename(v, 'c', '').names.c, undefined);
+  // The order chosen, kept when lists are parted; a list not in it follows.
+  v = views.move(views.EMPTY_VIEWS, ['a', 'b', 'c'], 1, 0);
+  assert.deepEqual(views.applyViews(lists, v).map((l) => l.id), ['b', 'a', 'c']);
+  assert.deepEqual(views.applyViews(lists, { ...v, order: ['c'] }).map((l) => l.id), ['c', 'a', 'b']);
+  assert.deepEqual(views.split(v, 'x').order, ['b', 'a', 'c']);
 });
 
 if (failures) {

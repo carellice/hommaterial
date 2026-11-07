@@ -994,6 +994,8 @@
     <string name="lists_edit">Rename and join</string>
     <string name="lists_edit_text">Only in Hommaterial: Alexa and Notion keep their lists as they are. With the home server it is the same on every device.</string>
     <string name="list_rename">Rename</string>
+    <string name="list_move_up">Move up</string>
+    <string name="list_move_down">Move down</string>
     <string name="list_rename_hint">Name in Hommaterial</string>
     <string name="list_name_reset">Original name</string>
     <string name="list_merge">Join lists</string>

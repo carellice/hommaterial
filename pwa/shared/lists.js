@@ -1,11 +1,11 @@
-// How the lists show in the app only: names given here, and lists joined into one. Alexa and Notion
-// never see it; on the server it is the same on every device. The Android app does the same in
-// data/ListViews.kt: keep them alike. views = { names: { [listId]: name }, merged: [[listId, ...]] }
+// How the lists show in the app only: names given here, lists joined into one, and their order. Alexa
+// and Notion never see it; on the server it is the same on every device. The Android app does the same
+// in data/ListViews.kt: keep them alike. views = { names: { [listId]: name }, merged: [[listId, ...]], order: [shownId, ...] }
 
 export const MERGED = 'MERGED';
 const PREFIX = 'merged:';
 
-export const EMPTY_VIEWS = { names: {}, merged: [] };
+export const EMPTY_VIEWS = { names: {}, merged: [], order: [] };
 
 export const viewId = (group) => PREFIX + group.join('|');
 
@@ -32,7 +32,18 @@ export function applyViews(lists, views = EMPTY_VIEWS, nameOf = (l) => l.name) {
     const active = parts.every((p) => p.active != null) ? parts.reduce((sum, p) => sum + p.active, 0) : null;
     out.push({ id, name: names[id] ?? parts.map(nameOf).join(' + '), type: MERGED, active });
   }
-  return out;
+  // In the order chosen; those not in it follow, as Alexa gives them.
+  const order = views?.order ?? [];
+  const at = (l) => (order.includes(l.id) ? order.indexOf(l.id) : Infinity);
+  return out.sort((a, b) => at(a) - at(b));
+}
+
+/** Moves the list at [from] of those [shown] (their ids) to [to]. */
+export function move(views, shown, from, to) {
+  if (from < 0 || to < 0 || from >= shown.length || to >= shown.length) return views;
+  const order = [...shown];
+  order.splice(to, 0, ...order.splice(from, 1));
+  return { ...EMPTY_VIEWS, ...views, order };
 }
 
 /** Joins [ids] into one list; a list already joined leaves its old group. */
@@ -45,7 +56,7 @@ export function merge(views, ids) {
 export function split(views, id) {
   const names = { ...(views?.names ?? {}) };
   delete names[id];
-  return { names, merged: (views?.merged ?? []).filter((g) => viewId(g) !== id) };
+  return { ...EMPTY_VIEWS, ...views, names, merged: (views?.merged ?? []).filter((g) => viewId(g) !== id) };
 }
 
 export function rename(views, id, name) {
