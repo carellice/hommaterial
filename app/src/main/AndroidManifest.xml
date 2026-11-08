@@ -22,6 +22,9 @@
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <!-- The panel of the assistant listens by itself, showing the words as they are said. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- The music player goes on in the background, with its notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-feature
         android:name="android.hardware.nfc"
         android:required="false" />
@@ -258,6 +261,14 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+        <service
+            android:name=".music.PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.updates"

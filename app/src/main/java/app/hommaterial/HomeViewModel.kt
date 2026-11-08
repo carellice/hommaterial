@@ -1,6 +1,10 @@
 package app.hommaterial
 
 import app.hommaterial.voice.parseOpenApp
+import app.hommaterial.voice.MusicCommand
+import app.hommaterial.voice.parseMusic
+import app.hommaterial.music.MusicLibrary
+import app.hommaterial.music.MusicPlayer
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import app.hommaterial.quick.Boards
@@ -780,6 +784,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         if (openApp(heard)) return
         // What the app knows without doubt is done here: Alexa does not know the groups of the app, for one.
         if (act(heard)) return
+        if (playMusic(heard)) return
         if (!assistantStore.configured) {
             s.voiceEcho?.let { return sayToAlexa(it, said) }
             return answer(parseVoice(heard, voiceDevices()))
@@ -796,6 +801,30 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             dismissReply()
             answer(parseVoice(heard, voiceDevices()))
         }
+    }
+
+    /** Plays, pauses or moves the music of the phone as asked in what was [heard]; false when not about it. */
+    private fun playMusic(heard: List<String>): Boolean {
+        val context = getApplication<Application>()
+        if (MusicLibrary.folder.value == null) return false
+        val command = parseMusic(heard, MusicLibrary.load(context), MusicPlayer.now.value.queued) ?: return false
+        val said = when (command) {
+            is MusicCommand.Play -> {
+                MusicPlayer.play(context, command.tracks, shuffle = command.shuffle)
+                when {
+                    command.name == null && command.shuffle -> str(R.string.voice_music_all_shuffle)
+                    command.name == null -> str(R.string.voice_music_all)
+                    else -> context.resources.getQuantityString(R.plurals.voice_music_named, command.tracks.size, command.name, command.tracks.size)
+                }
+            }
+            MusicCommand.Pause -> str(R.string.voice_music_pause).also { MusicPlayer.pause(context) }
+            MusicCommand.Resume -> str(R.string.voice_music_resume).also { MusicPlayer.resume(context) }
+            MusicCommand.Next -> str(R.string.voice_music_next).also { MusicPlayer.next(context) }
+            MusicCommand.Previous -> str(R.string.voice_music_previous).also { MusicPlayer.previous(context) }
+        }
+        _haptics.tryEmit(Haptic.Confirm)
+        _messages.tryEmit(said)
+        return true
     }
 
     /** Opens the app of the phone named after "apri" in what was [heard]; false when none is meant. */

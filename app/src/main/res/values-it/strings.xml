@@ -1035,4 +1035,39 @@
     <string name="weather_showers">Rovesci</string>
     <string name="weather_storm">Temporale</string>
     <string name="settings_keys_weather">meteo, previsioni, tempo, temperatura, pioggia, sole, comune, città, località</string>
+    <string name="s_music">Musica</string>
+    <string name="music_settings_text">Il lettore musicale dell\'app riproduce i brani di una cartella del telefono, con le sue sottocartelle. Funziona anche con la voce: «riproduci tutta la musica in modo casuale», «riproduci la musica di…».</string>
+    <string name="settings_keys_music">musica, brani, canzoni, lettore, riproduttore, album, artisti, cartella, mp3, riproduci</string>
+    <string name="music_folder">Cartella della musica</string>
+    <string name="music_folder_none">Nessuna: scegline una per vedere la pagina Musica</string>
+    <string name="music_folder_root">Tutta la memoria</string>
+    <string name="music_rescan">Rileggi la cartella</string>
+    <string name="music_folder_remove">Rimuovi la cartella</string>
+    <string name="music_songs">Brani</string>
+    <string name="music_albums">Album</string>
+    <string name="music_artists">Artisti</string>
+    <string name="music_folders">Cartelle</string>
+    <string name="music_reading">Sto leggendo la musica…</string>
+    <string name="music_empty">Nessun brano nella cartella scelta</string>
+    <string name="music_play">Riproduci</string>
+    <string name="music_shuffle">Casuale</string>
+    <string name="music_pause">Pausa</string>
+    <string name="music_next">Successivo</string>
+    <string name="music_previous">Precedente</string>
+    <string name="music_back">Indietro</string>
+    <string name="music_unknown_artist">Artista sconosciuto</string>
+    <plurals name="music_tracks">
+        <item quantity="one">%d brano</item>
+        <item quantity="other">%d brani</item>
+    </plurals>
+    <string name="voice_music_all">Riproduco tutta la musica</string>
+    <string name="voice_music_all_shuffle">Riproduco tutta la musica in ordine casuale</string>
+    <plurals name="voice_music_named">
+        <item quantity="one">Riproduco %1$s</item>
+        <item quantity="other">Riproduco %1$s: %2$d brani</item>
+    </plurals>
+    <string name="voice_music_pause">Musica in pausa</string>
+    <string name="voice_music_resume">Riprendo la musica</string>
+    <string name="voice_music_next">Brano successivo</string>
+    <string name="voice_music_previous">Brano precedente</string>
 </resources>

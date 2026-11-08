@@ -128,6 +128,13 @@ collegati al proprio account Alexa.
   WhatsApp». Il nome va detto per intero; se è solo una parte, vale quando
   corrisponde a una sola app («apri maps» apre Google Maps). Senza un'app
   riconosciuta la frase prosegue come sempre (assistente AI o Alexa).
+- Su Android c'è un lettore musicale: in **Impostazioni → Musica** scegli una
+  cartella del telefono (con le sue sottocartelle) e compare la pagina **Musica**
+  nella barra in basso, con brani, album, artisti e cartelle. La musica continua
+  in background, con i comandi nella notifica e nella schermata di blocco. Con la
+  voce: «riproduci tutta la musica in modo casuale», «riproduci la musica di
+  Claudio Baglioni», «metti l'album …»; mentre suona, «pausa», «riprendi»,
+  «canzone successiva», «brano precedente».
 - Hommaterial può essere l'assistente digitale predefinito del telefono, al posto
   di Google Assistant: in **Impostazioni di Android → App → App predefinite →
   App assistente digitale** scegli Hommaterial. Il gesto dell'assistente (tasto

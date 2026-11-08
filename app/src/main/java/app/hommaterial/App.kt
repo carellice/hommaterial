@@ -5,6 +5,7 @@ import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import app.hommaterial.data.Offline
 import app.hommaterial.data.ServerSync
+import app.hommaterial.music.MusicLibrary
 
 class App : Application() {
     override fun onCreate() {
@@ -12,6 +13,7 @@ class App : Application() {
         instance = this
         ServerSync.init(this)
         Offline.init(this)
+        MusicLibrary.init(this)
     }
 
     companion object {

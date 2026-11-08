@@ -1,5 +1,7 @@
 package app.hommaterial.ui
 
+import app.hommaterial.music.MusicLibrary
+
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -234,6 +236,11 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     // The notes have a page once some are chosen; without them it goes back to the home.
     val hasNotes = state.notionLinked && state.notionNotes.isNotEmpty()
     if (tab == TAB_NOTES && !hasNotes) tab = TAB_HOME
+    // The music has a page once its folder is chosen in the settings.
+    val hasMusic = MusicLibrary.folder.collectAsState().value != null
+    if (tab == TAB_MUSIC && !hasMusic) tab = TAB_HOME
+    val musicScanning by MusicLibrary.scanning.collectAsState()
+    val context = LocalContext.current
     // What was changed without internet went: the lists and the calendar are read again, as they are now.
     val latest = rememberUpdatedState(state)
     LaunchedEffect(Unit) {
@@ -291,6 +298,8 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                         Text(str(R.string.s_calendar))
                     } else if (tab == TAB_NOTES) {
                         Text(str(R.string.s_notes))
+                    } else if (tab == TAB_MUSIC) {
+                        Text(str(R.string.s_music))
                     } else if (typed == null) {
                         Title(state.updatedAt)
                     } else {
@@ -298,11 +307,12 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                     }
                 },
                 actions = {
-                    if (tab == TAB_LISTS || tab == TAB_CALENDAR || tab == TAB_NOTES) {
+                    if (tab == TAB_LISTS || tab == TAB_CALENDAR || tab == TAB_NOTES || tab == TAB_MUSIC) {
                         // Reads the page again from Alexa, Notion or the calendar, without waiting for a pull.
                         val loading = when (tab) {
                             TAB_LISTS -> lists.loading
                             TAB_CALENDAR -> calendar.loading
+                            TAB_MUSIC -> musicScanning
                             else -> notes.loading
                         }
                         IconButton(
@@ -310,6 +320,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                                 when (tab) {
                                     TAB_LISTS -> lists.reload()
                                     TAB_CALENDAR -> calendar.reload(state)
+                                    TAB_MUSIC -> MusicLibrary.refresh(context)
                                     else -> notes.reload()
                                 }
                             },
@@ -379,6 +390,10 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
             NotesPage(notes, state, vm)
             return@AnimatedContent
         }
+        if (shown == TAB_MUSIC) {
+            MusicPage()
+            return@AnimatedContent
+        }
         Row(Modifier.fillMaxSize()) {
             if (pages.size > 1 && query == null) {
                 SideBar(pages, current, expanded = width >= SIDE_BAR_DP, clock) { page = it }
@@ -427,6 +442,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
             current = tab,
             visible = query == null && !typing,
             notes = hasNotes,
+            music = hasMusic,
             onSelect = { tab = it },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
         )

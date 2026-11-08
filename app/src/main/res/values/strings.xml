@@ -1045,4 +1045,39 @@
     <string name="weather_showers">Showers</string>
     <string name="weather_storm">Thunderstorm</string>
     <string name="settings_keys_weather">weather, forecast, temperature, rain, sun, town, city, place</string>
+    <string name="s_music">Music</string>
+    <string name="music_settings_text">The music player of the app plays the songs of a folder of the phone, with its subfolders. It also plays by voice: “play all the music shuffled”, “play the music of…”.</string>
+    <string name="settings_keys_music">music, songs, player, albums, artists, folder, mp3, play</string>
+    <string name="music_folder">Music folder</string>
+    <string name="music_folder_none">None: choose one to see the Music page</string>
+    <string name="music_folder_root">Whole memory</string>
+    <string name="music_rescan">Read the folder again</string>
+    <string name="music_folder_remove">Remove the folder</string>
+    <string name="music_songs">Songs</string>
+    <string name="music_albums">Albums</string>
+    <string name="music_artists">Artists</string>
+    <string name="music_folders">Folders</string>
+    <string name="music_reading">Reading the music…</string>
+    <string name="music_empty">No songs in the chosen folder</string>
+    <string name="music_play">Play</string>
+    <string name="music_shuffle">Shuffle</string>
+    <string name="music_pause">Pause</string>
+    <string name="music_next">Next</string>
+    <string name="music_previous">Previous</string>
+    <string name="music_back">Back</string>
+    <string name="music_unknown_artist">Unknown artist</string>
+    <plurals name="music_tracks">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
+    <string name="voice_music_all">Playing all the music</string>
+    <string name="voice_music_all_shuffle">Playing all the music, shuffled</string>
+    <plurals name="voice_music_named">
+        <item quantity="one">Playing %1$s</item>
+        <item quantity="other">Playing %1$s: %2$d songs</item>
+    </plurals>
+    <string name="voice_music_pause">Music paused</string>
+    <string name="voice_music_resume">Resuming the music</string>
+    <string name="voice_music_next">Next song</string>
+    <string name="voice_music_previous">Previous song</string>
 </resources>

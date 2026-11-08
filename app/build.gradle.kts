@@ -78,6 +78,9 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // The music player: playback in the background, with the notification and the lock screen controls.
+    implementation("androidx.media3:media3-exoplayer:1.8.0")
+    implementation("androidx.media3:media3-session:1.8.0")
     testImplementation("junit:junit:4.13.2")
     // The JSON of Android is only a stub on the JVM; the fake TV of the LG tests is a local socket.
     testImplementation("org.json:json:20240303")

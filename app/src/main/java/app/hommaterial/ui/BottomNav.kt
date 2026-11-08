@@ -24,10 +24,12 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -46,7 +48,8 @@ import app.hommaterial.str
 
 /**
  * The pages of the app the bottom bar moves between: the home, the lists of Alexa, the calendar
- * ([TAB_CALENDAR]) and, once some are chosen, the notes of Notion ([TAB_NOTES]).
+ * ([TAB_CALENDAR]) and, once some are chosen, the notes of Notion ([TAB_NOTES]) and the music of the
+ * phone ([TAB_MUSIC]).
  */
 const val TAB_HOME = "home"
 const val TAB_LISTS = "lists"
@@ -64,6 +67,7 @@ private val TABS = listOf(
     Tab(TAB_LISTS, R.string.s_lists, Icons.Outlined.Checklist, Icons.Filled.Checklist),
     Tab(TAB_CALENDAR, R.string.s_calendar, Icons.Outlined.CalendarMonth, Icons.Filled.CalendarMonth),
     Tab(TAB_NOTES, R.string.s_notes, Icons.Outlined.Description, Icons.Filled.Description),
+    Tab(TAB_MUSIC, R.string.s_music, Icons.Outlined.LibraryMusic, Icons.Filled.LibraryMusic),
 )
 
 /** Where a tab sits in the bar, for the pages to slide in from its side. */
@@ -78,6 +82,7 @@ internal fun FloatingBottomBar(
     current: String,
     visible: Boolean,
     notes: Boolean,
+    music: Boolean,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -94,14 +99,17 @@ internal fun FloatingBottomBar(
             shadowElevation = 8.dp,
         ) {
             Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                for (tab in TABS) if (notes || tab.key != TAB_NOTES) TabPill(tab, tab.key == current) { onSelect(tab.key) }
+                val shown = TABS.filter { (notes || it.key != TAB_NOTES) && (music || it.key != TAB_MUSIC) }
+                // Five tabs fit on a narrow phone only a little closer together.
+                val padding = if (shown.size > 4) 12.dp else 18.dp
+                for (tab in shown) TabPill(tab, tab.key == current, padding) { onSelect(tab.key) }
             }
         }
     }
 }
 
 @Composable
-private fun TabPill(tab: Tab, selected: Boolean, onClick: () -> Unit) {
+private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.unit.Dp, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val background by animateColorAsState(
         if (selected) colors.secondaryContainer else colors.secondaryContainer.copy(alpha = 0f),
@@ -123,7 +131,7 @@ private fun TabPill(tab: Tab, selected: Boolean, onClick: () -> Unit) {
             .clip(CircleShape)
             .background(background)
             .selectable(selected = selected, role = Role.Tab, onClick = onClick)
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = padding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(

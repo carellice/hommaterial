@@ -1,6 +1,7 @@
 package app.hommaterial.voice
 
 import app.hommaterial.data.Device
+import app.hommaterial.music.Track
 import java.text.Normalizer
 
 /** What a spoken sentence asks for: [devices] switched [on] or off, all those of [room] when it is set. */
@@ -186,6 +187,82 @@ fun parseOpenApp(heard: List<String>, apps: List<Pair<String, String>>): String?
         }
         val holding = names.filter { (_, name, _) -> rest.all { w -> name.any { alike(it, w) } } }
         if (holding.size == 1) return holding.single().first
+    }
+    return null
+}
+
+/** What a sentence asks of the music of the phone. */
+sealed interface MusicCommand {
+    /** Plays [tracks], in their order or mixed; [name] is what was asked for, null for all the music. */
+    data class Play(val tracks: List<Track>, val shuffle: Boolean, val name: String?) : MusicCommand
+
+    data object Pause : MusicCommand
+
+    data object Resume : MusicCommand
+
+    data object Next : MusicCommand
+
+    data object Previous : MusicCommand
+}
+
+// "Riproduci" is about music by itself; "metti" only with a word such as "musica" ("metti la musica di…").
+private val PLAY_WORDS = setOf(
+    "riproduci", "riprodurre", "riproducimi", "suona", "suonami", "ascolta", "ascoltare", "play",
+)
+private val SOFT_PLAY_WORDS = setOf("metti", "mettimi", "mettere", "fammi", "fai", "sentire", "partire", "put")
+private val MUSIC_WORDS = setOf(
+    "musica", "canzone", "canzoni", "brano", "brani", "pezzo", "pezzi", "album", "artista", "cantante",
+    "libreria", "music", "song", "songs", "track", "tracks", "library", "artist",
+)
+private val SHUFFLE_WORDS = setOf(
+    "casuale", "casuali", "casualmente", "caso", "random", "shuffle", "mescola", "mescolata", "mescolato",
+    "mescolando", "aleatoria", "aleatorio", "randomly", "shuffled",
+)
+private val SHUFFLE_FILLER = setOf("modo", "ordine", "maniera", "mode", "order", "po", "mia", "mio", "miei", "mie", "by", "from", "da", "dal", "dalla", "dai")
+private val PAUSE_WORDS = setOf("pausa", "pause", "ferma", "fermare", "stop", "interrompi")
+private val RESUME_WORDS = setOf("riprendi", "riprendere", "continua", "resume")
+private val NEXT_WORDS = setOf("successiva", "successivo", "prossima", "prossimo", "avanti", "next", "skip", "salta")
+private val PREVIOUS_WORDS = setOf("precedente", "indietro", "previous", "back")
+
+/**
+ * Looks in what was [heard] for music to play from [tracks]: "riproduci tutta la musica in modo casuale",
+ * "riproduci la musica di Claudio Baglioni", "metti l'album…". Every word named must be found in the
+ * title, artist or album of a track, and all the tracks that have them are played. Pausing, going on
+ * and moving to the next or previous track are understood only while there is music [queued].
+ */
+fun parseMusic(heard: List<String>, tracks: List<Track>, queued: Boolean): MusicCommand? {
+    val fields = tracks.map { words("${it.title} ${it.artist} ${it.album}") }
+    for (sentence in heard) {
+        val said = words(sentence)
+        if (said.isEmpty()) continue
+        val music = said.any { it in MUSIC_WORDS }
+        val rest = said.filter {
+            it !in FILLER_WORDS && it !in MUSIC_WORDS && it !in ALL_WORDS && it !in SHUFFLE_WORDS && it !in SHUFFLE_FILLER
+        }
+        if (queued) {
+            // A word that moves the music, and nothing else of meaning: "metti in pausa", "canzone successiva".
+            fun only(set: Set<String>) = rest.any { it in set } && rest.all { it in set || it in PLAY_WORDS || it in SOFT_PLAY_WORDS }
+            when {
+                only(PAUSE_WORDS) -> return MusicCommand.Pause
+                only(NEXT_WORDS) -> return MusicCommand.Next
+                only(PREVIOUS_WORDS) -> return MusicCommand.Previous
+                only(RESUME_WORDS) -> return MusicCommand.Resume
+            }
+        }
+        val verb = said.firstOrNull { it in PLAY_WORDS } ?: said.firstOrNull { it in SOFT_PLAY_WORDS }?.takeIf { music } ?: continue
+        val shuffle = said.any { it in SHUFFLE_WORDS }
+        val named = rest.filter { it != verb && it !in PLAY_WORDS && it !in SOFT_PLAY_WORDS }
+        if (named.isEmpty()) {
+            if (music || shuffle) return MusicCommand.Play(tracks, shuffle, null).takeIf { tracks.isNotEmpty() }
+            if (queued) return MusicCommand.Resume
+            continue
+        }
+        val found = tracks.filterIndexed { i, _ -> named.all { w -> fields[i].any { alike(it, w) } } }
+        if (found.isEmpty()) continue
+        // One song goes by its title; more by the artist or album they share.
+        val name = (if (found.size == 1) listOf(Track::title) else listOf(Track::artist, Track::album, Track::title))
+            .firstNotNullOfOrNull { field -> found.map(field).distinct().singleOrNull()?.takeIf { it.isNotBlank() } }
+        return MusicCommand.Play(found, shuffle, name ?: named.joinToString(" "))
     }
     return null
 }

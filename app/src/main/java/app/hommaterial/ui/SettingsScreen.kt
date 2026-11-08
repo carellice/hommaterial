@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.TipsAndUpdates
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -552,6 +553,8 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
 
             Section(R.string.s_notion, R.string.notion_settings_text) { NotionSettings(state, vm) }
 
+            Section(R.string.s_music, R.string.music_settings_text) { MusicSettings() }
+
             Group(R.string.settings_group_voice)
             Section(R.string.s_voice, R.string.voice_settings_text) {
                 var picking by remember { mutableStateOf(false) }
@@ -861,6 +864,7 @@ private fun sectionKeys(@StringRes title: Int): Int? = when (title) {
     R.string.s_lgtv -> R.string.settings_keys_lgtv
     R.string.s_calendar -> R.string.settings_keys_calendar
     R.string.s_notion -> R.string.settings_keys_notion
+    R.string.s_music -> R.string.settings_keys_music
     R.string.s_voice -> R.string.settings_keys_voice
     R.string.s_assistant -> R.string.settings_keys_assistant
     R.string.s_ai_examples -> R.string.settings_keys_ai_examples
@@ -946,6 +950,7 @@ private fun sectionIcon(@StringRes title: Int): ImageVector? = when (title) {
     R.string.s_voice -> Icons.Outlined.RecordVoiceOver
     R.string.s_calendar -> Icons.Outlined.CalendarMonth
     R.string.s_notion -> Icons.Outlined.Description
+    R.string.s_music -> Icons.Outlined.LibraryMusic
     R.string.s_updates -> Icons.Outlined.SystemUpdate
     R.string.s_rooms -> Icons.Outlined.MeetingRoom
     R.string.s_devices -> Icons.Outlined.DevicesOther
