@@ -126,8 +126,11 @@ collegati al proprio account Alexa.
 - Hommaterial può essere l'assistente digitale predefinito del telefono, al posto
   di Google Assistant: in **Impostazioni di Android → App → App predefinite →
   App assistente digitale** scegli Hommaterial. Il gesto dell'assistente (tasto
-  laterale, pressione lunga su Home o scorrimento dall'angolo) apre l'app col
-  microfono già in ascolto.
+  laterale, pressione lunga su Home o scorrimento dall'angolo) apre un pannello in
+  basso, sopra quello che c'è sullo schermo, già in ascolto: le parole compaiono
+  mentre le dici, le luci colorate seguono la voce e il risultato si legge lì,
+  poi il pannello si chiude da solo. La prima volta chiede il permesso del
+  microfono; senza, ascolta il riconoscimento vocale del telefono.
 - Mostra temperatura e umidità dei sensori, con il grafico dell'ultimo giorno
   o dell'ultima settimana. I dati li raccoglie il telefono quando l'app o il
   widget si aggiornano, quindi il grafico parte vuoto e può avere dei buchi.

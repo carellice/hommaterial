@@ -791,6 +791,9 @@
     <string name="voice_echo_pick">Quale Echo?</string>
     <string name="voice_to_alexa">Ad Alexa: “%1$s”</string>
     <string name="voice_prompt_alexa">Dillo ad Alexa…</string>
+    <string name="assist_listening">Ti ascolto…</string>
+    <string name="assist_open_app">Apri Hommaterial</string>
+    <string name="assist_again">Parla di nuovo</string>
     <string name="alexa_waiting">Aspetto la risposta di Alexa…</string>
     <string name="alexa_no_reply">Fatto. Alexa non ha detto altro.</string>
     <string name="alexa_read">Leggi ad alta voce</string>

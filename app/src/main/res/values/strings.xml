@@ -801,6 +801,9 @@
     <string name="voice_echo_pick">Which Echo?</string>
     <string name="voice_to_alexa">To Alexa: “%1$s”</string>
     <string name="voice_prompt_alexa">Say it to Alexa…</string>
+    <string name="assist_listening">Listening…</string>
+    <string name="assist_open_app">Open Hommaterial</string>
+    <string name="assist_again">Speak again</string>
     <string name="alexa_waiting">Waiting for Alexa to answer…</string>
     <string name="alexa_no_reply">Done. Alexa had nothing else to say.</string>
     <string name="alexa_read">Read aloud</string>

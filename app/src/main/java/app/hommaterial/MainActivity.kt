@@ -55,7 +55,6 @@ import app.hommaterial.ui.RestScreen
 import app.hommaterial.ui.SettingsScreen
 import app.hommaterial.ui.UpdateDialog
 import app.hommaterial.ui.rememberNow
-import app.hommaterial.ui.OPEN_VOICE
 import app.hommaterial.ui.requestedTab
 import java.util.Calendar
 import kotlinx.coroutines.delay
@@ -177,7 +176,6 @@ class MainActivity : ComponentActivity() {
 
     /** The page of the bottom bar a widget asked for, if any. */
     private fun openTab(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_ASSIST) requestedTab.value = OPEN_VOICE
         intent?.getStringExtra(EXTRA_TAB)?.let { requestedTab.value = it }
     }
 

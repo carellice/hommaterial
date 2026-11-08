@@ -20,6 +20,8 @@
     <!-- The calendars of the phone, when there is no home server to read Google Calendar from. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <!-- The panel of the assistant listens by itself, showing the words as they are said. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature
         android:name="android.hardware.nfc"
         android:required="false" />
@@ -41,7 +43,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Lets Android offer the app as the default digital assistant: its gesture opens the microphone. -->
+        </activity>
+        <!-- Lets Android offer the app as the default digital assistant: its gesture opens a panel
+             over the screen, listening, instead of the whole app. -->
+        <activity
+            android:name=".AssistActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Hommaterial.Assist">
             <intent-filter>
                 <action android:name="android.intent.action.ASSIST" />
                 <category android:name="android.intent.category.DEFAULT" />

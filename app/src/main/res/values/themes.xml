@@ -1,3 +1,10 @@
 <resources>
     <style name="Theme.Hommaterial" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- The panel of the assistant: over whatever is on screen, which stays in sight behind it. -->
+    <style name="Theme.Hommaterial.Assist">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>

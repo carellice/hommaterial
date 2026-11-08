@@ -51,9 +51,6 @@ import app.hommaterial.str
 const val TAB_HOME = "home"
 const val TAB_LISTS = "lists"
 
-/** Asked by the assistant gesture of Android: the home opens with the microphone listening. */
-internal const val OPEN_VOICE = "voice"
-
 /** The page a widget asked to open, until the home takes it. */
 internal val requestedTab = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 

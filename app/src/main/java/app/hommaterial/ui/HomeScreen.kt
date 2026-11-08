@@ -244,15 +244,11 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     }
     // A widget opens the app on its own page.
     val asked by requestedTab.collectAsState()
-    val listen = rememberVoiceCommand(vm)
     LaunchedEffect(asked) {
         // The widget of the team opens its page, over the home.
         if (asked == "team") {
             tab = TAB_HOME
             teamOpen = state.team != null
-        } else if (asked == OPEN_VOICE) {
-            tab = TAB_HOME
-            if (!state.correcting) listen()
         } else {
             asked?.let { tab = it }
         }
@@ -1363,7 +1359,7 @@ private fun rememberVoiceCommand(vm: HomeViewModel): () -> Unit {
 }
 
 @Composable
-private fun VoiceDialog(ask: VoiceResult.Ask, vm: HomeViewModel) {
+internal fun VoiceDialog(ask: VoiceResult.Ask, vm: HomeViewModel) {
     AlertDialog(
         onDismissRequest = vm::dismissVoice,
         title = { Text(str(R.string.voice_ask_title)) },
