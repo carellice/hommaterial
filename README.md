@@ -123,6 +123,11 @@ collegati al proprio account Alexa.
 - Col microfono in alto si dice "accendi la lampada" o "spegni tutto in
   salotto". Capisce solo accensione e spegnimento, e chiede conferma quando il
   nome non è esatto o riguarda una stanza intera.
+- Su Android, col microfono o con l'assistente digitale, «apri» e il nome di
+  un'app del telefono la apre: «apri telefono», «apri impostazioni», «apri
+  WhatsApp». Il nome va detto per intero; se è solo una parte, vale quando
+  corrisponde a una sola app («apri maps» apre Google Maps). Senza un'app
+  riconosciuta la frase prosegue come sempre (assistente AI o Alexa).
 - Hommaterial può essere l'assistente digitale predefinito del telefono, al posto
   di Google Assistant: in **Impostazioni di Android → App → App predefinite →
   App assistente digitale** scegli Hommaterial. Il gesto dell'assistente (tasto

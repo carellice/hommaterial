@@ -70,6 +70,7 @@
     <string name="voice_room_on">Turn on everything in %1$s</string>
     <string name="voice_room_off">Turn off everything in %1$s</string>
     <string name="voice_nothing_heard">I did not hear anything</string>
+    <string name="voice_open_app">Opening %1$s</string>
     <string name="voice_not_understood">I did not understand “%1$s”</string>
     <string name="voice_unavailable">Speech recognition is not available on this phone</string>
     <string name="voice_prompt">Turn on or off…</string>

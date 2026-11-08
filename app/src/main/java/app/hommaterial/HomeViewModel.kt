@@ -1,5 +1,8 @@
 package app.hommaterial
 
+import app.hommaterial.voice.parseOpenApp
+import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import app.hommaterial.quick.Boards
 import app.hommaterial.ui.ACCENT_AUTO
 import android.app.Application
@@ -774,6 +777,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             return runMacro(macro)
         }
         val said = heard.firstOrNull { it.isNotBlank() } ?: return answer(VoiceResult.Unknown(""))
+        if (openApp(heard)) return
         // What the app knows without doubt is done here: Alexa does not know the groups of the app, for one.
         if (act(heard)) return
         if (!assistantStore.configured) {
@@ -791,6 +795,28 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             if (plan == null) return@launch
             dismissReply()
             answer(parseVoice(heard, voiceDevices()))
+        }
+    }
+
+    /** Opens the app of the phone named after "apri" in what was [heard]; false when none is meant. */
+    private fun openApp(heard: List<String>): Boolean {
+        val context = getApplication<Application>()
+        val pm = context.packageManager
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = pm.queryIntentActivities(launcher, 0)
+            .map { it.activityInfo }
+            .map { "${it.packageName}/${it.name}" to it.loadLabel(pm).toString() }
+        val id = parseOpenApp(heard, apps) ?: return false
+        val name = apps.first { it.first == id }.second
+        val intent = Intent(launcher).setComponent(ComponentName.unflattenFromString(id))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        return try {
+            context.startActivity(intent)
+            _haptics.tryEmit(Haptic.Confirm)
+            _messages.tryEmit(str(R.string.voice_open_app, name))
+            true
+        } catch (e: ActivityNotFoundException) {
+            false
         }
     }
 

@@ -162,3 +162,30 @@ private fun interpret(sentence: String, devices: List<Device>): Pair<Double, Voi
     }
     return top.second to result
 }
+
+private val OPEN_WORDS = setOf("apri", "aprire", "aprimi", "apra", "open")
+private val APP_WORDS = setOf("app", "applicazione", "applicazioni", "application")
+
+/**
+ * Looks in what was [heard] for "apri" and the name of one of the [apps] of the phone, given as id and
+ * name ("apri telefono", "open the camera app"). The name must be said whole, words may be run
+ * together ("whats app" is "WhatsApp"); when no name is exact, the only app whose name holds all the
+ * words said is taken ("apri maps" is "Google Maps"). Null when no app is meant without doubt.
+ */
+fun parseOpenApp(heard: List<String>, apps: List<Pair<String, String>>): String? {
+    val names = apps.map { (id, name) -> Triple(id, words(name), words(name).joinToString("")) }
+    for (sentence in heard) {
+        val said = words(sentence)
+        val verb = said.firstOrNull { it in OPEN_WORDS } ?: continue
+        val whole = said.filter { it != verb && it !in FILLER_WORDS }
+        val rest = whole.filter { it !in APP_WORDS }
+        if (rest.isEmpty()) continue
+        // "App" may be part of the name ("whats app") or just a word around it ("l'app fotocamera").
+        for (joined in listOf(whole, rest).map { it.joinToString("") }.distinct()) {
+            names.filter { it.third == joined }.let { if (it.size == 1) return it.single().first }
+        }
+        val holding = names.filter { (_, name, _) -> rest.all { w -> name.any { alike(it, w) } } }
+        if (holding.size == 1) return holding.single().first
+    }
+    return null
+}

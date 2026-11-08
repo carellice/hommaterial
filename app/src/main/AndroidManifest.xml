@@ -26,6 +26,14 @@
         android:name="android.hardware.nfc"
         android:required="false" />
 
+    <!-- "Apri telefono" con la voce: serve vedere le app che hanno un'icona nel launcher. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".App"
         android:allowBackup="false"
