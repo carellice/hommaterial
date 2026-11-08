@@ -244,11 +244,15 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     }
     // A widget opens the app on its own page.
     val asked by requestedTab.collectAsState()
+    val listen = rememberVoiceCommand(vm)
     LaunchedEffect(asked) {
         // The widget of the team opens its page, over the home.
         if (asked == "team") {
             tab = TAB_HOME
             teamOpen = state.team != null
+        } else if (asked == OPEN_VOICE) {
+            tab = TAB_HOME
+            if (!state.correcting) listen()
         } else {
             asked?.let { tab = it }
         }
@@ -1321,33 +1325,39 @@ private fun ageText(updatedAt: Long, now: Long): String {
  */
 @Composable
 private fun VoiceButton(vm: HomeViewModel, correcting: Boolean) {
-    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            vm.onSpeech(result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty())
-        }
-    }
     IconButton(
-        onClick = {
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, str(R.string.voice_language))
-                .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-                .putExtra(
-                    RecognizerIntent.EXTRA_PROMPT,
-                    str(if (vm.state.value.voiceEcho != null) R.string.voice_prompt_alexa else R.string.voice_prompt),
-                )
-            try {
-                speech.launch(intent)
-            } catch (e: ActivityNotFoundException) {
-                vm.speechUnavailable()
-            }
-        },
+        onClick = rememberVoiceCommand(vm),
         enabled = !correcting,
     ) {
         if (correcting) {
             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         } else {
             Icon(Icons.Outlined.Mic, contentDescription = str(R.string.voice_button))
+        }
+    }
+}
+
+/** Opens the phone's speech recognizer and hands what it heard to the voice commands. */
+@Composable
+private fun rememberVoiceCommand(vm: HomeViewModel): () -> Unit {
+    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            vm.onSpeech(result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty())
+        }
+    }
+    return {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, str(R.string.voice_language))
+            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            .putExtra(
+                RecognizerIntent.EXTRA_PROMPT,
+                str(if (vm.state.value.voiceEcho != null) R.string.voice_prompt_alexa else R.string.voice_prompt),
+            )
+        try {
+            speech.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            vm.speechUnavailable()
         }
     }
 }

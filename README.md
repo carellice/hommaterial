@@ -123,6 +123,11 @@ collegati al proprio account Alexa.
 - Col microfono in alto si dice "accendi la lampada" o "spegni tutto in
   salotto". Capisce solo accensione e spegnimento, e chiede conferma quando il
   nome non è esatto o riguarda una stanza intera.
+- Hommaterial può essere l'assistente digitale predefinito del telefono, al posto
+  di Google Assistant: in **Impostazioni di Android → App → App predefinite →
+  App assistente digitale** scegli Hommaterial. Il gesto dell'assistente (tasto
+  laterale, pressione lunga su Home o scorrimento dall'angolo) apre l'app col
+  microfono già in ascolto.
 - Mostra temperatura e umidità dei sensori, con il grafico dell'ultimo giorno
   o dell'ultima settimana. I dati li raccoglie il telefono quando l'app o il
   widget si aggiornano, quindi il grafico parte vuoto e può avere dei buchi.
