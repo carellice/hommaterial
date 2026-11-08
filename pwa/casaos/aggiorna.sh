@@ -88,9 +88,13 @@ main() {
     flock -n 9 || fail "C'è già un aggiornamento in corso."
   fi
 
-  local installed latest
+  local installed latest ref
   installed=$(running_version)
-  latest=$(curl -fsSL --max-time 30 "https://raw.githubusercontent.com/$REPO/$BRANCH/pwa/server/package.json" | json_version) \
+  # L'ultimo commit per SHA: raw.githubusercontent e codeload tengono in cache il ramo per qualche minuto,
+  # e subito dopo un rilascio rispondevano ancora con la versione vecchia.
+  ref=$(curl -fsSL --max-time 30 -H "Accept: application/vnd.github.sha" "https://api.github.com/repos/$REPO/commits/$BRANCH" 2>/dev/null) || true
+  [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || ref="$BRANCH"
+  latest=$(curl -fsSL --max-time 30 "https://raw.githubusercontent.com/$REPO/$ref/pwa/server/package.json" | json_version) \
     || fail "Non riesco a leggere l'ultima versione da GitHub. Controlla la connessione."
   [ -n "$latest" ] || fail "Versione su GitHub non trovata."
   info "Installata: ${installed:-Hommaterial non risponde} · ultima: $latest"
@@ -107,7 +111,7 @@ main() {
   step "Scarico Hommaterial $latest"
   WORK="$(mktemp -d)"
   trap 'rm -rf "$WORK"' EXIT
-  curl -fsSL --max-time 300 "https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH" | tar -xz -C "$WORK" \
+  curl -fsSL --max-time 300 "https://codeload.github.com/$REPO/tar.gz/$ref" | tar -xz -C "$WORK" \
     || fail "Download da GitHub non riuscito."
   local src version
   src="$(find "$WORK" -maxdepth 4 -type d -path "*/pwa" | head -n1)"
