@@ -1080,4 +1080,9 @@
     <string name="voice_music_resume">Resuming the music</string>
     <string name="voice_music_next">Next song</string>
     <string name="voice_music_previous">Previous song</string>
+    <string name="music_search_hint">Search songs, albums, artists, folders</string>
+    <string name="music_no_results">Nothing found</string>
+    <string name="music_now_playing">Now playing</string>
+    <string name="music_close">Close the player</string>
+    <string name="music_repeat">Repeat</string>
 </resources>

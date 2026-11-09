@@ -222,8 +222,13 @@ data class NowPlaying(
     val uri: String? = null,
     val title: String = "",
     val artist: String = "",
+    val album: String = "",
+    /** The picture held in the file, when it has one. */
+    val artwork: ByteArray? = null,
     val playing: Boolean = false,
     val shuffle: Boolean = false,
+    /** One of [Player.REPEAT_MODE_OFF], [Player.REPEAT_MODE_ALL] and [Player.REPEAT_MODE_ONE]. */
+    val repeat: Int = Player.REPEAT_MODE_OFF,
     /** Whether something is in the queue at all. */
     val queued: Boolean = false,
 )
@@ -242,8 +247,11 @@ object MusicPlayer {
             uri = player.currentMediaItem?.mediaId,
             title = meta.title?.toString().orEmpty(),
             artist = meta.artist?.toString().orEmpty(),
+            album = meta.albumTitle?.toString().orEmpty(),
+            artwork = meta.artworkData,
             playing = player.isPlaying,
             shuffle = player.shuffleModeEnabled,
+            repeat = player.repeatMode,
             queued = player.mediaItemCount > 0,
         )
     }
@@ -310,6 +318,22 @@ object MusicPlayer {
     fun previous(context: Context) = withController(context) { it.seekToPrevious() }
 
     fun setShuffle(context: Context, on: Boolean) = withController(context) { it.shuffleModeEnabled = on }
+
+    /** Off, then the whole queue again and again, then the same track. */
+    fun cycleRepeat(context: Context) = withController(context) {
+        it.repeatMode = when (it.repeatMode) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
+    }
+
+    fun seekTo(context: Context, ms: Long) = withController(context) { it.seekTo(ms) }
+
+    /** Where the track is and how long it lasts, in milliseconds: read often, while the player is in sight. */
+    fun position(): Long = controller?.currentPosition ?: 0
+
+    fun duration(): Long = controller?.duration?.takeIf { it > 0 } ?: 0
 }
 
 /** Plays in the background, with the controls of the notification, the lock screen and headphones. */

@@ -1070,4 +1070,9 @@
     <string name="voice_music_resume">Riprendo la musica</string>
     <string name="voice_music_next">Brano successivo</string>
     <string name="voice_music_previous">Brano precedente</string>
+    <string name="music_search_hint">Cerca brani, album, artisti, cartelle</string>
+    <string name="music_no_results">Nessun risultato</string>
+    <string name="music_now_playing">In riproduzione</string>
+    <string name="music_close">Chiudi il lettore</string>
+    <string name="music_repeat">Ripeti</string>
 </resources>

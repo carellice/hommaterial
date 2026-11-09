@@ -131,7 +131,9 @@ collegati al proprio account Alexa.
 - Su Android c'è un lettore musicale: in **Impostazioni → Musica** scegli una
   cartella del telefono (con le sue sottocartelle) e compare la pagina **Musica**
   nella barra in basso, con brani, album, artisti e cartelle. La musica continua
-  in background, con i comandi nella notifica e nella schermata di blocco. Con la
+  in background, con i comandi nella notifica e nella schermata di blocco. Un tocco
+  sulla barra del brano apre il lettore a tutto schermo (copertina, avanzamento,
+  casuale e ripeti); il campo in alto cerca tra brani, album, artisti e cartelle. Con la
   voce: «riproduci tutta la musica in modo casuale», «riproduci la musica di
   Claudio Baglioni», «metti l'album …»; mentre suona, «pausa», «riprendi»,
   «canzone successiva», «brano precedente».

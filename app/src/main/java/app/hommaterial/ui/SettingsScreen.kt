@@ -832,13 +832,13 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     }
 }
 
-/** The search at the head of the settings, with a button to empty it. */
+/** The search at the head of the settings, and of the music, with a button to empty it. */
 @Composable
-private fun SettingsSearchField(query: String, onChange: (String) -> Unit) {
+internal fun SettingsSearchField(query: String, hint: String = str(R.string.settings_search_hint), onChange: (String) -> Unit) {
     OutlinedTextField(
         value = query,
         onValueChange = onChange,
-        placeholder = { Text(str(R.string.settings_search_hint)) },
+        placeholder = { Text(hint) },
         leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
         trailingIcon = {
             if (query.isNotEmpty()) {

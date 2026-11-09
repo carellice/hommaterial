@@ -455,6 +455,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     ) {
         TeamScreen(state, vm, onBack = { teamOpen = false })
     }
+    MusicFullScreen()
     }
 }
 
