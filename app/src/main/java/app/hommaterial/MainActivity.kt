@@ -51,6 +51,7 @@ import app.hommaterial.ui.LoginScreen
 import app.hommaterial.ui.OnboardingScreen
 import app.hommaterial.ui.ProvideHaptics
 import app.hommaterial.ui.ReplyScreen
+import app.hommaterial.ui.chatOpen
 import app.hommaterial.ui.RestScreen
 import app.hommaterial.ui.SettingsScreen
 import app.hommaterial.ui.UpdateDialog
@@ -229,7 +230,8 @@ private fun Screens(state: UiState, vm: HomeViewModel, settings: Boolean, onSett
                     HomeScreen(state, vm, onSettings = { onSettings(true) })
                 }
             }
-            state.reply?.let { ReplyScreen(it, state.readAloud, vm) }
+            // In the chat the answer is written there, and never read aloud.
+            if (!chatOpen.value) state.reply?.let { ReplyScreen(it, state.readAloud, vm) }
         }
         else -> LoginScreen(state, vm)
     }

@@ -1357,3 +1357,17 @@ fieldset.plain { border: none; margin: 0; padding: 0; min-width: 0; display: fle
   .eq span, .orb-ring, .orb-core, .dots span { animation: none; }
 }
 .weather-temp { font-size: 45px; line-height: 52px; font-weight: 400; }
+
+/* The chat with the assistant (ui/home.js) */
+.chat-lines { display: flex; flex-direction: column; gap: 8px; padding: 16px; box-sizing: border-box; }
+.chat-empty { text-align: center; padding-top: 32px; }
+.chat-bubble {
+  align-self: flex-start; max-width: 85%; padding: 10px 14px; white-space: pre-wrap; line-height: 1.4;
+  border-radius: 20px 20px 20px 4px; background: var(--surface-container-high); color: var(--on-surface);
+  animation: rise-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.chat-bubble.mine { align-self: flex-end; border-radius: 20px 20px 4px 20px; background: var(--primary-container); color: var(--on-primary-container); }
+.chat-bubble.waiting { color: var(--on-surface-variant); }
+.chat-actions { display: flex; gap: 8px; margin-top: 8px; }
+.chat-input { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; padding: 8px 16px max(12px, env(safe-area-inset-bottom)); }
+.chat-input .field { flex: 1; }

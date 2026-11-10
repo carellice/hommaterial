@@ -78,6 +78,9 @@
     <string name="voice_button">Voice command</string>
     <string name="assistant_type">Type a command</string>
     <string name="assistant_type_hint">What should I do?</string>
+    <string name="assistant_chat">Chat with the assistant</string>
+    <string name="assistant_chat_clear">Clear the chat</string>
+    <string name="assistant_chat_empty">Write what to do: switch a light, ask a question. The answers come here, in writing.</string>
     <string name="assistant_send">Send</string>
     <string name="voice_ask_title">What did you mean?</string>
     <string name="voice_heard">I heard “%1$s”.</string>

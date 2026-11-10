@@ -1373,6 +1373,9 @@ export const summarizeNote = (title, text) =>
 
 export const dismissReply = () => update({ reply: null });
 
+/** Opens or closes the chat with the assistant: while open, answers are written there and never read aloud. */
+export const setChatting = (on) => update({ chatting: on, ...(on ? {} : { reply: null }) });
+
 /** Whether every answer shown full screen is read aloud at once: this browser only. */
 export function setReadAloud(on) {
   settings.set('readAloud', on);

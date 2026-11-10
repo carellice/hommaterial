@@ -287,7 +287,7 @@ export function Menu({ anchor, items, onDismiss }) {
 /** The sentences of the app, one at a time at the bottom of the screen. */
 export function Snackbar() {
   const [queue, setQueue] = useState([]);
-  useEffect(() => onMessage((text) => setQueue((q) => [...q, text])), []);
+  useEffect(() => onMessage((text) => !getState().chatting && setQueue((q) => [...q, text])), []);
   useEffect(() => {
     if (!queue.length) return undefined;
     const timer = setTimeout(() => setQueue((q) => q.slice(1)), 4000);

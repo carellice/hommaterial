@@ -203,7 +203,8 @@ private fun switchingOn(device: Device, state: UiState): List<Schedule> = state.
 @Composable
 fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
-    LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
+    // While the chat is open what the app says goes in it, not under it.
+    LaunchedEffect(Unit) { vm.messages.collect { if (!chatOpen.value) snackbar.showSnackbar(it) } }
 
     state.voice?.let { VoiceDialog(it, vm) }
 
@@ -1344,10 +1345,9 @@ private fun ageText(updatedAt: Long, now: Long): String {
  */
 @Composable
 private fun VoiceButton(vm: HomeViewModel, correcting: Boolean) {
-    // Next to the microphone, the same commands typed on the keyboard.
-    var typing by remember { mutableStateOf(false) }
-    if (typing) TypeCommandDialog(onSend = { vm.onSpeech(listOf(it)) }, onDismiss = { typing = false })
-    IconButton(onClick = { typing = true }, enabled = !correcting) {
+    // Next to the microphone, a chat with the assistant: the same commands typed, the answers in writing.
+    if (chatOpen.value) AssistantChat(vm, onDismiss = { chatOpen.value = false })
+    IconButton(onClick = { chatOpen.value = true }, enabled = !correcting) {
         Icon(Icons.Outlined.Keyboard, contentDescription = str(R.string.assistant_type))
     }
     IconButton(

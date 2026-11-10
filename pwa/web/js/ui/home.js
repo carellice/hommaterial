@@ -742,7 +742,7 @@ function ArrangeDialog({ s, onDismiss }) {
  */
 function VoiceButton() {
   const [session, setSession] = useState(null);
-  const [typing, setTyping] = useState(false);
+  const { chatting } = useStore();
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const listen = () => {
     if (!Recognition) {
@@ -791,29 +791,78 @@ function VoiceButton() {
     }
   };
   return html`
-    ${/* Next to the microphone, the same commands typed on the keyboard. */ ''}
-    <${IconButton} icon="keyboard" label=${str('assistant_type')} onClick=${() => setTyping(true)} />
-    ${typing && html`<${TypeCommandDialog} onDismiss=${() => setTyping(false)} />`}
+    ${/* Next to the microphone, a chat with the assistant: the same commands typed, the answers in writing. */ ''}
+    <${IconButton} icon="keyboard" label=${str('assistant_type')} onClick=${() => store.setChatting(true)} />
+    ${chatting && html`<${OnTop}><${AssistantChat} /><//>`}
     <button class=${`icon-btn ${session ? 'listening' : ''}`} aria-label=${str('voice_button')} title=${str('voice_button')}
       aria-pressed=${!!session} onClick=${() => (session ? session.stop() : listen())}>
       <${Icon} name="mic" filled=${!!session} /></button>
     ${session && html`<${OnTop}><${ListeningPanel} session=${session} /><//>`}`;
 }
 
-/** A command typed instead of said: it goes on as if it had been heard (ui/Assistant.kt). */
-function TypeCommandDialog({ onDismiss }) {
+/** What was written in the chat, kept while the page is open. */
+let chatLines = [];
+
+/**
+ * A chat with the assistant (ui/Assistant.kt): what is typed goes on as a voice command, and every
+ * answer, of the assistant, of Alexa or of the app itself, comes back in writing, never aloud.
+ */
+function AssistantChat() {
+  const s = useStore();
+  const [lines, setLinesState] = useState(chatLines);
   const [typed, setTyped] = useState('');
-  const ready = typed.trim().length > 0;
+  const end = useRef(null);
+  const setLines = (change) => setLinesState((old) => (chatLines = change(old)));
+  const close = () => store.setChatting(false);
+  useBack(close);
   const send = () => {
-    if (!ready) return;
-    store.onSpeech([typed.trim()]);
-    onDismiss();
+    const text = typed.trim();
+    if (!text) return;
+    setTyped('');
+    setLines((l) => [...l, { id: `me${Date.now()}`, mine: true, text }]);
+    store.onSpeech([text]);
   };
-  return html`<${Dialog} title=${str('assistant_type')} onDismiss=${onDismiss} actions=${html`
-    <button class="text-btn" onClick=${onDismiss}>${str('cancel')}</button>
-    <button class="text-btn" disabled=${!ready} onClick=${send}>${str('assistant_send')}</button>`}>
-    <${Field} label=${str('assistant_type_hint')} value=${typed} onInput=${setTyped} onEnter=${send} autofocus />
-  <//>`;
+  // The answer of the assistant or of Alexa, written in place as it changes.
+  useEffect(() => {
+    const r = s.reply;
+    if (!r) return;
+    const line = { id: r.id, mine: false, text: r.reply, waiting: r.waiting, alexa: r.from === 'alexa', actions: r.actions ?? [] };
+    setLines((l) => (l.some((it) => it.id === r.id) ? l.map((it) => (it.id === r.id ? line : it)) : [...l, line]));
+  }, [s.reply]);
+  // What the app says by itself: "Luce accesa", "Non ho capito…".
+  useEffect(() => store.onMessage((text) => setLines((l) => [...l, { id: `app${Date.now()}${Math.random()}`, mine: false, text }])), []);
+  useEffect(() => end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), [lines]);
+  const cancel = (line) => {
+    setLines((l) => l.map((it) => (it.id === line.id ? { ...it, actions: [] } : it)));
+    store.dismissReply();
+  };
+  return html`
+    <div class="full-dialog chat" role="dialog" aria-modal="true" aria-label=${str('assistant_chat')}>
+      <div class="top-bar">
+        <${IconButton} icon="close" label=${str('close')} onClick=${close} />
+        <div class="title"><div class="title-large">${str('assistant_chat')}</div></div>
+        ${lines.length > 0 && html`<${IconButton} icon="restart_alt" label=${str('assistant_chat_clear')} onClick=${() => setLines(() => [])} />`}
+      </div>
+      <div class="scroll"><div class="narrow chat-lines">
+        ${!lines.length && html`<div class="body-large supporting chat-empty">${str('assistant_chat_empty')}</div>`}
+        ${lines.map((line) => html`
+          <div key=${line.id} class=${`chat-bubble body-large ${line.mine ? 'mine' : ''} ${line.waiting ? 'waiting' : ''}`}>
+            ${line.waiting ? str(line.alexa ? 'alexa_waiting' : 'ai_thinking') : line.text ?? str('alexa_no_reply')}
+            ${!line.waiting && line.actions?.length > 0 && html`
+              ${line.actions.map((a, i) => html`<div key=${i} class="body-medium">• ${store.agentLabel(a)}</div>`)}
+              ${s.reply?.id === line.id && html`
+                <div class="chat-actions">
+                  <button class="tonal-btn" onClick=${() => cancel(line)}>${str('cancel')}</button>
+                  <button class="filled-btn" onClick=${store.confirmAgent}>${str('ai_confirm')}</button>
+                </div>`}`}
+          </div>`)}
+        <div ref=${end}></div>
+      </div></div>
+      <div class="chat-input narrow">
+        <${Field} label=${str('assistant_type_hint')} value=${typed} onInput=${setTyped} onEnter=${send} autofocus />
+        <${IconButton} icon="send" label=${str('assistant_send')} onClick=${send} />
+      </div>
+    </div>`;
 }
 
 /** Shows [children] on top of the whole page, out of the bar that holds the button. */

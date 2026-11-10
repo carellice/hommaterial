@@ -22,6 +22,13 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.Dialog
+import app.hommaterial.data.AgentAction
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -467,4 +474,144 @@ internal fun TypeCommandDialog(onSend: (String) -> Unit, onDismiss: () -> Unit) 
         confirmButton = { TextButton(enabled = ready, onClick = ::send) { Text(str(R.string.assistant_send)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
     )
+}
+
+/** A line of the chat: [mine] when typed by the user; an answer is [waiting] until it comes. */
+internal data class ChatLine(
+    val id: Long,
+    val mine: Boolean,
+    val text: String?,
+    val waiting: Boolean = false,
+    val fromAlexa: Boolean = false,
+    val actions: List<AgentAction> = emptyList(),
+)
+
+/** Whether the chat with the assistant is open: then answers are written there, not shown full screen. */
+internal val chatOpen = mutableStateOf(false)
+
+/** What was written in the chat, kept while the app is open. */
+private val chatLines = mutableStateListOf<ChatLine>()
+
+/**
+ * A chat with the assistant: what is typed goes on as a voice command, and every answer, of the
+ * assistant, of Alexa or of the app itself, comes back in writing, never aloud.
+ */
+@Composable
+internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
+    val state by vm.state.collectAsState()
+    var typed by rememberSaveable { mutableStateOf("") }
+    val list = rememberLazyListState()
+    fun close() {
+        vm.dismissReply()
+        onDismiss()
+    }
+    fun send() {
+        val text = typed.trim()
+        if (text.isEmpty()) return
+        typed = ""
+        chatLines += ChatLine(System.nanoTime(), mine = true, text = text)
+        vm.onSpeech(listOf(text))
+    }
+    // The answer of the assistant or of Alexa, written in place as it changes.
+    LaunchedEffect(state.reply) {
+        val reply = state.reply ?: return@LaunchedEffect
+        val line = ChatLine(reply.id, mine = false, text = reply.reply, waiting = reply.waiting, fromAlexa = reply.fromAlexa, actions = reply.actions)
+        val at = chatLines.indexOfFirst { it.id == reply.id }
+        if (at >= 0) chatLines[at] = line else chatLines += line
+    }
+    // What the app says by itself: "Luce accesa", "Non ho capito…".
+    LaunchedEffect(Unit) { vm.messages.collect { chatLines += ChatLine(System.nanoTime(), mine = false, text = it) } }
+    LaunchedEffect(chatLines.size) { if (chatLines.isNotEmpty()) list.animateScrollToItem(chatLines.lastIndex) }
+    Dialog(
+        onDismissRequest = ::close,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
+                Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = ::close) { Icon(Icons.Outlined.Close, contentDescription = str(R.string.close)) }
+                    Text(str(R.string.assistant_chat), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    if (chatLines.isNotEmpty()) {
+                        IconButton(onClick = { chatLines.clear() }) {
+                            Icon(Icons.Outlined.RestartAlt, contentDescription = str(R.string.assistant_chat_clear))
+                        }
+                    }
+                }
+                LazyColumn(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    state = list,
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (chatLines.isEmpty()) {
+                        item {
+                            Text(
+                                str(R.string.assistant_chat_empty),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
+                            )
+                        }
+                    }
+                    itemsIndexed(chatLines, key = { _, line -> line.id }) { _, line -> ChatBubble(line, state.reply?.id == line.id, vm) }
+                }
+                Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = typed,
+                        onValueChange = { typed = it },
+                        placeholder = { Text(str(R.string.assistant_type_hint)) },
+                        shape = RoundedCornerShape(28.dp),
+                        maxLines = 4,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { send() }),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    FilledIconButton(onClick = ::send, enabled = typed.isNotBlank()) {
+                        Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = str(R.string.assistant_send))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatBubble(line: ChatLine, current: Boolean, vm: HomeViewModel) {
+    val colors = MaterialTheme.colorScheme
+    Box(Modifier.fillMaxWidth(), contentAlignment = if (line.mine) Alignment.CenterEnd else Alignment.CenterStart) {
+        Surface(
+            color = if (line.mine) colors.primaryContainer else colors.surfaceContainerHigh,
+            contentColor = if (line.mine) colors.onPrimaryContainer else colors.onSurface,
+            shape = RoundedCornerShape(20.dp, 20.dp, if (line.mine) 4.dp else 20.dp, if (line.mine) 20.dp else 4.dp),
+            modifier = Modifier.widthIn(max = 320.dp),
+        ) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                if (line.waiting) {
+                    Text(
+                        str(if (line.fromAlexa) R.string.alexa_waiting else R.string.ai_thinking),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.onSurfaceVariant,
+                    )
+                } else {
+                    Text(line.text ?: str(R.string.alexa_no_reply), style = MaterialTheme.typography.bodyLarge)
+                }
+                // What the assistant would do waits for a yes, as on the full screen answer.
+                if (!line.waiting && line.actions.isNotEmpty()) {
+                    for (action in line.actions) Text("• " + agentLabel(action), style = MaterialTheme.typography.bodyMedium)
+                    if (current) {
+                        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = {
+                                val at = chatLines.indexOfFirst { it.id == line.id }
+                                if (at >= 0) chatLines[at] = line.copy(actions = emptyList())
+                                vm.dismissReply()
+                            }) { Text(str(R.string.cancel)) }
+                            Button(onClick = vm::confirmAgent) { Text(str(R.string.ai_confirm)) }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

@@ -153,7 +153,7 @@ export function App() {
     ${screen}
     ${resting && monitor && html`<${RestScreen} s=${s} night=${night} onWake=${() => setResting(false)} />`}
     ${s.update && s.updatePrompt && html`<${UpdateDialog} version=${s.update.version} />`}
-    ${s.reply && html`<${ReplyScreen} reply=${s.reply} readAloud=${s.readAloud} />`}
+    ${s.reply && !s.chatting && html`<${ReplyScreen} reply=${s.reply} readAloud=${s.readAloud} />`}
     <${Snackbar} />`;
 }
 

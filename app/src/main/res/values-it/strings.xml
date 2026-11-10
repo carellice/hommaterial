@@ -76,6 +76,9 @@
     <string name="voice_button">Comando vocale</string>
     <string name="assistant_type">Scrivi un comando</string>
     <string name="assistant_type_hint">Cosa devo fare?</string>
+    <string name="assistant_chat">Chat con l\'assistente</string>
+    <string name="assistant_chat_clear">Svuota la chat</string>
+    <string name="assistant_chat_empty">Scrivi cosa fare: accendere una luce, fare una domanda. Le risposte arrivano qui, per iscritto.</string>
     <string name="assistant_send">Invia</string>
     <string name="voice_ask_title">Cosa intendevi?</string>
     <string name="voice_heard">Ho sentito «%1$s».</string>
