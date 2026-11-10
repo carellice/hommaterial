@@ -812,6 +812,8 @@ function AssistantChat() {
   const [lines, setLinesState] = useState(chatLines);
   const [typed, setTyped] = useState('');
   const end = useRef(null);
+  const field = useRef(null);
+  useEffect(() => { setTimeout(() => field.current?.focus(), 50); }, []);
   const setLines = (change) => setLinesState((old) => (chatLines = change(old)));
   const close = () => store.setChatting(false);
   useBack(close);
@@ -858,9 +860,12 @@ function AssistantChat() {
           </div>`)}
         <div ref=${end}></div>
       </div></div>
-      <div class="chat-input narrow">
-        <${Field} label=${str('assistant_type_hint')} value=${typed} onInput=${setTyped} onEnter=${send} autofocus />
-        <${IconButton} icon="send" label=${str('assistant_send')} onClick=${send} />
+      ${/* As on Android: a rounded field with the hint inside and a filled send button. */ ''}
+      <div class="chat-input">
+        <input class="chat-field" placeholder=${str('assistant_type_hint')} aria-label=${str('assistant_type_hint')} value=${typed}
+          ref=${field}
+          onInput=${(e) => setTyped(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && (e.preventDefault(), send())} />
+        <${IconButton} icon="send" label=${str('assistant_send')} onClick=${send} disabled=${!typed.trim()} cls="filled" />
       </div>
     </div>`;
 }

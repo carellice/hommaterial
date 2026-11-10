@@ -1369,5 +1369,14 @@ fieldset.plain { border: none; margin: 0; padding: 0; min-width: 0; display: fle
 .chat-bubble.mine { align-self: flex-end; border-radius: 20px 20px 4px 20px; background: var(--primary-container); color: var(--on-primary-container); }
 .chat-bubble.waiting { color: var(--on-surface-variant); }
 .chat-actions { display: flex; gap: 8px; margin-top: 8px; }
-.chat-input { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; padding: 8px 16px max(12px, env(safe-area-inset-bottom)); }
-.chat-input .field { flex: 1; }
+/* Above the bottom bar (z-index 20): the chat is appended to body, out of .screen. */
+.full-dialog.chat { z-index: 25; background: var(--surface); }
+.chat-input { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 640px; margin: 0 auto; box-sizing: border-box; padding: 12px 12px max(12px, env(safe-area-inset-bottom)); }
+.chat-field {
+  flex: 1; min-width: 0; border: 1px solid var(--outline); border-radius: 28px; background: transparent;
+  padding: 16px 20px; font-size: 16px; color: var(--on-surface); outline: none;
+}
+.chat-field:focus { border: 2px solid var(--primary); padding: 15px 19px; }
+.chat-field::placeholder { color: var(--on-surface-variant); }
+.icon-btn.filled { width: 40px; height: 40px; background: var(--primary); color: var(--on-primary); }
+.icon-btn.filled:disabled { background: color-mix(in srgb, var(--on-surface) 12%, transparent); color: var(--on-surface); }
