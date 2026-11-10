@@ -254,13 +254,13 @@ function applySnapshot(answer) {
     }
   }
   // The favorite team too: null on the server until a device chooses, false for none.
-  const fromServer = answer.data?.team;
-  if (fromServer != null && !pendingValues.has('team')) {
-    const team = fromServer || null;
+  const serverTeam = answer.data?.team;
+  if (serverTeam != null && !pendingValues.has('team')) {
+    const team = serverTeam || null;
     settings.set('team', team);
     notion.team = team;
     if (team?.id !== state.team?.id) Object.assign(notion, { teamInfo: null, teamFailed: false });
-  } else if (answer.data && fromServer == null && state.team) {
+  } else if (answer.data && serverTeam == null && state.team) {
     post('/api/data', { values: { team: state.team } }).catch(() => {});
   }
   // The place of the weather the same way.
