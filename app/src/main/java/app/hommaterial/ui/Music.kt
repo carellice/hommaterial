@@ -364,11 +364,16 @@ private fun TrackRow(track: Track, current: Boolean, playing: Boolean, modifier:
             Text("${artistName(track)} · ${track.album}", maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         leadingContent = {
-            Crossfade(current, label = "track icon") { isCurrent ->
-                if (isCurrent) {
-                    Equalizer(playing, MaterialTheme.colorScheme.primary)
-                } else {
-                    Icon(Icons.Outlined.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            // The picture of the song, with the dancing bars over it while it is the one that plays.
+            Box(contentAlignment = Alignment.Center) {
+                Cover(track.uri, Icons.Outlined.MusicNote, RoundedCornerShape(10.dp))
+                AnimatedVisibility(current, enter = fadeIn(), exit = fadeOut()) {
+                    Box(
+                        Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).background(Color.Black.copy(alpha = 0.45f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Equalizer(playing, Color.White)
+                    }
                 }
             }
         },
