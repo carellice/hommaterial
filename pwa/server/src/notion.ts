@@ -62,7 +62,9 @@ function pageTitle(page: any): string {
   return ''
 }
 
-const richText = (text: string) => [{ type: 'text', text: { content: text.slice(0, 2000) } }]
+// Notion takes at most 2000 characters in a piece of rich text and 100 pieces: a long text goes in several.
+const richText = (text: string) =>
+  (text.match(/[\s\S]{1,2000}/g) ?? ['']).slice(0, 100).map((content) => ({ type: 'text', text: { content } }))
 
 /** Every page of [path], following the cursor up to a few hundred. */
 async function paged(method: string, path: string, body: Record<string, unknown> = {}): Promise<any[]> {

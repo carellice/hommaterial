@@ -682,7 +682,7 @@ route('GET', '/api/notion/lists/:kind/:id/items', async (_req, res, [kind, id]) 
 
 route('POST', '/api/notion/lists/:kind/:id/items', async (req, res, [kind, id]) => {
   const { name } = await readJson<{ name?: string }>(req)
-  const value = text(name, 500).trim()
+  const value = text(name, 20_000).trim()
   if (!value) throw new HttpError(400, str('something_wrong'))
   await notion.add(notionKind(kind), decodeURIComponent(id), value)
   ok(res)
@@ -691,7 +691,7 @@ route('POST', '/api/notion/lists/:kind/:id/items', async (req, res, [kind, id]) 
 route('PUT', '/api/notion/lists/:kind/:id/items/:item', async (req, res, [kind, id, item]) => {
   const { name, completed } = await readJson<{ name?: string; completed?: boolean }>(req)
   if (name != null) {
-    const value = text(name, 500).trim()
+    const value = text(name, 20_000).trim()
     if (!value) throw new HttpError(400, str('something_wrong'))
     await notion.rename(notionKind(kind), decodeURIComponent(id), decodeURIComponent(item), value)
   }

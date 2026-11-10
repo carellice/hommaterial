@@ -358,8 +358,12 @@ internal class NotionSchema(
     }
 }
 
-private fun richText(text: String): JSONArray =
-    JSONArray().put(JSONObject().put("type", "text").put("text", JSONObject().put("content", text.take(2000))))
+/** Notion takes at most 2000 characters in a piece of rich text and 100 pieces: a long text goes in several. */
+private fun richText(text: String): JSONArray = JSONArray().apply {
+    for (piece in text.chunked(2000).ifEmpty { listOf("") }.take(100)) {
+        put(JSONObject().put("type", "text").put("text", JSONObject().put("content", piece)))
+    }
+}
 
 /** The text of rich text, without its formatting. */
 internal fun plain(rich: JSONArray?): String =
