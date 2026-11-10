@@ -76,6 +76,9 @@
     <string name="voice_prompt">Turn on or off…</string>
     <string name="voice_language">en-US</string>
     <string name="voice_button">Voice command</string>
+    <string name="assistant_type">Type a command</string>
+    <string name="assistant_type_hint">What should I do?</string>
+    <string name="assistant_send">Send</string>
     <string name="voice_ask_title">What did you mean?</string>
     <string name="voice_heard">I heard “%1$s”.</string>
     <string name="voice_room_option" translatable="false">%1$s (%2$s)</string>

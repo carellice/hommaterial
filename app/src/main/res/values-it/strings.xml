@@ -74,6 +74,9 @@
     <string name="voice_prompt">Accendi o spegni…</string>
     <string name="voice_language">it-IT</string>
     <string name="voice_button">Comando vocale</string>
+    <string name="assistant_type">Scrivi un comando</string>
+    <string name="assistant_type_hint">Cosa devo fare?</string>
+    <string name="assistant_send">Invia</string>
     <string name="voice_ask_title">Cosa intendevi?</string>
     <string name="voice_heard">Ho sentito «%1$s».</string>
     <string name="diagnostics_copied">Dati tecnici copiati negli appunti</string>

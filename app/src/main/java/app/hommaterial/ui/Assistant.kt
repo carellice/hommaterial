@@ -439,3 +439,32 @@ internal fun AssistantSettings(state: UiState, vm: HomeViewModel) {
     )
     Setting(title = str(R.string.assistant_unlink), onClick = { unlinking = true })
 }
+
+/** A command typed instead of said: it goes to [onSend] as if it had been heard. */
+@Composable
+internal fun TypeCommandDialog(onSend: (String) -> Unit, onDismiss: () -> Unit) {
+    var typed by remember { mutableStateOf("") }
+    val ready = typed.isNotBlank()
+    fun send() {
+        if (!ready) return
+        onSend(typed.trim())
+        onDismiss()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.assistant_type)) },
+        text = {
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it },
+                label = { Text(str(R.string.assistant_type_hint)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { send() }),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = { TextButton(enabled = ready, onClick = ::send) { Text(str(R.string.assistant_send)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
+    )
+}

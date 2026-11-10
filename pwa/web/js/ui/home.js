@@ -2,7 +2,7 @@
 import { html, render, useState, useEffect, useRef, useLayoutEffect } from '../lib.js';
 import {
   Icon, IconButton, Spinner, Switch, Details, Dialog, FullDialog, Menu, ConfirmDialog, PinDialog,
-  Card, Chips, OrderRow, useStore, useNow, useWidth, usePress, useBack,
+  Card, Chips, OrderRow, Field, useStore, useNow, useWidth, usePress, useBack,
 } from './common.js';
 import * as store from '../store.js';
 import { tileSpan } from '/shared/backup.js';
@@ -742,6 +742,7 @@ function ArrangeDialog({ s, onDismiss }) {
  */
 function VoiceButton() {
   const [session, setSession] = useState(null);
+  const [typing, setTyping] = useState(false);
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const listen = () => {
     if (!Recognition) {
@@ -790,10 +791,29 @@ function VoiceButton() {
     }
   };
   return html`
+    ${/* Next to the microphone, the same commands typed on the keyboard. */ ''}
+    <${IconButton} icon="keyboard" label=${str('assistant_type')} onClick=${() => setTyping(true)} />
+    ${typing && html`<${TypeCommandDialog} onDismiss=${() => setTyping(false)} />`}
     <button class=${`icon-btn ${session ? 'listening' : ''}`} aria-label=${str('voice_button')} title=${str('voice_button')}
       aria-pressed=${!!session} onClick=${() => (session ? session.stop() : listen())}>
       <${Icon} name="mic" filled=${!!session} /></button>
     ${session && html`<${OnTop}><${ListeningPanel} session=${session} /><//>`}`;
+}
+
+/** A command typed instead of said: it goes on as if it had been heard (ui/Assistant.kt). */
+function TypeCommandDialog({ onDismiss }) {
+  const [typed, setTyped] = useState('');
+  const ready = typed.trim().length > 0;
+  const send = () => {
+    if (!ready) return;
+    store.onSpeech([typed.trim()]);
+    onDismiss();
+  };
+  return html`<${Dialog} title=${str('assistant_type')} onDismiss=${onDismiss} actions=${html`
+    <button class="text-btn" onClick=${onDismiss}>${str('cancel')}</button>
+    <button class="text-btn" disabled=${!ready} onClick=${send}>${str('assistant_send')}</button>`}>
+    <${Field} label=${str('assistant_type_hint')} value=${typed} onInput=${setTyped} onEnter=${send} autofocus />
+  <//>`;
 }
 
 /** Shows [children] on top of the whole page, out of the bar that holds the button. */

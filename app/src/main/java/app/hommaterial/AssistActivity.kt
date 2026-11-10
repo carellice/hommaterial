@@ -60,6 +60,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.filled.Speaker
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -95,6 +96,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.hommaterial.ui.LocalHaptics
 import app.hommaterial.ui.ProvideHaptics
 import app.hommaterial.ui.ReplyScreen
+import app.hommaterial.ui.TypeCommandDialog
 import app.hommaterial.ui.VoiceDialog
 import app.hommaterial.ui.accentScheme
 import kotlin.math.PI
@@ -259,6 +261,15 @@ private fun AssistPanel(state: UiState, vm: HomeViewModel, onOpenApp: () -> Unit
     }
     state.voice?.let { VoiceDialog(it, vm) }
     state.reply?.let { ReplyScreen(it, state.readAloud, vm) }
+    // Typed instead of said: the microphone stops and the text goes on as if heard.
+    var typing by remember { mutableStateOf(false) }
+    if (typing) {
+        TypeCommandDialog(onSend = { onHeard(listOf(it)) }, onDismiss = {
+            typing = false
+            // Dropped without a command: so is the panel.
+            if (phase == Phase.LISTENING) close()
+        })
+    }
 
     val level by animateFloatAsState(
         // The recognizer gives about -2 dB in silence and 10 dB for a loud voice.
@@ -290,6 +301,12 @@ private fun AssistPanel(state: UiState, vm: HomeViewModel, onOpenApp: () -> Unit
                 toAlexa = state.voiceEcho != null,
                 level = level,
                 onMic = { if (phase == Phase.LISTENING) listener.stop() else listen() },
+                onType = {
+                    // Cancelled, not stopped: what was half said must not run as a command.
+                    listener.cancel()
+                    rms = 0f
+                    typing = true
+                },
                 onOpenApp = onOpenApp,
                 onClose = close,
             )
@@ -307,6 +324,7 @@ private fun Panel(
     toAlexa: Boolean,
     level: Float,
     onMic: () -> Unit,
+    onType: () -> Unit,
     onOpenApp: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -354,7 +372,11 @@ private fun Panel(
                 Words(phase, heard, outcome, prompt, Modifier.padding(end = 8.dp, top = 4.dp, bottom = 16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Wave(phase, level, Modifier.weight(1f).height(40.dp))
-                    Spacer(Modifier.width(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(onClick = onType) {
+                        Icon(Icons.Outlined.Keyboard, contentDescription = str(R.string.assistant_type))
+                    }
+                    Spacer(Modifier.width(4.dp))
                     Mic(phase, level, onMic)
                 }
             }
@@ -558,6 +580,8 @@ private class Listener(
 
     /** Stops listening: what was said so far is taken as said. */
     fun stop() = recognizer?.stopListening()
+
+    fun cancel() = recognizer?.cancel()
 
     fun destroy() = recognizer?.destroy()
 }

@@ -74,6 +74,7 @@ import androidx.compose.material.icons.outlined.DevicesOther
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PauseCircle
@@ -1338,6 +1339,12 @@ private fun ageText(updatedAt: Long, now: Long): String {
  */
 @Composable
 private fun VoiceButton(vm: HomeViewModel, correcting: Boolean) {
+    // Next to the microphone, the same commands typed on the keyboard.
+    var typing by remember { mutableStateOf(false) }
+    if (typing) TypeCommandDialog(onSend = { vm.onSpeech(listOf(it)) }, onDismiss = { typing = false })
+    IconButton(onClick = { typing = true }, enabled = !correcting) {
+        Icon(Icons.Outlined.Keyboard, contentDescription = str(R.string.assistant_type))
+    }
     IconButton(
         onClick = rememberVoiceCommand(vm),
         enabled = !correcting,
