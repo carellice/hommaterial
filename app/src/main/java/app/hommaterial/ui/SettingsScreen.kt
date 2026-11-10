@@ -430,6 +430,16 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             if (searching) return
             // In the skeuomorphic look, the engraved capitals of a grouped table.
             val skeuo = LocalSkeuoMaterials.current
+            // In Modern UI, the big light lowercase words of a header in the accent.
+            if (LocalMetro.current) {
+                Text(
+                    str(title).lowercase(),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 4.dp, top = 16.dp),
+                )
+                return
+            }
             Text(
                 if (skeuo != null) str(title).uppercase() else str(title),
                 style = if (skeuo != null) MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, shadow = skeuo.emboss)
@@ -455,7 +465,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             Section(R.string.s_appearance) {
                 val themes = listOf(R.string.theme_auto, R.string.theme_light, R.string.theme_dark)
                 Chips(R.string.theme, themes.mapIndexed { i, label -> i to str(label) }, state.theme, vm::setTheme)
-                Chips(R.string.look, listOf(LOOK_MATERIAL to str(R.string.look_material), LOOK_SKEUO to str(R.string.look_skeuo)), state.look, vm::setLook)
+                Chips(R.string.look, listOf(LOOK_MATERIAL to str(R.string.look_material), LOOK_SKEUO to str(R.string.look_skeuo), LOOK_METRO to str(R.string.look_metro)), state.look, vm::setLook)
                 AccentPicker(state.accent, vm::setAccent)
                 val layouts = listOf(LAYOUT_GRID to str(R.string.layout_grid), LAYOUT_LIST to str(R.string.layout_list))
                 Chips(R.string.layout, layouts, state.layout, vm::setLayout)
@@ -856,7 +866,7 @@ internal fun SettingsSearchField(query: String, hint: String = str(R.string.sett
             }
         },
         singleLine = true,
-        shape = RoundedCornerShape(28.dp),
+        shape = corners(28.dp),
         modifier = Modifier.fillMaxWidth(),
     )
 }
@@ -906,11 +916,12 @@ private fun Accordion(
 ) {
     val turn by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
     val skeuo = LocalSkeuo.current
+    val metro = LocalMetro.current
     Surface(
         color = if (skeuo) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(if (skeuo) 12.dp else 20.dp),
-        modifier = Modifier.skeuoPanel(RoundedCornerShape(12.dp)),
+        shape = if (metro) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(if (skeuo) 12.dp else 20.dp),
+        modifier = Modifier.skeuoPanel(corners(12.dp)),
     ) {
         Column {
             Row(
@@ -920,13 +931,14 @@ private fun Accordion(
                 sectionIcon(title)?.let { icon ->
                     Box(
                         if (skeuo) Modifier.size(40.dp).skeuoBadge()
+                        else if (metro) Modifier.size(40.dp).background(MaterialTheme.colorScheme.primary)
                         else Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             icon,
                             contentDescription = null,
-                            tint = if (skeuo) Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
+                            tint = if (skeuo || metro) Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.size(22.dp),
                         )
                     }
@@ -1101,13 +1113,15 @@ private fun Swatch(seed: Color?, selected: Boolean, label: String, auto: Boolean
         spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "tick",
     )
+    // The accents of Windows Phone were squares.
+    val shape = if (LocalMetro.current) androidx.compose.ui.graphics.RectangleShape else CircleShape
     Box(
         Modifier
             .size(48.dp)
-            .clip(CircleShape)
-            .border(ring, colors.onSurface, CircleShape)
+            .clip(shape)
+            .border(ring, colors.onSurface, shape)
             .padding(if (selected) 5.dp else 0.dp)
-            .clip(CircleShape)
+            .clip(shape)
             .background(seed ?: colors.primaryContainer)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .semantics { contentDescription = label },

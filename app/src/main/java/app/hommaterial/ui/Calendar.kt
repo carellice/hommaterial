@@ -270,7 +270,7 @@ internal fun CalendarPage(model: CalendarModel, state: UiState, vm: HomeViewMode
                 contentColor = if (skeuo) Color.White else androidx.compose.material3.contentColorFor(androidx.compose.material3.FloatingActionButtonDefaults.containerColor),
                 elevation = if (skeuo) androidx.compose.material3.FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp) else androidx.compose.material3.FloatingActionButtonDefaults.elevation(),
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = BOTTOM_BAR_SPACE + 8.dp)
-                    .skeuoRaised(RoundedCornerShape(16.dp), lit = true, elevation = 6.dp),
+                    .skeuoRaised(corners(16.dp), lit = true, elevation = 6.dp),
             )
         }
     }
@@ -328,7 +328,7 @@ private fun Agenda(events: List<CalendarEvent>, model: CalendarModel, state: UiS
 @Composable
 private fun EventRow(event: CalendarEvent, calendar: CalendarInfo?, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val skeuo = LocalSkeuo.current
-    val shape = RoundedCornerShape(if (skeuo) 12.dp else 18.dp)
+    val shape = if (LocalMetro.current) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(if (skeuo) 12.dp else 18.dp)
     Surface(
         color = if (skeuo) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -432,8 +432,8 @@ internal fun HomeAgenda(model: CalendarModel, state: UiState, onOpen: () -> Unit
     val soon = model.events?.filter { it.start < until && it.end > System.currentTimeMillis() } ?: return
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp).clip(RoundedCornerShape(24.dp)).clickable(onClick = onOpen),
+        shape = corners(24.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp).clip(corners(24.dp)).clickable(onClick = onOpen),
     ) {
         Column(Modifier.animateContentSize().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -852,7 +852,7 @@ private fun GoogleSetup(state: UiState, vm: HomeViewModel) {
 /** A step of the setup, with the page of Google Cloud it happens on. */
 @Composable
 internal fun Step(title: Int, text: Int, done: Boolean = false, onOpen: (() -> Unit)?) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(16.dp)) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = corners(16.dp)) {
         Row(Modifier.fillMaxWidth().padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(str(title), style = MaterialTheme.typography.titleSmall, color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)

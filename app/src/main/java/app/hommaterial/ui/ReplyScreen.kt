@@ -293,7 +293,7 @@ private fun ActionRow(action: AgentAction, index: Int) {
         appear.animateTo(1f, tween(400))
     }
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = corners(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth().graphicsLayer {
             alpha = appear.value

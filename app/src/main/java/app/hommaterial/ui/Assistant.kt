@@ -360,7 +360,7 @@ internal fun AssistantNotesDialog(state: UiState, vm: HomeViewModel, onDismiss: 
                     Text(str(R.string.assistant_notes_none), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 notes.forEachIndexed { index, note ->
-                    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(16.dp)) {
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = corners(16.dp)) {
                         Column(Modifier.padding(start = 12.dp, bottom = 12.dp, end = 4.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(nameOf(note.target), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
@@ -592,7 +592,7 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
                         value = typed,
                         onValueChange = { typed = it },
                         placeholder = { Text(str(R.string.assistant_type_hint)) },
-                        shape = RoundedCornerShape(28.dp),
+                        shape = corners(28.dp),
                         maxLines = 4,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(onSend = { send() }),

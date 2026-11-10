@@ -178,7 +178,7 @@ internal static class Skeuo
     }
 
     /// <summary>Controls read their resources again only when their theme changes: a flip makes them.</summary>
-    static void Refresh(FrameworkElement root)
+    internal static void Refresh(FrameworkElement root)
     {
         Refreshing = true;
         var theme = root.RequestedTheme;

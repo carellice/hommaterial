@@ -31,8 +31,8 @@ public sealed partial class MainWindow
         theme.SelectionChanged += (_, _) => { home.Theme = theme.SelectedIndex == 1 ? "Light" : theme.SelectedIndex == 2 ? "Dark" : "Default"; ApplyTheme(); Save(); };
         var layout = new ComboBox { Header = "Dispositivi", Items = { "Griglia", "Elenco" }, SelectedIndex = home.Layout };
         layout.SelectionChanged += (_, _) => { home.Layout = layout.SelectedIndex; Save(); };
-        var look = new ComboBox { Header = "Stile", Items = { "Material", "Skeuomorfismo" }, SelectedIndex = home.Look == "Skeuo" ? 1 : 0 };
-        look.SelectionChanged += (_, _) => { home.Look = look.SelectedIndex == 1 ? "Skeuo" : "Material"; ApplyTheme(); Save(); Render(); };
+        var look = new ComboBox { Header = "Stile", Items = { "Material", "Skeuomorfismo", "Modern UI" }, SelectedIndex = home.Look switch { "Skeuo" => 1, "Metro" => 2, _ => 0 } };
+        look.SelectionChanged += (_, _) => { home.Look = look.SelectedIndex switch { 1 => "Skeuo", 2 => "Metro", _ => "Material" }; ApplyTheme(); Save(); Render(); };
         appearance.Children.Add(theme); appearance.Children.Add(look); appearance.Children.Add(layout);
         appearance.Children.Add(Text("Ctrl+K: ricerca in tutta la casa · Invio: azione sul primo risultato · F5: aggiorna · Esc: svuota la ricerca · Maiusc+F10: dettagli della card selezionata."));
         appearance.Children.Add(Text("Le animazioni seguono la preferenza di accessibilità di Windows.", 12)); page.Children.Add(Card(appearance));

@@ -270,7 +270,7 @@ fun MusicPage() {
                                 all.groupBy { it.albumKey }.entries.sortedBy { it.value.first().album.lowercase() },
                                 Icons.Outlined.Album,
                                 bottom,
-                                cover = RoundedCornerShape(10.dp),
+                                cover = corners(10.dp),
                                 name = { it.first().album },
                                 detail = { "${artistName(it.first())} · ${plural(R.plurals.music_tracks, it.size)}" },
                             ) { opened = ALBUM + it }
@@ -369,10 +369,10 @@ private fun TrackRow(track: Track, current: Boolean, playing: Boolean, modifier:
         leadingContent = {
             // The picture of the song, with the dancing bars over it while it is the one that plays.
             Box(contentAlignment = Alignment.Center) {
-                Cover(track.uri, Icons.Outlined.MusicNote, RoundedCornerShape(10.dp))
+                Cover(track.uri, Icons.Outlined.MusicNote, corners(10.dp))
                 AnimatedVisibility(current, enter = fadeIn(), exit = fadeOut()) {
                     Box(
-                        Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).background(Color.Black.copy(alpha = 0.45f)),
+                        Modifier.size(48.dp).clip(corners(10.dp)).background(Color.Black.copy(alpha = 0.45f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Equalizer(playing, Color.White)
@@ -493,7 +493,7 @@ private fun Equalizer(playing: Boolean, color: Color) {
             )
             val rest by animateFloatAsState(if (playing) 1f else 0f, label = "rest $i")
             val height = 0.3f + (dance - 0.3f).coerceAtLeast(0f) * rest
-            Box(Modifier.width(5.dp).fillMaxHeight(height).clip(RoundedCornerShape(2.dp)).background(color))
+            Box(Modifier.width(5.dp).fillMaxHeight(height).clip(corners(2.dp)).background(color))
         }
     }
 }
@@ -753,10 +753,10 @@ private fun NowBar(now: NowPlaying) {
     val (position, length) = rememberProgress(now)
     val progress by animateFloatAsState(if (length > 0) position.toFloat() / length else 0f, label = "progress")
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = corners(24.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
         shadowElevation = 6.dp,
-        modifier = Modifier.fillMaxWidth().swipeToSkip().clip(RoundedCornerShape(24.dp)).clickable { musicExpanded.value = true },
+        modifier = Modifier.fillMaxWidth().swipeToSkip().clip(corners(24.dp)).clickable { musicExpanded.value = true },
     ) {
         Column {
             Row(Modifier.padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -866,7 +866,7 @@ internal fun MusicFullScreen() {
                         .aspectRatio(1f)
                         .swipeToSkip()
                         .graphicsLayer { scaleX = scale; scaleY = scale }
-                        .shadow(lift, RoundedCornerShape(28.dp)),
+                        .shadow(lift, corners(28.dp)),
                 )
                 Spacer(Modifier.weight(1f))
                 AnimatedContent(

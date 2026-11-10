@@ -18,6 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -115,7 +120,17 @@ internal fun FloatingBottomBar(
             }
         }
         if (LocalSkeuo.current) {
-            Box(Modifier.skeuoTabBar(RoundedCornerShape(22.dp))) { tabs() }
+            Box(Modifier.skeuoTabBar(corners(22.dp))) { tabs() }
+        } else if (LocalMetro.current) {
+            // The application bar of Windows Phone: a flat strip across the bottom edge, its icons in rings.
+            val inset = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            Surface(
+                shape = androidx.compose.ui.graphics.RectangleShape,
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                modifier = Modifier.fillMaxWidth().offset(y = 16.dp + inset),
+            ) {
+                Box(Modifier.padding(bottom = inset), contentAlignment = Alignment.Center) { tabs() }
+            }
         } else {
             Surface(
                 shape = CircleShape,
@@ -131,10 +146,11 @@ internal fun FloatingBottomBar(
 private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.unit.Dp, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val skeuo = LocalSkeuo.current
+    val metro = LocalMetro.current
     // In the black bar of the skeuomorphic look the chosen tab sits on glass, its icon lit.
     val background by animateColorAsState(
         when {
-            skeuo -> Color.Transparent
+            skeuo || metro -> Color.Transparent
             selected -> colors.secondaryContainer
             else -> colors.secondaryContainer.copy(alpha = 0f)
         },
@@ -143,12 +159,13 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
     val content by animateColorAsState(
         when {
             skeuo -> if (selected) Color.White else Color(0xFF9C9C9C)
+            metro -> if (selected) colors.onSurface else colors.onSurfaceVariant
             selected -> colors.onSecondaryContainer
             else -> colors.onSurfaceVariant
         },
         label = "tab content",
     )
-    val shape = if (skeuo) RoundedCornerShape(15.dp) else CircleShape
+    val shape = if (skeuo) corners(15.dp) else CircleShape
     // The icon of the tab just chosen gives a little bounce.
     val scale by animateFloatAsState(
         if (selected) 1f else 0.92f,
@@ -165,20 +182,35 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
             .padding(horizontal = padding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            if (selected) tab.selectedIcon else tab.icon,
-            contentDescription = if (selected) null else str(tab.label),
-            tint = if (skeuo && selected) skeuoLitIcon() else content,
-            modifier = Modifier.size(24.dp).graphicsLayer { scaleX = scale; scaleY = scale },
-        )
+        val icon = @Composable {
+            Icon(
+                if (selected) tab.selectedIcon else tab.icon,
+                contentDescription = if (selected) null else str(tab.label),
+                tint = if (skeuo && selected) skeuoLitIcon() else if (metro && selected) Color.White else content,
+                modifier = Modifier.size(if (metro) 20.dp else 24.dp).graphicsLayer { scaleX = scale; scaleY = scale },
+            )
+        }
+        if (metro) {
+            // The ring of an icon of the application bar, filled with the accent when chosen, its word under it.
+            val ring by animateColorAsState(if (selected) colors.primary else Color.Transparent, label = "tab ring")
+            androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape).background(ring).border(2.dp, if (selected) colors.primary else content, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { icon() }
+                Text(str(tab.label).lowercase(), style = MaterialTheme.typography.labelSmall, color = content, maxLines = 1)
+            }
+            return@Row
+        }
+        icon()
         AnimatedVisibility(
             visible = selected,
             enter = expandHorizontally(spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
             exit = shrinkHorizontally(spring(stiffness = Spring.StiffnessMedium)) + fadeOut(),
         ) {
             Text(
-                str(tab.label),
-                style = MaterialTheme.typography.labelLarge,
+                if (metro) str(tab.label).lowercase() else str(tab.label),
+                style = if (metro) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge,
                 color = content,
                 maxLines = 1,
                 modifier = Modifier.padding(start = 10.dp),

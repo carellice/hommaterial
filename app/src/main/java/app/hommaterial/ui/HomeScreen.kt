@@ -542,7 +542,7 @@ private fun SearchResults(query: String, found: List<Entry>, state: UiState, vm:
             val marked = entry === first
             Box(
                 if (marked) {
-                    Modifier.border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(23.dp)).padding(3.dp)
+                    Modifier.border(3.dp, MaterialTheme.colorScheme.primary, corners(23.dp)).padding(3.dp)
                 } else {
                     Modifier
                 },
@@ -939,10 +939,12 @@ private fun ArrangeDialog(state: UiState, vm: HomeViewModel, onDismiss: () -> Un
 private fun SectionHeader(name: String, onPower: ((Boolean) -> Unit)? = null) {
     // The fixed height keeps headers aligned whether or not they carry the power button.
     Row(Modifier.padding(top = 4.dp).height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+        // In Modern UI, the big light lowercase words that head a hub.
+        val metro = LocalMetro.current
         Text(
-            name,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            if (metro) name.lowercase() else name,
+            style = if (metro) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleSmall,
+            color = if (metro) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
         if (onPower != null) {
@@ -1209,7 +1211,7 @@ internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: St
                 Text(
                     name,
                     style = if (size == 2) type.titleMedium.onTile() else type.titleSmall.onTile(),
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = if (LocalMetro.current) FontWeight.Normal else FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -1235,7 +1237,7 @@ internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: St
         Text(
             name,
             style = if (size == 2) type.titleLarge.onTile() else type.titleSmall.onTile(),
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = if (LocalMetro.current) FontWeight.Normal else FontWeight.SemiBold,
             // A compact tile has no room for a name on two lines.
             maxLines = if (size == 0) 1 else 2,
             overflow = TextOverflow.Ellipsis,
@@ -1267,7 +1269,7 @@ private fun TimerRow(
             delay(1_000)
         }
     }
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(20.dp)) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = corners(20.dp)) {
         Row(
             Modifier.padding(start = 14.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,

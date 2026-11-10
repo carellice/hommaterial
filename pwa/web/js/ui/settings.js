@@ -175,7 +175,7 @@ export function SettingsScreen({ onBack }) {
         ${section('appearance', 's_appearance', null, html`
           <${Chips} title=${str('theme')} choices=${[[0, str('theme_auto')], [1, str('theme_light')], [2, str('theme_dark')]]}
             selected=${s.theme} onSelect=${store.setTheme} />
-          <${Chips} title=${str('look')} choices=${[[0, str('look_material')], [1, str('look_skeuo')]]}
+          <${Chips} title=${str('look')} choices=${[[0, str('look_material')], [1, str('look_skeuo')], [2, str('look_metro')]]}
             selected=${s.look} onSelect=${store.setLook} />
           <${AccentPicker} selected=${s.accent} onSelect=${store.setAccent} />
           <${Chips} title=${str('layout')} choices=${[[LAYOUT_GRID, str('layout_grid')], [LAYOUT_LIST, str('layout_list')]]}

@@ -50,7 +50,7 @@ internal fun OfflineBanner() {
         Surface(
             color = MaterialTheme.colorScheme.tertiaryContainer,
             contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-            shape = RoundedCornerShape(16.dp),
+            shape = corners(16.dp),
             modifier = Modifier.fillMaxWidth().wrapContentWidth().widthIn(max = 720.dp).padding(horizontal = 16.dp, vertical = 4.dp),
         ) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {

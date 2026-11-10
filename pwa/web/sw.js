@@ -3,7 +3,7 @@
 // the libraries and fonts, which never change, from the copy.
 const CACHE = 'hommaterial-v2';
 const SHELL = [
-  '/', '/index.html', '/manifest.webmanifest', '/css/app.css', '/css/skeuo.css',
+  '/', '/index.html', '/manifest.webmanifest', '/css/app.css', '/css/skeuo.css', '/css/metro.css',
   '/icons/icon.svg', '/icons/icon-192.png', '/icons/apple-touch-icon.png',
 ];
 

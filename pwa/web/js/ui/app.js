@@ -23,6 +23,7 @@ function useTheme(theme, accent, look) {
     else if (theme === 2) root.dataset.theme = 'dark';
     else delete root.dataset.theme;
     if (look === 1) root.dataset.look = 'skeuo';
+    else if (look === 2) root.dataset.look = 'metro';
     else delete root.dataset.look;
     // The colors of the accent, after app.css so that they win over its own.
     let style = document.getElementById('accent');

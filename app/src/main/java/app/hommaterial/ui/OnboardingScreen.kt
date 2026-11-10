@@ -113,7 +113,7 @@ fun OnboardingScreen(onAccept: () -> Unit) {
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                shape = RoundedCornerShape(20.dp),
+                shape = corners(20.dp),
                 modifier = Modifier.padding(bottom = 24.dp),
             ) {
                 Column(Modifier.padding(20.dp)) {

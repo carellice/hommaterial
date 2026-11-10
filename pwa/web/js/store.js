@@ -1752,7 +1752,7 @@ async function restore(backup, selected) {
     lgTvs: Array.isArray(backup.lgTvs) ? backup.lgTvs : null,
   });
   const theme = clamp(Number(backup.theme ?? 0), 0, 2);
-  const look = clamp(Number(backup.look ?? 0), 0, 1);
+  const look = clamp(Number(backup.look ?? 0), 0, 2);
   const layout = clamp(Number(backup.layout ?? 0), 0, 1);
   const language = backup.language || 'auto';
   const accent = typeof backup.accent === 'string' && backup.accent ? backup.accent : 'auto';

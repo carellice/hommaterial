@@ -28,6 +28,7 @@ internal static class AppPalette
     public static void ApplyCard(Button button, bool on, bool highlighted)
     {
         if (Skeuo.On && !new AccessibilitySettings().HighContrast) { Skeuo.ApplyCard(button, on, highlighted); return; }
+        if (Metro.On && !new AccessibilitySettings().HighContrast) { Metro.ApplyCard(button, on, highlighted); return; }
         var accent = Accent(button.ActualTheme);
         var dark = button.ActualTheme == ElementTheme.Dark;
         Brush foreground = new SolidColorBrush(dark ? ColorHelper.FromArgb(255, 245, 245, 245) : ColorHelper.FromArgb(255, 27, 30, 39));

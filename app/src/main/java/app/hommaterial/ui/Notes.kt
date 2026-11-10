@@ -142,8 +142,8 @@ internal fun NotesPage(model: NotesModel, state: UiState, vm: HomeViewModel) {
                     items(notes, key = { it.id }) { note ->
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceContainer,
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { open = note }.animateItem(),
+                            shape = corners(20.dp),
+                            modifier = Modifier.fillMaxWidth().clip(corners(20.dp)).clickable { open = note }.animateItem(),
                         ) {
                             ListItem(
                                 leadingContent = {
@@ -262,7 +262,7 @@ private fun NoteBlockView(block: NoteBlock, number: Int) {
             Spacer(Modifier.width(12.dp))
             Text(block.text, style = type.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        "code" -> Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(12.dp), modifier = indent.fillMaxWidth()) {
+        "code" -> Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = corners(12.dp), modifier = indent.fillMaxWidth()) {
             Text(block.text, style = type.bodyMedium, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(12.dp))
         }
         else -> if (block.text.isNotBlank()) Text(block.text, style = type.bodyLarge, modifier = indent)

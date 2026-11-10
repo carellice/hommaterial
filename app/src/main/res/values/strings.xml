@@ -276,6 +276,7 @@
     <string name="look">Style</string>
     <string name="look_material">Material</string>
     <string name="look_skeuo">Skeuomorphic</string>
+    <string name="look_metro">Modern UI</string>
     <string name="widget_order">Order</string>
     <string name="move_up">Move up</string>
     <string name="move_down">Move down</string>
@@ -979,7 +980,7 @@
     <string name="settings_group_voice">Voice and assistant</string>
     <string name="settings_group_home">Home and devices</string>
     <string name="settings_group_system">Data and system</string>
-    <string name="settings_keys_appearance">theme, dark, light, night, color, colour, accent, wallpaper, layout, grid, list, vibration, haptics, language, look, style, skeuomorphic, skeuomorphism, material</string>
+    <string name="settings_keys_appearance">theme, dark, light, night, color, colour, accent, wallpaper, layout, grid, list, vibration, haptics, language, look, style, skeuomorphic, skeuomorphism, material, modern ui, metro, windows phone</string>
     <string name="settings_keys_notifications">notifications, alerts, push, messages, badge</string>
     <string name="settings_keys_team">football, soccer, team, club, match, serie a, serie b, table, standings, results, sport</string>
     <string name="settings_keys_server">server, home server, casaos, sync, web, browser, pwa, address, link</string>

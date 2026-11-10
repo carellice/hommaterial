@@ -84,10 +84,11 @@ public sealed partial class MainWindow : Window
         // The demo for screenshots can show the skeuomorphic look without touching the saved settings.
         var args = Environment.GetCommandLineArgs();
         if (args.Contains("--demo") && args.Contains("--skeuo")) home.Look = "Skeuo";
+        if (args.Contains("--demo") && args.Contains("--metro")) home.Look = "Metro";
         if (args.Contains("--demo") && args.Contains("--dark")) home.Theme = "Dark";
         ApplyTheme();
-        // Following Windows from light to dark, the skeuomorphic look changes its materials too.
-        root.ActualThemeChanged += (_, _) => { if (Skeuo.On && !Skeuo.Refreshing) { ApplyTheme(); Render(); } };
+        // Following Windows from light to dark, the skeuomorphic and Modern UI looks change their materials too.
+        root.ActualThemeChanged += (_, _) => { if ((Skeuo.On || Metro.On) && !Skeuo.Refreshing) { ApplyTheme(); Render(); } };
         RebuildNavigation();
         Render();
         polling.Tick += async (_, _) => { if (!dialogOpen) { if (demo) await runtime.ReceiveAsync(home.States, DateTimeOffset.Now.ToUnixTimeMilliseconds()); else if (client.IsLoggedIn) await RefreshAsync(false); } };
@@ -132,11 +133,11 @@ public sealed partial class MainWindow : Window
         };
         return button;
     }
-    static Border Card(UIElement content) => new() { Child = content, CornerRadius = new CornerRadius(12),
+    static Border Card(UIElement content) => new() { Child = content, CornerRadius = new CornerRadius(Metro.On ? 0 : 12),
         Padding = new Thickness(20),
-        Background = Skeuo.On ? Skeuo.Panel(Skeuo.Dark) : (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
+        Background = Skeuo.On ? Skeuo.Panel(Skeuo.Dark) : Metro.On ? Metro.Panel(Metro.Dark) : (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
         BorderBrush = Skeuo.On ? Skeuo.Edge(Skeuo.Dark) : (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
-        BorderThickness = Skeuo.On ? new Thickness(1, 1, 1, 2) : new Thickness(1) };
+        BorderThickness = Skeuo.On ? new Thickness(1, 1, 1, 2) : Metro.On ? new Thickness(0) : new Thickness(1) };
     void ShowError(Exception error)
     {
         LocalStore.Log(error);
@@ -148,7 +149,9 @@ public sealed partial class MainWindow : Window
     void ApplyTheme()
     {
         root.RequestedTheme = home.Theme switch { "Light" => ElementTheme.Light, "Dark" => ElementTheme.Dark, _ => ElementTheme.Default };
-        Skeuo.Apply(this, root, titleBar, home.Look == "Skeuo");
+        // Each look takes its own resources back before the other puts its own.
+        if (home.Look == "Metro") { Skeuo.Apply(this, root, titleBar, false); Metro.Apply(this, root, titleBar, true); }
+        else { Metro.Apply(this, root, titleBar, false); Skeuo.Apply(this, root, titleBar, home.Look == "Skeuo"); }
     }
 
     void RebuildNavigation()

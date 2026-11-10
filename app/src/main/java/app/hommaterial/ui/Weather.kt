@@ -110,7 +110,7 @@ internal fun WeatherHomeCard(state: UiState, vm: HomeViewModel) {
         Modifier
             .fillMaxWidth()
             .padding(top = 4.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(corners(24.dp))
             .background(Brush.linearGradient(listOf(look.top, look.bottom))),
     ) {
         // The icon of the sky, large and faint, behind everything.
@@ -166,7 +166,7 @@ internal fun WeatherHomeCard(state: UiState, vm: HomeViewModel) {
                                             alpha = appear
                                             translationY = (1 - appear) * 16.dp.toPx()
                                         }
-                                        .clip(RoundedCornerShape(16.dp))
+                                        .clip(corners(16.dp))
                                         .background(Color.White.copy(alpha = 0.14f))
                                         .padding(vertical = 8.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -241,7 +241,7 @@ private fun PlacePicker(vm: HomeViewModel, onPick: (WeatherPlace) -> Unit, onDis
                         found?.isEmpty() == true -> Text(str(R.string.weather_no_results), Modifier.padding(top = 16.dp))
                         else -> LazyColumn {
                             items(found.orEmpty(), key = { "${it.lat},${it.lon}" }) { place ->
-                                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onPick(place) }.padding(12.dp)) {
+                                Column(Modifier.fillMaxWidth().clip(corners(12.dp)).clickable { onPick(place) }.padding(12.dp)) {
                                     Text(place.name, style = MaterialTheme.typography.bodyLarge)
                                     if (place.detail.isNotEmpty()) {
                                         Text(place.detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

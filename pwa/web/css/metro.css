@@ -1,0 +1,326 @@
+/*
+ * The Modern UI look of Windows Phone, chosen in Settings → Appearance → Style: pure black or white,
+ * square tiles in one vivid accent, Segoe set light and large, framed square buttons, the tilt of
+ * what is pressed and the turnstile of the pages. It only applies under html[data-look="metro"], set
+ * by ui/app.js; the Material look of app.css stays untouched underneath.
+ * html:root wins over the :root rules the accent writes at run time (shared/accents.js).
+ */
+
+/* ——— Colors, light ——— */
+html:root[data-look="metro"] {
+  /* The accent made vivid: the same hue, full and bright, under white text. */
+  /* Worked out from the container, which the look leaves alone: --primary cannot feed itself. A gray accent stays gray. */
+  --mt-accent: #1BA1E2;
+  --mt-accent: oklch(from var(--primary-container) 0.58 min(0.2, calc(c * 3.5)) h);
+  --primary: var(--mt-accent);
+  --on-primary: #FFFFFF;
+  --secondary-container: var(--mt-accent);
+  --on-secondary-container: #FFFFFF;
+  --background: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-container-lowest: #FFFFFF;
+  --surface-container-low: #F7F7F7;
+  --surface-container: #F0F0F0;
+  --surface-container-high: #E6E6E6;
+  --surface-container-highest: #DCDCDC;
+  --on-surface: #000000;
+  --on-background: #000000;
+  --on-surface-variant: #5E5E5E;
+  --outline: #404040;
+  --outline-variant: #CCCCCC;
+  --mt-frame: #000000;
+  color-scheme: light;
+}
+
+/* ——— Colors, dark ——— */
+html:root[data-look="metro"][data-theme="dark"] {
+  --mt-accent: oklch(from var(--primary-container) 0.62 min(0.2, calc(c * 3.5)) h);
+  --background: #000000;
+  --surface: #000000;
+  --surface-container-lowest: #000000;
+  --surface-container-low: #141414;
+  --surface-container: #1F1F1F;
+  --surface-container-high: #2B2B2B;
+  --surface-container-highest: #363636;
+  --on-surface: #FFFFFF;
+  --on-background: #FFFFFF;
+  --on-surface-variant: #A6A6A6;
+  --outline: #BFBFBF;
+  --outline-variant: #3D3D3D;
+  --mt-frame: #FFFFFF;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  html:root[data-look="metro"]:not([data-theme="light"]) {
+    --mt-accent: oklch(from var(--primary-container) 0.62 min(0.2, calc(c * 3.5)) h);
+    --background: #000000;
+    --surface: #000000;
+    --surface-container-lowest: #000000;
+    --surface-container-low: #141414;
+    --surface-container: #1F1F1F;
+    --surface-container-high: #2B2B2B;
+    --surface-container-highest: #363636;
+    --on-surface: #FFFFFF;
+    --on-background: #FFFFFF;
+    --on-surface-variant: #A6A6A6;
+    --outline: #BFBFBF;
+    --outline-variant: #3D3D3D;
+    --mt-frame: #FFFFFF;
+    color-scheme: dark;
+  }
+}
+
+/* ——— Type: Segoe, light and large for what heads a page ——— */
+[data-look="metro"] body { font-family: 'Segoe UI', 'Segoe WP', 'Selawik', 'Open Sans', 'Roboto Flex', Roboto, system-ui, sans-serif; }
+[data-look="metro"] .top-bar { background: var(--background); min-height: 72px; }
+[data-look="metro"] .top-bar .title-large {
+  font-family: 'Segoe UI Light', 'Segoe UI', 'Segoe WP Light', 'Selawik Light', 'Open Sans', system-ui, sans-serif;
+  font-weight: 300;
+  font-size: 30px;
+  line-height: 38px;
+  letter-spacing: -0.5px;
+  text-transform: lowercase;
+}
+[data-look="metro"] .section-header .title-small,
+[data-look="metro"] .settings-group,
+[data-look="metro"] .cal-day-title {
+  font-weight: 300;
+  font-size: 24px;
+  letter-spacing: -0.2px;
+  text-transform: lowercase;
+}
+[data-look="metro"] .section-header { height: 48px; margin-top: 8px; }
+[data-look="metro"] .settings-group { color: var(--primary); }
+
+/* ——— Everything square ——— */
+[data-look="metro"] .card,
+[data-look="metro"] .tile,
+[data-look="metro"] .dialog,
+[data-look="metro"] .menu,
+[data-look="metro"] .sheet,
+[data-look="metro"] .side-panel,
+[data-look="metro"] .snackbar,
+[data-look="metro"] .listen-panel,
+[data-look="metro"] .chip,
+[data-look="metro"] .key,
+[data-look="metro"] .pad-key,
+[data-look="metro"] .rocker,
+[data-look="metro"] .fab,
+[data-look="metro"] .filled-btn,
+[data-look="metro"] .tonal-btn,
+[data-look="metro"] .outlined-btn,
+[data-look="metro"] .text-btn,
+[data-look="metro"] .icon-btn.filled,
+[data-look="metro"] .icon-btn.tonal,
+[data-look="metro"] .cal-event,
+[data-look="metro"] .cal-step,
+[data-look="metro"] .cal-home,
+[data-look="metro"] .timer-row,
+[data-look="metro"] .team-box,
+[data-look="metro"] .team-card,
+[data-look="metro"] .weather-card,
+[data-look="metro"] .weather-day,
+[data-look="metro"] .reply-action,
+[data-look="metro"] .list-picker,
+[data-look="metro"] .note-card,
+[data-look="metro"] .note-text,
+[data-look="metro"] .section-icon,
+[data-look="metro"] .note-icon,
+[data-look="metro"] .list-picker-icon,
+[data-look="metro"] .list-empty-icon,
+[data-look="metro"] .cal-badge,
+[data-look="metro"] .segments,
+[data-look="metro"] .segment,
+[data-look="metro"] .segment-pill,
+[data-look="metro"] .item-group,
+[data-look="metro"] .item-row,
+[data-look="metro"] .item-row:first-child,
+[data-look="metro"] .item-row:last-child,
+[data-look="metro"] .side-item,
+[data-look="metro"] .rail-item .pill,
+[data-look="metro"] .chat-bubble,
+[data-look="metro"] .field input,
+[data-look="metro"] .field textarea,
+[data-look="metro"] .field select,
+[data-look="metro"] .settings-search,
+[data-look="metro"] .add-field,
+[data-look="metro"] .chat-field,
+[data-look="metro"] .marked,
+[data-look="metro"] .swatch,
+[data-look="metro"] .progress,
+[data-look="metro"] .progress span,
+[data-look="metro"] .list-progress,
+[data-look="metro"] .list-progress span { border-radius: 0; }
+[data-look="metro"] .dialog,
+[data-look="metro"] .menu,
+[data-look="metro"] .sheet { box-shadow: none; border: 2px solid var(--outline-variant); }
+
+/* ——— Tiles: squares of the accent, the tilt under the finger and the turnstile when they arrive ——— */
+[data-look="metro"] .tile {
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  transition: background 0.2s, color 0.2s, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
+  transform-origin: center;
+}
+[data-look="metro"] .tile.on { background: var(--primary); color: #FFFFFF; }
+[data-look="metro"] .tile .name { font-weight: 400; }
+[data-look="metro"] .tile:active,
+[data-look="metro"] .card:active,
+[data-look="metro"] .cal-event:active,
+[data-look="metro"] .note-card:active,
+[data-look="metro"] .key:active,
+[data-look="metro"] .chip:active,
+[data-look="metro"] .filled-btn:active,
+[data-look="metro"] .tonal-btn:active,
+[data-look="metro"] .outlined-btn:active { transform: perspective(600px) rotateX(6deg) scale(0.96); }
+[data-look="metro"] .grid > * { animation: mt-tile-in 480ms cubic-bezier(0.1, 0.9, 0.2, 1) both; transform-origin: left center; }
+[data-look="metro"] .grid > *:nth-child(2) { animation-delay: 30ms; }
+[data-look="metro"] .grid > *:nth-child(3) { animation-delay: 60ms; }
+[data-look="metro"] .grid > *:nth-child(4) { animation-delay: 90ms; }
+[data-look="metro"] .grid > *:nth-child(5) { animation-delay: 120ms; }
+[data-look="metro"] .grid > *:nth-child(6) { animation-delay: 150ms; }
+[data-look="metro"] .grid > *:nth-child(7) { animation-delay: 180ms; }
+[data-look="metro"] .grid > *:nth-child(8) { animation-delay: 210ms; }
+[data-look="metro"] .grid > *:nth-child(n + 9) { animation-delay: 240ms; }
+@keyframes mt-tile-in { from { opacity: 0; transform: perspective(800px) rotateY(-70deg) translateX(-20px); } to { opacity: 1; transform: none; } }
+
+/* The pages swing in as a turnstile from their left edge. */
+[data-look="metro"] .tab-page { animation: mt-turn-in 380ms cubic-bezier(0.1, 0.9, 0.2, 1) both; transform-origin: left center; }
+[data-look="metro"] .tab-page.from-left { animation-name: mt-turn-in; }
+@keyframes mt-turn-in { from { opacity: 0; transform: perspective(1000px) rotateY(-60deg); } to { opacity: 1; transform: none; } }
+
+/* ——— Panels and settings: flat gray squares, icons on the accent ——— */
+[data-look="metro"] .card,
+[data-look="metro"] .cal-event,
+[data-look="metro"] .note-card,
+[data-look="metro"] .list-picker,
+[data-look="metro"] .timer-row,
+[data-look="metro"] .team-box { background: var(--surface-container); }
+[data-look="metro"] .section-icon,
+[data-look="metro"] .note-icon,
+[data-look="metro"] .list-picker-icon,
+[data-look="metro"] .list-empty-icon,
+[data-look="metro"] .cal-badge,
+[data-look="metro"] .step::before { background: var(--primary); color: #FFFFFF; }
+
+/* ——— Buttons: a frame of two pixels, the main action filled with the accent ——— */
+[data-look="metro"] .filled-btn,
+[data-look="metro"] .tonal-btn,
+[data-look="metro"] .outlined-btn {
+  border: 2px solid var(--mt-frame);
+  background: transparent;
+  color: var(--on-surface);
+  font-weight: 600;
+  min-height: 42px;
+  transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1), background 0.15s;
+}
+[data-look="metro"] .filled-btn { background: var(--primary); border-color: var(--primary); color: #FFFFFF; }
+[data-look="metro"] .tonal-btn:hover,
+[data-look="metro"] .outlined-btn:hover { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+[data-look="metro"] .filled-btn:disabled,
+[data-look="metro"] .tonal-btn:disabled { background: transparent; border-color: color-mix(in srgb, var(--on-surface) 38%, transparent); }
+[data-look="metro"] .fab.extended { background: var(--primary); color: #FFFFFF; box-shadow: none; }
+[data-look="metro"] .chip { border: 2px solid var(--mt-frame); color: var(--on-surface); height: 34px; transition: transform 0.12s; }
+[data-look="metro"] .chip.selected { background: var(--primary); border-color: var(--primary); color: #FFFFFF; }
+[data-look="metro"] .key,
+[data-look="metro"] .pad-key { background: var(--surface-container-high); }
+[data-look="metro"] .pad-key.primary,
+[data-look="metro"] .add-send,
+[data-look="metro"] .icon-btn.filled { background: var(--primary); color: #FFFFFF; }
+
+/* ——— The toggle of Windows Phone 8: a framed track that fills with the accent, a square thumb ——— */
+[data-look="metro"] .switch {
+  width: 54px;
+  height: 24px;
+  border-radius: 0;
+  border: 2px solid var(--mt-frame);
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--background);
+}
+[data-look="metro"] .switch::after {
+  top: -2px;
+  left: -2px;
+  width: 14px;
+  height: 24px;
+  border-radius: 0;
+  background: var(--mt-frame);
+  transition: left 0.18s cubic-bezier(0.2, 0, 0, 1);
+}
+[data-look="metro"] .switch.on { background: var(--primary); border-color: var(--mt-frame); }
+[data-look="metro"] .switch.on::after { left: 38px; top: -2px; width: 14px; height: 24px; background: var(--mt-frame); }
+
+/* ——— Fields: a framed white box, as on the phone ——— */
+[data-look="metro"] .field input,
+[data-look="metro"] .field textarea,
+[data-look="metro"] .field select,
+[data-look="metro"] .settings-search,
+[data-look="metro"] .add-field,
+[data-look="metro"] .chat-field { border: 2px solid var(--outline-variant); background: var(--surface-container-low); }
+[data-look="metro"] .field input:focus,
+[data-look="metro"] .field textarea:focus,
+[data-look="metro"] .chat-field:focus,
+[data-look="metro"] .settings-search:focus-within,
+[data-look="metro"] .add-field:focus-within { border: 2px solid var(--primary); background: #FFFFFF; color: #000000; }
+[data-look="metro"] .field input:focus,
+[data-look="metro"] .field textarea:focus { padding: 14px 16px; }
+[data-look="metro"] input[type="range"] { accent-color: var(--primary); }
+
+/* ——— The application bar: a flat strip, its icons in rings ——— */
+[data-look="metro"] .bottom-bar {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: none;
+  justify-content: center;
+  border-radius: 0;
+  padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+  background: var(--surface-container-high);
+  box-shadow: none;
+  transition: transform 260ms cubic-bezier(0.1, 0.9, 0.2, 1), opacity 200ms;
+}
+[data-look="metro"] .bottom-bar.hidden { transform: translateY(100%); }
+[data-look="metro"] .tab-pill { border-radius: 0; flex-direction: column; height: auto; padding: 4px 12px; gap: 2px; }
+[data-look="metro"] .tab-pill:hover { background: transparent; }
+[data-look="metro"] .tab-pill .icon {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 20px;
+  transform: none;
+  transition: background 200ms, border-color 200ms, color 200ms;
+}
+[data-look="metro"] .tab-pill .tab-label {
+  max-width: none;
+  opacity: 1;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: lowercase;
+}
+[data-look="metro"] .tab-pill.selected { background: transparent; color: var(--on-surface); }
+[data-look="metro"] .tab-pill.selected .icon { background: var(--primary); border-color: var(--primary); color: #FFFFFF; }
+[data-look="metro"] .tab-pill.selected .tab-label { margin: 0; }
+
+/* ——— Side bars on wide screens ——— */
+[data-look="metro"] .side-item.selected,
+[data-look="metro"] .rail-item.selected .pill,
+[data-look="metro"] .list-choice.selected,
+[data-look="metro"] .team-pick.selected,
+[data-look="metro"] .table-line.mine { background: var(--primary); color: #FFFFFF; }
+
+/* ——— Lists: plain rows, a square check ——— */
+[data-look="metro"] .segment-pill { background: var(--primary); }
+[data-look="metro"] .segment.selected { color: #FFFFFF; }
+[data-look="metro"] .segment.selected .segment-count { color: #FFFFFF; background: rgba(255, 255, 255, 0.25); }
+[data-look="metro"] .check-circle { border-radius: 0; border: 2px solid var(--mt-frame); }
+[data-look="metro"] .item-row.checked .check-circle { background: var(--primary); border-color: var(--primary); color: #FFFFFF; }
+[data-look="metro"] .chat-bubble.mine { background: var(--primary); color: #FFFFFF; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-look="metro"] .grid > *, [data-look="metro"] .tab-page { animation: none; }
+  [data-look="metro"] .tile:active { transform: none; }
+}

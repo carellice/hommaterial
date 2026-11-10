@@ -495,7 +495,7 @@ private fun PhraseSuggestionsDialog(
                                     },
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(corners(12.dp))
                                         .clickable(enabled = !added) { onAdd(phrase) },
                                 )
                             }
@@ -513,7 +513,7 @@ private fun PhraseSuggestionsDialog(
 
 @Composable
 internal fun SectionCard(content: @Composable () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(20.dp), content = content)
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = corners(20.dp), content = content)
 }
 
 /** The actions of one branch, in the order they run, with what moves one up, removes it or adds one. */

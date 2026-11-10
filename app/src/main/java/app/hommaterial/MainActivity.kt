@@ -46,7 +46,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.hommaterial.data.ServerSync
 import app.hommaterial.quick.EXTRA_TAB
 import app.hommaterial.ui.accentScheme
+import app.hommaterial.ui.LOOK_METRO
 import app.hommaterial.ui.LOOK_SKEUO
+import app.hommaterial.ui.LocalMetro
+import app.hommaterial.ui.MetroShapes
+import app.hommaterial.ui.MetroTypography
+import app.hommaterial.ui.metroScheme
 import app.hommaterial.ui.LocalSkeuo
 import app.hommaterial.ui.LocalSkeuoMaterials
 import app.hommaterial.ui.ScreenSurface
@@ -258,10 +263,20 @@ private fun isNight(at: Long, from: Int, to: Int): Boolean {
 private fun HommaterialTheme(dark: Boolean, accent: String, look: Int, haptics: Boolean, hapticLevel: Int, content: @Composable () -> Unit) {
     val accentColors = accentScheme(accent, dark, LocalContext.current)
     val skeuo = look == LOOK_SKEUO
-    val colors = if (skeuo) skeuoScheme(accentColors, dark) else accentColors
-    MaterialTheme(colorScheme = colors, shapes = if (skeuo) SkeuoShapes else MaterialTheme.shapes) {
+    val metro = look == LOOK_METRO
+    val colors = when {
+        skeuo -> skeuoScheme(accentColors, dark)
+        metro -> metroScheme(accentColors, dark)
+        else -> accentColors
+    }
+    MaterialTheme(
+        colorScheme = colors,
+        shapes = if (skeuo) SkeuoShapes else if (metro) MetroShapes else MaterialTheme.shapes,
+        typography = if (metro) MetroTypography else MaterialTheme.typography,
+    ) {
         CompositionLocalProvider(
             LocalSkeuo provides skeuo,
+            LocalMetro provides metro,
             LocalSkeuoMaterials provides if (skeuo) remember(dark, colors) { SkeuoMaterials(dark, colors) } else null,
         ) {
             // Painted behind every screen: what a sliding screen uncovers is the theme, not the window.

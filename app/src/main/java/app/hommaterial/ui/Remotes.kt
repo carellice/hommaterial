@@ -328,8 +328,8 @@ private fun RemoteKey(name: String, removing: Boolean, modifier: Modifier = Modi
     Surface(
         color = if (removing) colors.errorContainer else colors.secondaryContainer,
         contentColor = if (removing) colors.onErrorContainer else colors.onSecondaryContainer,
-        shape = RoundedCornerShape(18.dp),
-        modifier = modifier.height(KEY_HEIGHT).clip(RoundedCornerShape(18.dp)).clickable(onClick = onClick),
+        shape = corners(18.dp),
+        modifier = modifier.height(KEY_HEIGHT).clip(corners(18.dp)).clickable(onClick = onClick),
     ) {
         Column(
             Modifier.padding(horizontal = 6.dp),
@@ -365,8 +365,8 @@ private fun AddKey(modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier
             .height(KEY_HEIGHT)
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, colors.outlineVariant, RoundedCornerShape(18.dp))
+            .clip(corners(18.dp))
+            .border(1.dp, colors.outlineVariant, corners(18.dp))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -459,7 +459,7 @@ private fun Rocker(@StringRes label: Int, modifier: Modifier = Modifier, onPress
     Surface(
         color = colors.secondaryContainer,
         contentColor = colors.onSecondaryContainer,
-        shape = RoundedCornerShape(28.dp),
+        shape = corners(28.dp),
         modifier = modifier,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

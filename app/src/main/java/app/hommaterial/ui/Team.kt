@@ -294,7 +294,7 @@ internal fun TeamHomeCard(state: UiState, vm: HomeViewModel, onOpen: () -> Unit)
         Modifier
             .fillMaxWidth()
             .padding(top = 4.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(corners(24.dp))
             .background(brush)
             .clickable(onClick = onOpen),
     ) {
@@ -476,7 +476,7 @@ internal fun TeamScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             info.next?.let { next ->
                 item(key = "next") {
                     Block(str(if (next.state == "in") R.string.team_live else R.string.team_next)) {
-                        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        Surface(shape = corners(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                             Column(Modifier.padding(16.dp)) {
                                 Versus(next, logo = 56.dp)
                                 if (next.venue.isNotEmpty()) {
@@ -540,7 +540,7 @@ internal fun TeamScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                                 alpha = appear.coerceIn(0f, 1f)
                                 translationY = (1 - appear) * 16.dp.toPx()
                             }
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(corners(12.dp))
                             .background(if (mine) MaterialTheme.colorScheme.primaryContainer else Color.Transparent),
                     ) {
                         CompositionLocalProvider(
@@ -606,7 +606,7 @@ private fun Record(row: TableRow) {
     fun count(value: Int) = animateIntAsState(if (started) value else 0, tween(900, easing = FastOutSlowInEasing), label = "count").value
 
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = corners(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp).graphicsLayer {
             translationY = (1 - enter) * 24.dp.toPx()
@@ -672,7 +672,7 @@ private fun MatchLine(match: Match, teamId: String) {
         Text(match.home.name, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         TeamLogo(match.home.logo, 22.dp, Modifier.padding(horizontal = 6.dp))
         Box(
-            Modifier.width(54.dp).clip(RoundedCornerShape(8.dp))
+            Modifier.width(54.dp).clip(corners(8.dp))
                 .background(if (result != null) resultColor(result).copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(vertical = 4.dp),
             contentAlignment = Alignment.Center,
@@ -763,7 +763,7 @@ private fun TeamPicker(vm: HomeViewModel, current: FavoriteTeam?, onPick: (Favor
                                 Column(
                                     Modifier
                                         .padding(4.dp)
-                                        .clip(RoundedCornerShape(16.dp))
+                                        .clip(corners(16.dp))
                                         .background(if (chosen) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
                                         .clickable { onPick(team) }
                                         .padding(8.dp),

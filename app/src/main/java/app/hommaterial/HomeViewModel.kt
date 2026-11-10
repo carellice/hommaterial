@@ -188,7 +188,7 @@ data class UiState(
     val layout: Int = LAYOUT_GRID,
     /** 0 follows the phone, 1 is always light, 2 always dark. */
     val theme: Int = 0,
-    /** How the app is drawn: [app.hommaterial.ui.LOOK_MATERIAL] or [app.hommaterial.ui.LOOK_SKEUO]. */
+    /** How the app is drawn: [app.hommaterial.ui.LOOK_MATERIAL], [app.hommaterial.ui.LOOK_SKEUO] or [app.hommaterial.ui.LOOK_METRO]. */
     val look: Int = 0,
     /** The color of the app: one of the accents, or [ACCENT_AUTO] for that of the wallpaper. */
     val accent: String = ACCENT_AUTO,
@@ -1984,7 +1984,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .putBoolean("haptics", backup.optBoolean("haptics", true))
             .putInt("hapticLevel", backup.optInt("hapticLevel", HAPTIC_LEVEL_DEFAULT).coerceIn(HAPTIC_LEVEL_MIN, 100))
             .putInt("theme", backup.optInt("theme", 0).coerceIn(0, 2))
-            .putInt("look", backup.optInt("look", 0).coerceIn(0, 1))
+            .putInt("look", backup.optInt("look", 0).coerceIn(0, 2))
             .putString("accent", backup.optString("accent", ACCENT_AUTO).ifBlank { ACCENT_AUTO })
             .putInt("layout", backup.optInt("layout", 0).coerceIn(0, 1))
             .apply()

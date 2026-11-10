@@ -421,10 +421,10 @@ private fun Segments(
     val fits = segments.size <= 3
     val skeuo = LocalSkeuo.current
     Surface(
-        shape = if (skeuo) RoundedCornerShape(12.dp) else CircleShape,
+        shape = if (skeuo) corners(12.dp) else CircleShape,
         color = if (skeuo) Color.Transparent else colors.surfaceContainerHigh,
         contentColor = colors.onSurface,
-        modifier = modifier.fillMaxWidth().skeuoRaised(RoundedCornerShape(12.dp), elevation = 1.dp),
+        modifier = modifier.fillMaxWidth().skeuoRaised(corners(12.dp), elevation = 1.dp),
     ) {
         Box(
             (if (fits) Modifier.fillMaxWidth() else Modifier.horizontalScroll(rememberScrollState()))
@@ -448,7 +448,7 @@ private fun Segments(
                             },
                         )
                         .height(44.dp)
-                        .then(if (skeuo) Modifier.skeuoBadge(RoundedCornerShape(9.dp)) else Modifier.clip(CircleShape).background(colors.primary)),
+                        .then(if (skeuo) Modifier.skeuoBadge(corners(9.dp)) else Modifier.clip(CircleShape).background(colors.primary)),
                 )
             }
             Row(if (fits) Modifier.fillMaxWidth() else Modifier) {
@@ -916,7 +916,7 @@ internal fun ListsEditDialog(model: ListsModel, views: ListViews, onChange: (Lis
                     for (list in source) {
                         val checked = list.id in chosen
                         Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                            Modifier.fillMaxWidth().clip(corners(12.dp))
                                 .clickable { chosen = if (checked) chosen - list.id else chosen + list.id }
                                 .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -944,7 +944,7 @@ internal fun ListsEditDialog(model: ListsModel, views: ListViews, onChange: (Lis
                 val ids = shown.map { it.id }
                 for ((index, list) in shown.withIndex()) {
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { renaming = list }.padding(start = 8.dp),
+                        Modifier.fillMaxWidth().clip(corners(12.dp)).clickable { renaming = list }.padding(start = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
