@@ -266,3 +266,103 @@ fun parseMusic(heard: List<String>, tracks: List<Track>, queued: Boolean): Music
     }
     return null
 }
+
+/** A timer or an alarm for the clock app of the phone. */
+sealed interface ClockCommand {
+    data class Timer(val seconds: Int) : ClockCommand
+
+    data class Alarm(val hour: Int, val minute: Int) : ClockCommand
+}
+
+private val TIMER_WORDS = setOf("timer", "countdown")
+private val ALARM_WORDS = setOf("sveglia", "svegliami", "svegliarmi", "alarm", "wake")
+private val NUMBER_WORDS = mapOf(
+    "un" to 1, "uno" to 1, "una" to 1, "a" to 1, "an" to 1, "one" to 1, "due" to 2, "two" to 2, "tre" to 3, "three" to 3,
+    "quattro" to 4, "four" to 4, "cinque" to 5, "five" to 5, "sei" to 6, "six" to 6, "sette" to 7, "seven" to 7,
+    "otto" to 8, "eight" to 8, "nove" to 9, "nine" to 9, "dieci" to 10, "ten" to 10, "undici" to 11, "eleven" to 11,
+    "dodici" to 12, "twelve" to 12, "quindici" to 15, "fifteen" to 15, "venti" to 20, "twenty" to 20,
+    "trenta" to 30, "thirty" to 30, "quaranta" to 40, "forty" to 40, "cinquanta" to 50, "fifty" to 50,
+)
+private val HOUR_UNITS = setOf("ora", "ore", "hour", "hours", "h")
+private val MINUTE_UNITS = setOf("minuto", "minuti", "minute", "minutes", "min")
+private val SECOND_UNITS = setOf("secondo", "secondi", "second", "seconds", "sec", "s")
+private val EVENING_WORDS = setOf("sera", "pomeriggio", "pm", "evening", "afternoon")
+
+private fun number(word: String): Int? = word.toIntOrNull() ?: NUMBER_WORDS[word]
+
+/**
+ * "10 minuti", "un'ora e mezza", "1 ora e 20", "mezz'ora", "90 secondi": the seconds said in [words],
+ * null when none. A number with no unit after another one is of the next smaller unit.
+ */
+private fun duration(words: List<String>): Int? {
+    var total = 0
+    var found = false
+    var last = 0 // the unit of the last amount, in seconds
+    var i = 0
+    while (i < words.size) {
+        val w = words[i]
+        val next = words.getOrNull(i + 1)
+        when {
+            (w == "mezz" || w == "mezzo" || w == "mezza") && next in HOUR_UNITS -> { total += 1800; found = true; last = 3600; i++ }
+            (w == "mezza" || w == "mezzo" || w == "half") && last > 0 -> { total += last / 2; last = 0 }
+            w == "quarto" && next == "d" -> { total += 900; found = true; last = 0; i += 2 }
+            number(w) != null -> {
+                val n = number(w)!!
+                val unit = when (next) {
+                    in HOUR_UNITS -> 3600
+                    in MINUTE_UNITS -> 60
+                    in SECOND_UNITS -> 1
+                    else -> if (last == 3600) 60 else if (last == 60 && words.getOrNull(i - 1) == "e") 1 else 0
+                }
+                if (unit > 0) {
+                    total += n * unit
+                    found = true
+                    last = unit
+                    if (next in HOUR_UNITS || next in MINUTE_UNITS || next in SECOND_UNITS) i++
+                }
+            }
+        }
+        i++
+    }
+    return total.takeIf { found && it > 0 }
+}
+
+/** "alle 7", "alle 7:30", "alle 7 e mezza", "alle sette di sera", "at 6 30 pm": hour and minute, null when none. */
+private fun clockTime(words: List<String>): Pair<Int, Int>? {
+    for ((at, w) in words.withIndex()) {
+        if (w != "alle" && w != "all" && w != "at" && w != "per") continue
+        clockTime(words, words.drop(at + 1).filter { it != "le" && it != "ore" })?.let { return it }
+    }
+    return null
+}
+
+private fun clockTime(words: List<String>, rest: List<String>): Pair<Int, Int>? {
+    var hour = rest.firstOrNull()?.let(::number) ?: return null
+    val after = rest.drop(1).dropWhile { it == "e" }
+    val minute = when {
+        after.firstOrNull() == "mezza" || after.firstOrNull() == "mezzo" -> 30
+        after.firstOrNull() == "un" && after.getOrNull(1) == "quarto" -> 15
+        else -> after.firstOrNull()?.let(::number)?.takeIf { it in 0..59 } ?: 0
+    }
+    if (hour < 12 && words.any { it in EVENING_WORDS }) hour += 12
+    if (hour !in 0..23) return null
+    return hour to minute
+}
+
+/**
+ * Looks in what was [heard] for a timer ("imposta un timer di 10 minuti", "timer 5 minuti") or an
+ * alarm ("sveglia alle 7", "svegliami alle 6 e mezza"; "svegliami tra 20 minuti" is a timer). A
+ * sentence that switches something on or off is left to the devices: "spegni la sveglia" is not one.
+ */
+fun parseClock(heard: List<String>): ClockCommand? {
+    for (sentence in heard) {
+        val said = words(sentence)
+        if (said.any { it in ON_WORDS || it in OFF_WORDS }) continue
+        val timer = said.any { it in TIMER_WORDS }
+        val alarm = said.any { it in ALARM_WORDS }
+        if (!timer && !alarm) continue
+        if (alarm) clockTime(said)?.let { (h, m) -> return ClockCommand.Alarm(h, m) }
+        duration(said)?.let { return ClockCommand.Timer(it.coerceAtMost(24 * 3600)) }
+    }
+    return null
+}

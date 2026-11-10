@@ -1,11 +1,14 @@
 package app.hommaterial
 
 import app.hommaterial.voice.parseOpenApp
+import app.hommaterial.voice.parseClock
+import app.hommaterial.voice.ClockCommand
 import app.hommaterial.voice.MusicCommand
 import app.hommaterial.voice.parseMusic
 import app.hommaterial.music.MusicLibrary
 import app.hommaterial.music.MusicPlayer
 import android.content.ActivityNotFoundException
+import android.provider.AlarmClock
 import android.content.ComponentName
 import app.hommaterial.quick.Boards
 import app.hommaterial.ui.ACCENT_AUTO
@@ -790,6 +793,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
         val said = heard.firstOrNull { it.isNotBlank() } ?: return answer(VoiceResult.Unknown(""))
         if (openApp(heard)) return
+        if (setClock(heard)) return
         // What the app knows without doubt is done here: Alexa does not know the groups of the app, for one.
         if (act(heard)) return
         if (playMusic(heard)) return
@@ -834,6 +838,36 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _messages.tryEmit(said)
         return true
     }
+
+    /** Sets a timer or an alarm in the clock app of the phone, as asked in what was [heard]; false when not about it. */
+    private fun setClock(heard: List<String>): Boolean {
+        val context = getApplication<Application>()
+        val command = parseClock(heard) ?: return false
+        val (intent, said) = when (command) {
+            is ClockCommand.Timer -> Intent(AlarmClock.ACTION_SET_TIMER)
+                .putExtra(AlarmClock.EXTRA_LENGTH, command.seconds)
+                .putExtra(AlarmClock.EXTRA_SKIP_UI, true) to str(R.string.voice_timer_set, durationText(command.seconds))
+            is ClockCommand.Alarm -> Intent(AlarmClock.ACTION_SET_ALARM)
+                .putExtra(AlarmClock.EXTRA_HOUR, command.hour)
+                .putExtra(AlarmClock.EXTRA_MINUTES, command.minute)
+                .putExtra(AlarmClock.EXTRA_SKIP_UI, true) to str(R.string.voice_alarm_set, "%d:%02d".format(command.hour, command.minute))
+        }
+        try {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            _haptics.tryEmit(Haptic.Confirm)
+            _messages.tryEmit(said)
+        } catch (e: ActivityNotFoundException) {
+            _haptics.tryEmit(Haptic.Reject)
+            _messages.tryEmit(str(R.string.voice_no_clock))
+        }
+        return true
+    }
+
+    private fun durationText(seconds: Int): String = listOfNotNull(
+        (seconds / 3600).takeIf { it > 0 }?.let { "$it h" },
+        (seconds % 3600 / 60).takeIf { it > 0 }?.let { "$it min" },
+        (seconds % 60).takeIf { it > 0 }?.let { "$it s" },
+    ).joinToString(" ")
 
     /** Opens the app of the phone named after "apri" in what was [heard]; false when none is meant. */
     private fun openApp(heard: List<String>): Boolean {

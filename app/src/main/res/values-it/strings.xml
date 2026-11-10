@@ -69,6 +69,9 @@
     <string name="voice_room_off">Spegni tutto in %1$s</string>
     <string name="voice_nothing_heard">Non ho sentito niente</string>
     <string name="voice_open_app">Apro %1$s</string>
+    <string name="voice_timer_set">Timer di %1$s avviato</string>
+    <string name="voice_alarm_set">Sveglia impostata alle %1$s</string>
+    <string name="voice_no_clock">Nessuna app orologio sul telefono per timer e sveglie</string>
     <string name="voice_not_understood">Non ho capito «%1$s»</string>
     <string name="voice_unavailable">Riconoscimento vocale non disponibile su questo telefono</string>
     <string name="voice_prompt">Accendi o spegni…</string>

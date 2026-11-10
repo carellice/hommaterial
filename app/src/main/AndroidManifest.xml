@@ -17,6 +17,8 @@
     <!-- Writes the tags that switch devices, and reads them. Phones without NFC install it too. -->
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Timers and alarms asked by voice are set in the clock app of the phone. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- The calendars of the phone, when there is no home server to read Google Calendar from. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
