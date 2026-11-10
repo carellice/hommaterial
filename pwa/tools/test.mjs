@@ -11,7 +11,7 @@ process.env.DATA_DIR = (await import('node:fs')).mkdtempSync((await import('node
 const { setLanguage } = await import('../shared/i18n.js');
 setLanguage('it');
 const { switchBotSign } = await import('../server/src/switchbot.ts');
-const { parseVoice, parseExtras, parsePhrase } = await import('../web/js/voice.js');
+const { parseVoice, parseExtras, parsePhrase, completeCommand } = await import('../web/js/voice.js');
 const model = await import('../shared/model.js');
 const { remoteKind } = model;
 
@@ -410,6 +410,30 @@ await test('lists renamed and joined in the app only', () => {
   assert.deepEqual(views.applyViews(lists, v).map((l) => l.id), ['b', 'a', 'c']);
   assert.deepEqual(views.applyViews(lists, { ...v, order: ['c'] }).map((l) => l.id), ['c', 'a', 'b']);
   assert.deepEqual(views.split(v, 'x').order, ['b', 'a', 'c']);
+});
+
+await test('the chat completes names as AutocompleteTest.kt', () => {
+  const words = {
+    power: ['Luce cucina', 'Lampada', 'TV Flavio', 'Luci salotto'], run: ['Buonanotte', 'Modalità cinema'],
+    rooms: ['Cucina', 'Salotto'], lists: ['Spesa', 'Cose da fare'], phrases: ['Buonanotte a tutti'],
+    verbs: ['Accendi', 'Spegni', 'Esegui', 'Aggiungi'],
+  };
+  const labels = (typed) => completeCommand(typed, words).map((c) => c.label);
+  assert.deepEqual(labels('a').slice(0, 2), ['Accendi', 'Aggiungi']);
+  assert.equal(completeCommand('sp', words)[0].text, 'Spegni ');
+  assert.equal(completeCommand('accendi luce c', words)[0].text, 'accendi Luce cucina ');
+  assert.equal(labels('spegni fla')[0], 'TV Flavio');
+  assert.ok(labels('accendi cuc').includes('Cucina'));
+  assert.equal(labels('esegui MODALITA')[0], 'Modalità cinema');
+  assert.deepEqual(labels('esegui '), ['Buonanotte', 'Modalità cinema']);
+  assert.ok(!labels('spegni ').includes('Buonanotte'));
+  assert.deepEqual(labels('aggiungi latte alla lista '), ['Spesa', 'Cose da fare']);
+  assert.equal(completeCommand('aggiungi latte alla lista sp', words)[0].text, 'aggiungi latte alla lista Spesa ');
+  assert.deepEqual(labels('aggiungi sp'), []);
+  assert.equal(labels('buonanotte a')[0], 'Buonanotte a tutti');
+  assert.ok(!labels('accendi lampada').includes('Lampada'));
+  assert.deepEqual(labels(''), []);
+  assert.deepEqual(labels('accendi xyz'), []);
 });
 
 if (failures) {

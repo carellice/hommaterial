@@ -18,12 +18,12 @@ sealed interface VoiceResult {
 }
 
 // Italian and English are both understood, whatever the language of the phone.
-private val ON_WORDS = setOf("accendi", "accendere", "accendimi", "accenda", "attiva", "attivare", "on")
-private val OFF_WORDS = setOf(
+internal val ON_WORDS = setOf("accendi", "accendere", "accendimi", "accenda", "attiva", "attivare", "on")
+internal val OFF_WORDS = setOf(
     "spegni", "spegnere", "spegnimi", "spenga", "spengi", "disattiva", "disattivare", "off",
 )
-private val ALL_WORDS = setOf("tutto", "tutta", "tutti", "tutte", "all", "everything", "every")
-private val FILLER_WORDS = setOf(
+internal val ALL_WORDS = setOf("tutto", "tutta", "tutti", "tutte", "all", "everything", "every")
+internal val FILLER_WORDS = setOf(
     "il", "lo", "la", "i", "gli", "le", "l", "un", "uno", "una",
     "di", "del", "dello", "della", "dei", "degli", "delle", "in", "nel", "nello", "nella", "a", "al", "alla",
     "per", "favore", "piacere", "grazie", "ora", "adesso", "subito", "e",
@@ -67,7 +67,7 @@ sealed interface ExtraCommand {
     data class Group(val groupId: String, val on: Boolean) : ExtraCommand
 }
 
-private val RUN_WORDS = setOf("esegui", "avvia", "lancia", "fai", "run", "start", "launch")
+internal val RUN_WORDS = setOf("esegui", "avvia", "lancia", "fai", "run", "start", "launch")
 
 /**
  * Looks in what was [heard] for a custom device to run, or a remote or group to switch on or off. All are

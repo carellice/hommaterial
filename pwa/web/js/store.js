@@ -873,6 +873,20 @@ export async function runMacro(macro) {
 
 const voiceDevices = () => placed(state).filter((d) => !state.hidden.includes(d.applianceId));
 
+/** The names the chat with the assistant completes while they are typed, with the to-do [lists] (HomeViewModel.kt). */
+export function completionWords(lists) {
+  const devices = voiceDevices();
+  return {
+    power: [...devices.filter((d) => d.hasPower).map((d) => d.name), ...state.groups.map((g) => g.name),
+      ...shownRemotes(state).filter((r) => remoteKind(r) !== 'CUSTOM').map((r) => r.name)],
+    run: state.macros.map((m) => m.name),
+    rooms: [...new Set(devices.map((d) => d.room).filter(Boolean))],
+    lists,
+    phrases: state.macros.flatMap((m) => m.phrases ?? []),
+    verbs: str('assistant_verbs').split('|'),
+  };
+}
+
 /** Does what was [heard] when it is understood without doubt; false when it is not. */
 function act(heard) {
   const result = parseVoice(heard, voiceDevices());

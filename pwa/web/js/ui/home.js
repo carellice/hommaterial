@@ -5,6 +5,7 @@ import {
   Card, Chips, OrderRow, Field, useStore, useNow, useWidth, usePress, useBack,
 } from './common.js';
 import * as store from '../store.js';
+import { completeCommand } from '../voice.js';
 import { tileSpan } from '/shared/backup.js';
 import { str, plural, clock, dateText, degrees } from '/shared/i18n.js';
 import {
@@ -811,8 +812,16 @@ function AssistantChat() {
   const s = useStore();
   const [lines, setLinesState] = useState(chatLines);
   const [typed, setTyped] = useState('');
+  const [lists, setLists] = useState([]);
   const end = useRef(null);
   const field = useRef(null);
+  // The names of the lists are read once, as the chat opens; the rest comes from the state.
+  useEffect(() => { store.alexaLists().then((l) => setLists((l ?? []).map((it) => it.name)), () => {}); }, []);
+  const suggestions = completeCommand(typed, store.completionWords(lists));
+  const pick = (text) => {
+    setTyped(text);
+    setTimeout(() => { const f = field.current; if (f) { f.focus(); f.setSelectionRange(text.length, text.length); } });
+  };
   useEffect(() => { setTimeout(() => field.current?.focus(), 50); }, []);
   const setLines = (change) => setLinesState((old) => (chatLines = change(old)));
   const close = () => store.setChatting(false);
@@ -861,6 +870,11 @@ function AssistantChat() {
         <div ref=${end}></div>
       </div></div>
       ${/* As on Android: a rounded field with the hint inside and a filled send button. */ ''}
+      ${suggestions.length > 0 && html`
+        <div class="chat-suggestions" role="group" aria-label=${str('assistant_suggestions')}>
+          ${suggestions.map((c) => html`
+            <button key=${c.label} class="chip" onMouseDown=${(e) => e.preventDefault()} onClick=${() => pick(c.text)}>${c.label}</button>`)}
+        </div>`}
       <div class="chat-input">
         <input class="chat-field" placeholder=${str('assistant_type_hint')} aria-label=${str('assistant_type_hint')} value=${typed}
           ref=${field}

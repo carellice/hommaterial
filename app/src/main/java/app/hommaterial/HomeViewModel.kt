@@ -113,6 +113,7 @@ import app.hommaterial.ui.HAPTIC_LEVEL_DEFAULT
 import app.hommaterial.ui.HAPTIC_LEVEL_MIN
 import app.hommaterial.ui.Haptic
 import app.hommaterial.ui.assistantKeys
+import app.hommaterial.voice.CompletionWords
 import app.hommaterial.voice.ExtraCommand
 import app.hommaterial.voice.VoiceCommand
 import app.hommaterial.voice.VoiceResult
@@ -847,6 +848,21 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: ActivityNotFoundException) {
             false
         }
+    }
+
+    /** The names the chat with the assistant completes while they are typed, with the to-do [lists]. */
+    fun completionWords(lists: List<String>): CompletionWords {
+        val s = _state.value
+        val devices = voiceDevices()
+        return CompletionWords(
+            power = devices.filter { it.hasPower }.map { it.name } + s.groups.map { it.name } +
+                s.shownRemotes.filter { it.kind != RemoteKind.CUSTOM }.map { it.name },
+            run = s.macros.map { it.name },
+            rooms = devices.mapNotNull { it.room }.distinct(),
+            lists = lists,
+            phrases = s.macros.flatMap { it.phrases },
+            verbs = str(R.string.assistant_verbs).split('|'),
+        )
     }
 
     private fun voiceDevices(): List<Device> = _state.value.let { s -> s.placed.filter { it.applianceId !in s.hidden } }

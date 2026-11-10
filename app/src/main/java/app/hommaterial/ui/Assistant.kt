@@ -29,6 +29,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.window.Dialog
 import app.hommaterial.data.AgentAction
+import app.hommaterial.voice.completeCommand
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -499,16 +507,23 @@ private val chatLines = mutableStateListOf<ChatLine>()
 @Composable
 internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
     val state by vm.state.collectAsState()
-    var typed by rememberSaveable { mutableStateOf("") }
+    var typed by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     val list = rememberLazyListState()
+    // The names of the lists are read once, as the chat opens; the rest comes from the state.
+    val lists by produceState(emptyList<String>()) { value = runCatching { vm.alexaLists() }.getOrNull().orEmpty().map { it.name } }
+    val words = remember(state, lists) { vm.completionWords(lists) }
+    // Completed only with the cursor at the end, where the user is writing.
+    val suggestions = remember(typed, words) {
+        if (typed.selection.collapsed && typed.selection.end == typed.text.length) completeCommand(typed.text, words) else emptyList()
+    }
     fun close() {
         vm.dismissReply()
         onDismiss()
     }
     fun send() {
-        val text = typed.trim()
+        val text = typed.text.trim()
         if (text.isEmpty()) return
-        typed = ""
+        typed = TextFieldValue()
         chatLines += ChatLine(System.nanoTime(), mine = true, text = text)
         vm.onSpeech(listOf(text))
     }
@@ -556,6 +571,22 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
                     }
                     itemsIndexed(chatLines, key = { _, line -> line.id }) { _, line -> ChatBubble(line, state.reply?.id == line.id, vm) }
                 }
+                if (suggestions.isNotEmpty()) {
+                    val label = str(R.string.assistant_suggestions)
+                    LazyRow(
+                        Modifier.fillMaxWidth().semantics { contentDescription = label },
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(suggestions, key = { it.label }) { suggestion ->
+                            AssistChip(
+                                onClick = { typed = TextFieldValue(suggestion.text, TextRange(suggestion.text.length)) },
+                                label = { Text(suggestion.label, maxLines = 1) },
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
+                    }
+                }
                 Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = typed,
@@ -568,7 +599,7 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
                         modifier = Modifier.weight(1f),
                     )
                     Spacer(Modifier.size(8.dp))
-                    FilledIconButton(onClick = ::send, enabled = typed.isNotBlank()) {
+                    FilledIconButton(onClick = ::send, enabled = typed.text.isNotBlank()) {
                         Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = str(R.string.assistant_send))
                     }
                 }

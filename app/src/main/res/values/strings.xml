@@ -79,6 +79,8 @@
     <string name="assistant_type">Type a command</string>
     <string name="assistant_type_hint">What should I do?</string>
     <string name="assistant_chat">Chat with the assistant</string>
+    <string name="assistant_verbs">Turn on|Turn off|Run|Add</string>
+    <string name="assistant_suggestions">Suggestions</string>
     <string name="assistant_chat_clear">Clear the chat</string>
     <string name="assistant_chat_empty">Write what to do: switch a light, ask a question. The answers come here, in writing.</string>
     <string name="assistant_send">Send</string>

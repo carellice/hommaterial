@@ -136,3 +136,76 @@ function interpret(sentence, devices) {
     : { type: 'ask', heard: sentence, options: ranked.slice(0, MAX_OPTIONS).map(([c]) => c) };
   return [top[1], result];
 }
+
+// Kept the same as completeCommand in voice/Autocomplete.kt.
+const LIST_NAMES = new Set(['lista', 'liste', 'list', 'lists']);
+const LIST_WORDS = new Set([...LIST_NAMES, 'aggiungi', 'aggiungere', 'aggiungimi', 'add']);
+const TAIL_WORDS = 4;
+
+const nameWords = (text) =>
+  text.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ');
+
+/**
+ * Suggestions for what is being [typed] in the chat, as [{label, text}]: the name of a thing of the
+ * home, a room or a list that the last words begin (or of which they begin a word), chosen by the
+ * verb already typed; after a verb and a space, the things it can act on; while the first word is
+ * typed, the verbs and the voice phrases. [words] holds power, run, rooms, lists, phrases, verbs.
+ */
+export function completeCommand(typed, words, max = 6) {
+  if (!typed.trim()) return [];
+  const tokens = [...typed.matchAll(/[\p{L}\p{N}]+/gu)].map((m) => ({ start: m.index, word: nameWords(m[0]) }));
+  if (!tokens.length) return [];
+  const open = /[\p{L}\p{N}]$/u.test(typed);
+  const said = tokens.map((t) => t.word);
+  const verbAt = said.findIndex((it) => ON_WORDS.has(it) || OFF_WORDS.has(it) || RUN_WORDS.has(it) || LIST_WORDS.has(it));
+  const verb = said[verbAt];
+  const toList = said.some((it) => LIST_WORDS.has(it));
+  // A list is named only after "lista": what comes before it is what to add.
+  const listAt = said.findLastIndex((it) => LIST_NAMES.has(it));
+  const { power = [], run = [], rooms = [], lists = [], phrases = [], verbs = [] } = words;
+  const seen = new Set();
+  const pool = (toList ? lists
+    : ON_WORDS.has(verb) ? [...power, ...run, ...rooms]
+    : OFF_WORDS.has(verb) ? [...power, ...rooms]
+    : RUN_WORDS.has(verb) ? run
+    : [...power, ...run, ...rooms, ...lists])
+    .filter((n) => n.trim() && !seen.has(nameWords(n)) && seen.add(nameWords(n)));
+
+  const found = [];
+  const whole = said.join(' ');
+  if (open && verbAt < 0) {
+    for (const phrase of phrases) {
+      const p = nameWords(phrase);
+      if (p.startsWith(whole) && p !== whole) found.push([100, { label: phrase, text: phrase }]);
+    }
+  }
+  if (open && tokens.length === 1) {
+    for (const v of verbs) {
+      if (nameWords(v).startsWith(said[0]) && nameWords(v) !== said[0]) found.push([90, { label: v, text: `${v} ` }]);
+    }
+  }
+  if (open && (!toList || listAt >= 0)) {
+    // The longest run of last words that begins a name, or a word inside it, wins.
+    const from = Math.max(toList ? listAt + 1 : verbAt + 1, tokens.length - TAIL_WORDS);
+    for (const name of pool) {
+      const n = nameWords(name);
+      let best = null;
+      for (let first = from; first < tokens.length; first++) {
+        const tail = said.slice(first).join(' ');
+        if (n === tail) { best = null; break; }
+        const k = tokens.length - first;
+        const score = n.startsWith(tail) ? 3 * k + 2 : ` ${n}`.includes(` ${tail}`) ? 3 * k + 1 : 0;
+        if (score && (!best || score > best[0])) best = [score, tokens[first].start];
+      }
+      if (best) found.push([best[0], { label: name, text: `${typed.slice(0, best[1])}${name} ` }]);
+    }
+  } else if (!open && (toList ? LIST_NAMES.has(said.findLast((it) => !FILLER_WORDS.has(it)))
+    : verb != null && said.slice(verbAt + 1).every((it) => FILLER_WORDS.has(it) || ALL_WORDS.has(it)))) {
+    // "Accendi " with nothing after it yet: what it can act on.
+    for (const name of pool) found.push([0, { label: name, text: `${typed}${name} ` }]);
+  }
+  const labels = new Set();
+  return found.sort((a, b) => b[0] - a[0]).map((it) => it[1])
+    .filter((c) => c.text.trim() !== typed.trim() && !labels.has(c.label.toLowerCase()) && labels.add(c.label.toLowerCase()))
+    .slice(0, max);
+}
