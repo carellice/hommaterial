@@ -1088,5 +1088,13 @@
     <string name="music_now_playing">Now playing</string>
     <string name="music_close">Close the player</string>
     <string name="music_stop">Stop the music</string>
+    <string name="music_more">More</string>
+    <string name="music_play_next">Play next</string>
+    <string name="music_add_queue">Add to queue</string>
+    <string name="music_queued_next">“%1$s” plays next</string>
+    <string name="music_queued">“%1$s” added to the queue</string>
+    <string name="music_queue">Queue</string>
+    <string name="music_queue_empty">Nothing plays after this song</string>
+    <string name="music_remove">Remove from the queue</string>
     <string name="music_repeat">Repeat</string>
 </resources>

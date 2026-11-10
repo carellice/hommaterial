@@ -231,7 +231,12 @@ data class NowPlaying(
     val repeat: Int = Player.REPEAT_MODE_OFF,
     /** Whether something is in the queue at all. */
     val queued: Boolean = false,
+    /** What plays after this one, in the order it will play. */
+    val upcoming: List<QueueEntry> = emptyList(),
 )
+
+/** A song waiting in the queue: [index] is its place among the items of the player. */
+data class QueueEntry(val index: Int, val title: String, val artist: String)
 
 /** The music plays in [PlaybackService]; the app talks to it through a controller of its own. */
 object MusicPlayer {
@@ -253,8 +258,26 @@ object MusicPlayer {
             shuffle = player.shuffleModeEnabled,
             repeat = player.repeatMode,
             queued = player.mediaItemCount > 0,
+            upcoming = upcoming(player),
         )
     }
+
+    /** The songs after the one that plays, in the order they will play, shuffled or not. */
+    private fun upcoming(player: Player): List<QueueEntry> {
+        val timeline = player.currentTimeline
+        if (timeline.isEmpty) return emptyList()
+        val out = mutableListOf<QueueEntry>()
+        var i = player.currentMediaItemIndex
+        while (out.size < QUEUE_SHOWN) {
+            i = timeline.getNextWindowIndex(i, Player.REPEAT_MODE_OFF, player.shuffleModeEnabled)
+            if (i == C.INDEX_UNSET) break
+            val meta = player.getMediaItemAt(i).mediaMetadata
+            out += QueueEntry(i, meta.title?.toString().orEmpty(), meta.artist?.toString().orEmpty())
+        }
+        return out
+    }
+
+    private const val QUEUE_SHOWN = 300
 
     /** Runs [action] once connected to the service, which starts if it is not running. */
     private fun withController(context: Context, action: (MediaController) -> Unit) {
@@ -290,15 +313,7 @@ object MusicPlayer {
     /** Plays [tracks] from the one at [start]; mixed, from a random one, when [shuffle]. */
     fun play(context: Context, tracks: List<Track>, start: Int = 0, shuffle: Boolean = false) {
         if (tracks.isEmpty()) return
-        val items = tracks.map { t ->
-            MediaItem.Builder()
-                .setMediaId(t.uri)
-                .setUri(t.uri)
-                .setMediaMetadata(
-                    MediaMetadata.Builder().setTitle(t.title).setArtist(t.artist.ifEmpty { null }).setAlbumTitle(t.album).build(),
-                )
-                .build()
-        }
+        val items = tracks.map(::item)
         withController(context) { c ->
             c.shuffleModeEnabled = shuffle
             c.setMediaItems(items, if (shuffle && start == 0) tracks.indices.random() else start, 0)
@@ -306,6 +321,40 @@ object MusicPlayer {
             c.play()
         }
     }
+
+    private fun item(t: Track): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(t.uri)
+            .setUri(t.uri)
+            .setMediaMetadata(
+                MediaMetadata.Builder().setTitle(t.title).setArtist(t.artist.ifEmpty { null }).setAlbumTitle(t.album).build(),
+            )
+            .build()
+
+    /**
+     * Puts [track] in the queue: right after the one that plays when [next], at its end otherwise.
+     * With nothing in the queue it plays at once.
+     */
+    fun enqueue(context: Context, track: Track, next: Boolean) = withController(context) { c ->
+        if (c.mediaItemCount == 0) {
+            c.setMediaItems(listOf(item(track)))
+            c.prepare()
+            c.play()
+        } else if (next) {
+            // shortcut: in shuffle the player gives the new song a random place of its order; fine until shuffle needs "next" too.
+            c.addMediaItem(c.currentMediaItemIndex + 1, item(track))
+        } else {
+            c.addMediaItem(item(track))
+        }
+    }
+
+    /** Jumps to the song at [index] of the queue. */
+    fun playAt(context: Context, index: Int) = withController(context) {
+        it.seekToDefaultPosition(index)
+        it.play()
+    }
+
+    fun remove(context: Context, index: Int) = withController(context) { it.removeMediaItem(index) }
 
     fun toggle(context: Context) = withController(context) { if (it.isPlaying) it.pause() else it.play() }
 

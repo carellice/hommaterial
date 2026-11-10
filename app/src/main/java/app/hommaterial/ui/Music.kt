@@ -1,5 +1,22 @@
 package app.hommaterial.ui
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
+import android.util.LruCache
+import android.widget.Toast
+import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.Shape
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -250,6 +267,7 @@ fun MusicPage() {
                                 all.groupBy { it.albumKey }.entries.sortedBy { it.value.first().album.lowercase() },
                                 Icons.Outlined.Album,
                                 bottom,
+                                cover = RoundedCornerShape(10.dp),
                                 name = { it.first().album },
                                 detail = { "${artistName(it.first())} · ${plural(R.plurals.music_tracks, it.size)}" },
                             ) { opened = ALBUM + it }
@@ -257,6 +275,7 @@ fun MusicPage() {
                                 all.groupBy { artistName(it) }.entries.sortedBy { it.key.lowercase() },
                                 Icons.Outlined.Person,
                                 bottom,
+                                cover = CircleShape,
                                 name = { artistName(it.first()) },
                                 detail = { plural(R.plurals.music_tracks, it.size) },
                             ) { opened = ARTIST + it }
@@ -353,10 +372,106 @@ private fun TrackRow(track: Track, current: Boolean, playing: Boolean, modifier:
                 }
             }
         },
-        trailingContent = if (track.duration > 0) ({ Text(duration(track.duration)) }) else null,
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (track.duration > 0) Text(duration(track.duration))
+                QueueMenu(track)
+            }
+        },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = modifier.clickable(onClick = onClick),
     )
+}
+
+/** Plays a song after the one that plays, or at the end of the queue. */
+@Composable
+private fun QueueMenu(track: Track) {
+    val context = LocalContext.current
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(Icons.Outlined.MoreVert, contentDescription = str(R.string.music_more), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(str(R.string.music_play_next)) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.PlaylistPlay, contentDescription = null) },
+                onClick = {
+                    open = false
+                    MusicPlayer.enqueue(context, track, next = true)
+                    Toast.makeText(context, str(R.string.music_queued_next, track.title), Toast.LENGTH_SHORT).show()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(str(R.string.music_add_queue)) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.QueueMusic, contentDescription = null) },
+                onClick = {
+                    open = false
+                    MusicPlayer.enqueue(context, track, next = false)
+                    Toast.makeText(context, str(R.string.music_queued, track.title), Toast.LENGTH_SHORT).show()
+                },
+            )
+        }
+    }
+}
+
+/** The picture of an album, from the file of [uri], or [icon] while it is read or when it has none. */
+@Composable
+private fun Cover(uri: String, icon: ImageVector, shape: Shape) {
+    val context = LocalContext.current
+    val image by produceState(Covers.cached(uri)?.asImageBitmap(), uri) {
+        value = Covers.load(context, uri)?.asImageBitmap()
+    }
+    Box(
+        Modifier.size(48.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        Crossfade(image, label = "cover") { picture ->
+            if (picture != null) {
+                Image(picture, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+/** The pictures held in the songs, read once and kept small while the app is open. */
+private object Covers {
+    private const val SIZE = 144
+    private val found = object : LruCache<String, Bitmap>(12 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap) = value.byteCount
+    }
+    private val none = java.util.Collections.synchronizedSet(HashSet<String>())
+
+    fun cached(uri: String): Bitmap? = found.get(uri)
+
+    suspend fun load(context: Context, uri: String): Bitmap? = withContext(Dispatchers.IO) {
+        found.get(uri)?.let { return@withContext it }
+        if (uri in none) return@withContext null
+        val bytes = runCatching {
+            val retriever = MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(context, Uri.parse(uri))
+                retriever.embeddedPicture
+            } finally {
+                retriever.release()
+            }
+        }.getOrNull()
+        val bitmap = bytes?.let { small(it) }
+        if (bitmap == null) none += uri else found.put(uri, bitmap)
+        bitmap
+    }
+
+    private fun small(bytes: ByteArray): Bitmap? = runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= SIZE && bounds.outHeight / (sample * 2) >= SIZE) sample *= 2
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
+    }.getOrNull()
 }
 
 /** Three bars that dance while the music plays, and rest when it is paused. */
@@ -385,12 +500,13 @@ private fun Groups(
     groups: List<Map.Entry<String, List<Track>>>,
     icon: ImageVector,
     bottom: PaddingValues,
+    cover: Shape? = null,
     name: (List<Track>) -> String,
     detail: (List<Track>) -> String,
     onOpen: (String) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = bottom) {
-        groupItems(groups, icon, { _, list -> name(list) }, detail, onOpen)
+        groupItems(groups, icon, { _, list -> name(list) }, detail, onOpen, cover)
     }
 }
 
@@ -400,12 +516,20 @@ private fun LazyListScope.groupItems(
     name: (key: String, List<Track>) -> String,
     detail: (List<Track>) -> String,
     onOpen: (String) -> Unit,
+    cover: Shape? = null,
 ) {
     items(groups, key = { icon.name + it.key }) { (key, list) ->
         ListItem(
             headlineContent = { Text(name(key, list), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = { Text(detail(list), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            leadingContent = { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+            leadingContent = {
+                // The picture held in the first song of the album or of the artist, when there is one.
+                if (cover != null) {
+                    Cover(list.first().uri, icon, cover)
+                } else {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.animateItem().clickable { onOpen(key) },
         )
@@ -634,6 +758,8 @@ internal fun MusicFullScreen() {
         BackHandler(onBack = close)
         val drag = remember { Animatable(0f) }
         val colors = MaterialTheme.colorScheme
+        var queueOpen by remember { mutableStateOf(false) }
+        if (queueOpen) QueueSheet(now, onDismiss = { queueOpen = false })
         Box(
             Modifier
                 .fillMaxSize()
@@ -666,6 +792,9 @@ internal fun MusicFullScreen() {
                         textAlign = TextAlign.Center,
                         modifier = Modifier.weight(1f),
                     )
+                    IconButton(onClick = { queueOpen = true }) {
+                        Icon(Icons.AutoMirrored.Outlined.QueueMusic, contentDescription = str(R.string.music_queue))
+                    }
                     // Stopped, the queue is emptied and the bar of the music leaves every page.
                     IconButton(onClick = { MusicPlayer.stop(context) }) {
                         Icon(Icons.Outlined.Stop, contentDescription = str(R.string.music_stop))
@@ -794,5 +923,43 @@ internal fun MusicSettings() {
             onClick = if (scanning) null else ({ MusicLibrary.refresh(context) }),
         )
         Setting(title = str(R.string.music_folder_remove), onClick = { MusicLibrary.choose(context, null) })
+    }
+}
+
+/** What plays after this song: a touch plays one at once, the cross takes it away. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QueueSheet(now: NowPlaying, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            str(R.string.music_queue),
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+        )
+        if (now.upcoming.isEmpty()) {
+            Text(
+                str(R.string.music_queue_empty),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+            )
+        }
+        LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+            items(now.upcoming, key = { it.index }) { entry ->
+                ListItem(
+                    headlineContent = { Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = if (entry.artist.isNotEmpty()) ({ Text(entry.artist, maxLines = 1, overflow = TextOverflow.Ellipsis) }) else null,
+                    leadingContent = { Icon(Icons.Outlined.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    trailingContent = {
+                        IconButton(onClick = { MusicPlayer.remove(context, entry.index) }) {
+                            Icon(Icons.Outlined.Close, contentDescription = str(R.string.music_remove))
+                        }
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.animateItem().clickable { MusicPlayer.playAt(context, entry.index) },
+                )
+            }
+        }
     }
 }
