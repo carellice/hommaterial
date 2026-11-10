@@ -1087,5 +1087,6 @@
     <string name="music_no_results">Nothing found</string>
     <string name="music_now_playing">Now playing</string>
     <string name="music_close">Close the player</string>
+    <string name="music_stop">Stop the music</string>
     <string name="music_repeat">Repeat</string>
 </resources>

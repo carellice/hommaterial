@@ -447,6 +447,11 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
             onSelect = { tab = it },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
         )
+        MusicNowBar(
+            enabled = hasMusic,
+            visible = query == null && !typing,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = BOTTOM_NAV_SPACE),
+        )
         }
     }
     AnimatedVisibility(

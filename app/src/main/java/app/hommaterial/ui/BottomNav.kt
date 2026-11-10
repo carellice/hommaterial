@@ -35,6 +35,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.unit.Dp
+import app.hommaterial.music.MusicPlayer
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,8 +60,15 @@ const val TAB_LISTS = "lists"
 /** The page a widget asked to open, until the home takes it. */
 internal val requestedTab = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 
-/** The room the floating bar takes over the bottom of a page, for what scrolls under it to clear it. */
-internal val BOTTOM_BAR_SPACE = 88.dp
+/** The room the floating bar takes over the bottom of a page. */
+internal val BOTTOM_NAV_SPACE = 88.dp
+
+/**
+ * The room the floating bars take over the bottom of a page, for what scrolls under them to clear
+ * it: the one of the pages and, while something is in its queue, the one of the music above it.
+ */
+internal val BOTTOM_BAR_SPACE: Dp
+    @Composable get() = BOTTOM_NAV_SPACE + if (MusicPlayer.now.collectAsState().value.queued) MUSIC_BAR_SPACE else 0.dp
 
 private class Tab(val key: String, val label: Int, val icon: ImageVector, val selectedIcon: ImageVector)
 

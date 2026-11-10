@@ -311,6 +311,12 @@ object MusicPlayer {
 
     fun pause(context: Context) = withController(context) { it.pause() }
 
+    /** Stops and empties the queue: nothing is left to show. */
+    fun stop(context: Context) = withController(context) {
+        it.stop()
+        it.clearMediaItems()
+    }
+
     fun resume(context: Context) = withController(context) { it.play() }
 
     fun next(context: Context) = withController(context) { it.seekToNextMediaItem() }

@@ -71,6 +71,7 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.RepeatOne
 import androidx.compose.material.icons.outlined.Shuffle
+import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
@@ -173,7 +174,7 @@ fun MusicPage() {
 
     val all = tracks.orEmpty()
     val play = { list: List<Track>, start: Int, shuffle: Boolean -> MusicPlayer.play(context, list, start, shuffle) }
-    val bottom = PaddingValues(bottom = BOTTOM_BAR_SPACE + if (now.queued) 88.dp else 0.dp)
+    val bottom = PaddingValues(bottom = BOTTOM_BAR_SPACE)
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -265,14 +266,29 @@ fun MusicPage() {
                 }
             }
         }
-        AnimatedVisibility(
-            visible = now.queued,
-            enter = slideInVertically(spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow)) { it * 2 } + fadeIn(),
-            exit = slideOutVertically { it * 2 } + fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = BOTTOM_BAR_SPACE),
-        ) {
-            NowBar(now)
-        }
+    }
+}
+
+/** The room the bar of what plays takes above the bar of the pages. */
+internal val MUSIC_BAR_SPACE = 80.dp
+
+/**
+ * What plays, over the bar of the pages of every page of the home, until the music is stopped in
+ * the player. Only once a music folder is chosen: [enabled].
+ */
+@Composable
+internal fun MusicNowBar(enabled: Boolean, visible: Boolean, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val now by MusicPlayer.now.collectAsState()
+    // Music left playing by an earlier visit shows at once.
+    LaunchedEffect(enabled) { if (enabled) MusicPlayer.attach(context) }
+    AnimatedVisibility(
+        visible = visible && now.queued,
+        enter = slideInVertically(spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow)) { it * 2 } + fadeIn(),
+        exit = slideOutVertically { it * 2 } + fadeOut(),
+        modifier = modifier,
+    ) {
+        NowBar(now)
     }
 }
 
@@ -650,7 +666,10 @@ internal fun MusicFullScreen() {
                         textAlign = TextAlign.Center,
                         modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.size(48.dp))
+                    // Stopped, the queue is emptied and the bar of the music leaves every page.
+                    IconButton(onClick = { MusicPlayer.stop(context) }) {
+                        Icon(Icons.Outlined.Stop, contentDescription = str(R.string.music_stop))
+                    }
                 }
                 Spacer(Modifier.weight(1f))
                 // The cover breathes out while the music plays and draws back when it is paused.
