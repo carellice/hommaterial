@@ -14,8 +14,8 @@ android {
         applicationId = "app.hommaterial"
         minSdk = 26
         targetSdk = 36
-        versionCode = 68
-        versionName = "1.67"
+        versionCode = 69
+        versionName = "1.68"
     }
 
     val signingPropertiesFile = file(
