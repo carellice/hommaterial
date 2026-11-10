@@ -1783,7 +1783,11 @@ let syncTimer = null;
 export function startSync() {
   if (syncTimer) return;
   syncTimer = setInterval(() => {
-    if (document.visibilityState === 'visible') sync();
+    // The states are read anew too: switched from elsewhere (the Android app, the voice), the server
+    // would not know until its next reading, which may never come without automations or sensors.
+    if (document.visibilityState !== 'visible') return;
+    if (state.loggedIn) poll();
+    else sync();
   }, SYNC_MS);
   // A notification of the server comes with fresh states and timers to show.
   navigator.serviceWorker?.addEventListener('message', (event) => {
