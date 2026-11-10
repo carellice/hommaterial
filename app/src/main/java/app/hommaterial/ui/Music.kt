@@ -30,6 +30,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -126,6 +127,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextAlign
@@ -145,6 +147,7 @@ import app.hommaterial.str
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** The page of the music of the phone, once a folder is chosen in the settings. */
@@ -642,15 +645,18 @@ private fun SearchResults(
     }
 }
 
-/** The picture of the track, decoded once per track. */
+/**
+ * The picture of the track, decoded once per picture: every update from the player brings a new copy
+ * of the same bytes, so they are told apart by their content, or the cover would fade at each one.
+ */
 @Composable
 private fun rememberArtwork(bytes: ByteArray?): ImageBitmap? =
-    remember(bytes) { bytes?.let { runCatching { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull() } }
+    remember(bytes?.contentHashCode()) { bytes?.let { runCatching { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull() } }
 
 @Composable
 private fun Artwork(now: NowPlaying, corner: Dp, modifier: Modifier = Modifier) {
     val picture = rememberArtwork(now.artwork)
-    Crossfade(picture to now.uri, modifier.clip(RoundedCornerShape(corner)), label = "artwork") { (image, _) ->
+    Crossfade(picture, modifier.clip(RoundedCornerShape(corner)), label = "artwork") { image ->
         if (image != null) {
             Image(image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
@@ -669,6 +675,44 @@ private fun Artwork(now: NowPlaying, corner: Dp, modifier: Modifier = Modifier) 
             }
         }
     }
+}
+
+/**
+ * A swipe across changes song: to the left the next one, to the right the one before. Far enough
+ * or fast enough, what is swiped leaves on that side and comes back from the other with the new song;
+ * otherwise it springs back.
+ */
+@Composable
+private fun Modifier.swipeToSkip(): Modifier {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var offset by remember { mutableFloatStateOf(0f) }
+    var width by remember { mutableIntStateOf(0) }
+    return this
+        .onSizeChanged { width = it.width }
+        .draggable(
+            rememberDraggableState { delta -> offset += delta },
+            Orientation.Horizontal,
+            onDragStopped = { speed ->
+                val side = when {
+                    offset < -width / 4f || speed < -1500f -> -1f
+                    offset > width / 4f || speed > 1500f -> 1f
+                    else -> 0f
+                }
+                scope.launch {
+                    if (side != 0f) {
+                        animate(offset, side * width, animationSpec = tween(140)) { v, _ -> offset = v }
+                        if (side < 0f) MusicPlayer.next(context) else MusicPlayer.previousTrack(context)
+                        offset = -side * width
+                    }
+                    animate(offset, 0f, animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) { v, _ -> offset = v }
+                }
+            },
+        )
+        .graphicsLayer {
+            translationX = offset
+            alpha = if (width > 0) 1f - (abs(offset) / width).coerceAtMost(0.7f) else 1f
+        }
 }
 
 /** Where the track is, and how long it is, read again twice a second while it plays. */
@@ -712,7 +756,7 @@ private fun NowBar(now: NowPlaying) {
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
         shadowElevation = 6.dp,
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).clickable { musicExpanded.value = true },
+        modifier = Modifier.fillMaxWidth().swipeToSkip().clip(RoundedCornerShape(24.dp)).clickable { musicExpanded.value = true },
     ) {
         Column {
             Row(Modifier.padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -813,8 +857,6 @@ internal fun MusicFullScreen() {
                     label = "cover",
                 )
                 val lift by animateDpAsState(if (now.playing) 24.dp else 6.dp, label = "cover shadow")
-                // A swipe on the cover changes song: to the left the next one, to the right the one before.
-                val swipe = remember { Animatable(0f) }
                 Artwork(
                     now,
                     28.dp,
@@ -822,23 +864,7 @@ internal fun MusicFullScreen() {
                         .widthIn(max = 420.dp)
                         .fillMaxWidth()
                         .aspectRatio(1f)
-                        .draggable(
-                            rememberDraggableState { delta -> scope.launch { swipe.snapTo(swipe.value + delta) } },
-                            Orientation.Horizontal,
-                            onDragStopped = { speed ->
-                                val far = swipe.value
-                                when {
-                                    far < -200f || speed < -1500f -> MusicPlayer.next(context)
-                                    far > 200f || speed > 1500f -> MusicPlayer.previousTrack(context)
-                                }
-                                swipe.animateTo(0f, spring(dampingRatio = 0.7f))
-                            },
-                        )
-                        .graphicsLayer {
-                            translationX = swipe.value
-                            rotationZ = swipe.value / 60f
-                            alpha = 1f - (kotlin.math.abs(swipe.value) / 900f).coerceAtMost(0.5f)
-                        }
+                        .swipeToSkip()
                         .graphicsLayer { scaleX = scale; scaleY = scale }
                         .shadow(lift, RoundedCornerShape(28.dp)),
                 )
