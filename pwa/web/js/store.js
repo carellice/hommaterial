@@ -1230,15 +1230,40 @@ function localMoment(d) {
   return `${localDate(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00${offset >= 0 ? '+' : '-'}${hours}:${pad2(Math.abs(offset) % 60)}`;
 }
 
+/** The lists for the assistant, each with what is still to do in it (as listsContext in Assistant.kt). */
+export function listsContext(lists) {
+  const line = ({ name, items }) => `- "${name}": ${items == null ? '(could not be read)' : !items.length ? '(empty)'
+    : items.slice(0, 50).join('; ') + (items.length > 50 ? `; and ${items.length - 50} more` : '')}`;
+  return `Lists, with what is still to do in each:\n${lists.map(line).join('\n')}`;
+}
+
+/**
+ * The list meant by [said]: the same name, else the same once case, accents, spaces and dashes are
+ * left out, else the only one whose name holds the other (as closestList in Assistant.kt).
+ */
+export function closestList(lists, said) {
+  const key = (text) => text.normalize('NFD').replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+  const wanted = key(said);
+  if (!wanted) return null;
+  const holding = lists.filter((l) => { const n = key(l.name); return n && (n.includes(wanted) || wanted.includes(n)); });
+  return lists.find((l) => l.name.trim().toLowerCase() === said.trim().toLowerCase())
+    ?? lists.find((l) => key(l.name) === wanted)
+    ?? (holding.length === 1 ? holding[0] : null);
+}
+
 /** What the assistant is told besides the home: the lists, the agenda of the next days, the timers. Each part may be missing. */
 async function agentContext() {
   const quiet = (work) => work().catch(() => null);
   const today = new Date(new Date().setHours(0, 0, 0, 0));
   const [lists, events] = await Promise.all([
-    quiet(async () => [
-      ...(state.loggedIn ? (await get('/api/lists')).lists : []),
-      ...(state.notion.linked ? state.notionLists : []),
-    ]),
+    // Each list with what is left to do in it, read at once; a list that is slow or fails says so.
+    quiet(async () => Promise.all(((await alexaLists()) ?? []).map(async (l) => ({
+      name: l.name,
+      items: await Promise.race([
+        alexaListItems(l.id).then((items) => Array.isArray(items) ? items.filter((it) => !it.completed).map((it) => it.name) : null, () => null),
+        new Promise((done) => setTimeout(() => done(null), 4000)),
+      ]),
+    })))),
     quiet(async () => {
       if (!state.calendar.linked) return null;
       const all = (await get('/api/calendar/calendars')).calendars;
@@ -1248,7 +1273,7 @@ async function agentContext() {
     }),
   ]);
   const parts = [];
-  if (lists?.length) parts.push(`Lists: ${lists.map((l) => `"${l.name}"`).join(', ')}`);
+  if (lists?.length) parts.push(listsContext(lists));
   if (events) parts.push(`Calendar, today and the next two days:\n${events.map((e) => `- ${e.start}${e.allDay ? ' (all day)' : ` to ${e.end}`}: ${e.title}`).join('\n') || '- nothing'}`);
   const timers = [
     ...Object.entries(state.timers).map(([id, at]) => `- ${state.devices.find((d) => d.applianceId === id)?.name ?? id} switches off at ${clock(at)}`),
@@ -1316,7 +1341,7 @@ async function doAgent(actions) {
       else ok = false;
     } else if (a.do === 'list') {
       const lists = await alexaLists();
-      const list = lists?.find((l) => l.name.trim().toLowerCase() === a.list.toLowerCase());
+      const list = closestList(lists ?? [], a.list);
       if (!list) ok = false;
       else for (const item of a.items) ok = (await addAlexaListItem(list.id, item)) && ok;
     } else if (a.do === 'event') {

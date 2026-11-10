@@ -184,4 +184,21 @@ class AssistantTest {
         val line = historyLine("Termometro", listOf(Reading(0, 20.0, 50), Reading(3_600_000, 22.5, null)), day)
         assertEquals("\"Termometro\" by day (MM-DD min-max): 01-01 20.0-22.5°C 50.0-50.0%", line)
     }
+
+    @Test
+    fun listsAreFoundByALooseName() {
+        val lists = listOf("To-do list", "Spesa", "Lista dei regali")
+        assertEquals("To-do list", closestList(lists, "to-do list") { it })
+        assertEquals("To-do list", closestList(lists, "todo list") { it })
+        assertEquals("To-do list", closestList(lists, "todo") { it })
+        assertEquals("Spesa", closestList(lists, "spésa") { it })
+        assertNull(closestList(lists, "list") { it }) // two lists hold it: none is guessed
+        assertNull(closestList(lists, "") { it })
+    }
+
+    @Test
+    fun listsContextShowsWhatIsLeft() {
+        val text = listsContext(listOf("Spesa" to listOf("latte", "pane"), "To-do" to emptyList(), "Notion" to null))
+        assertEquals("Lists, with what is still to do in each:\n- \"Spesa\": latte; pane\n- \"To-do\": (empty)\n- \"Notion\": (could not be read)", text)
+    }
 }

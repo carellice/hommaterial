@@ -98,6 +98,8 @@ import app.hommaterial.quick.Quick
 import app.hommaterial.data.AgentAction
 import app.hommaterial.data.AgentPlan
 import app.hommaterial.data.agentPrompt
+import app.hommaterial.data.closestList
+import app.hommaterial.data.listsContext
 import app.hommaterial.data.parseAgent
 import app.hommaterial.data.historyLine
 import app.hommaterial.data.ACTION_MACRO
@@ -137,6 +139,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -1491,8 +1494,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun agentContext(): String {
         val s = _state.value
         val parts = mutableListOf<String>()
-        val lists = (Offline.lists().orEmpty().map { it.name } + notionStore.lists().map { it.name }).distinct()
-        if (lists.isNotEmpty()) parts += "Lists: " + lists.joinToString(", ") { "\"$it\"" }
+        // The lists with what is left to do in each, read at once; the copy kept here when slow or offline.
+        val lists = alexaLists().orEmpty().distinctBy { it.name.trim().lowercase() }
+        if (lists.isNotEmpty()) {
+            val items = coroutineScope {
+                lists.map { l -> async { withTimeoutOrNull(4_000) { alexaListItems(l.id) } ?: Offline.items(l.id) } }.map { it.await() }
+            }
+            parts += listsContext(lists.zip(items) { l, all -> l.name to all?.filter { !it.completed }?.map { it.name } })
+        }
         if (calendar.ready) {
             // Without the agenda the rest is still worth an answer.
             runCatching {
@@ -1635,7 +1644,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 "list" -> {
-                    val list = alexaLists()?.find { it.name.trim().equals(a.list, ignoreCase = true) }
+                    val list = closestList(alexaLists().orEmpty(), a.list) { it.name }
                     if (list == null) {
                         ok = false
                     } else {

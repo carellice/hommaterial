@@ -387,9 +387,10 @@ Return JSON {"reply": text for the user, "alexa": boolean, "actions": [...]}. Ac
   from now on, each time that device gets there, switch or run the target. One condition and one action only:
   for anything more (a time of day, several actions) make the closest one and say in the reply what was left out.
 - {"do":"list","list":exact name of a list,"items":[...]}: add items to a list; a dish asked for becomes its ingredients, one per item.
+A list may be said loosely (no dashes or spaces, singular for plural, another word for the same thing): it means the closest list below.
 - {"do":"event","title":text,"start":"YYYY-MM-DDTHH:MM","minutes":duration} or {"do":"event","title":text,"date":"YYYY-MM-DD"} for a whole day: add to the calendar.
 "Tutto tranne X" means each switchable device (of the room, if one is said) except X, one action each.
-Questions about the home (what is on, temperatures, how a sensor went, the agenda) are answered
+Questions about the home (what is on, temperatures, how a sensor went, the agenda, what is in a list) are answered
 in the reply from the data below, with no actions. A brief of the day: greet, then what is on, the temperatures,
 the events of today and tomorrow, the timers; six sentences at most. A note given below is summed up in a few sentences.
 Set "alexa" true, with no actions and an empty reply, only when the request is about nothing of this app

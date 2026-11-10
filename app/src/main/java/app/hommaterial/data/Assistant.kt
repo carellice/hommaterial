@@ -422,9 +422,10 @@ Return JSON {"reply": text for the user, "alexa": boolean, "actions": [...]}. Ac
   from now on, each time that device gets there, switch or run the target. One condition and one action only:
   for anything more (a time of day, several actions) make the closest one and say in the reply what was left out.
 - {"do":"list","list":exact name of a list,"items":[...]}: add items to a list; a dish asked for becomes its ingredients, one per item.
+A list may be said loosely (no dashes or spaces, singular for plural, another word for the same thing): it means the closest list below.
 - {"do":"event","title":text,"start":"YYYY-MM-DDTHH:MM","minutes":duration} or {"do":"event","title":text,"date":"YYYY-MM-DD"} for a whole day: add to the calendar.
 "Tutto tranne X" means each switchable device (of the room, if one is said) except X, one action each.
-Questions about the home (what is on, temperatures, how a sensor went, the agenda) are answered
+Questions about the home (what is on, temperatures, how a sensor went, the agenda, what is in a list) are answered
 in the reply from the data below, with no actions. A brief of the day: greet, then what is on, the temperatures,
 the events of today and tomorrow, the timers; six sentences at most. A note given below is summed up in a few sentences.
 Set "alexa" true, with no actions and an empty reply, only when the request is about nothing of this app
@@ -439,6 +440,30 @@ fun agentPrompt(catalog: AssistantCatalog, house: String, language: String, now:
     append("The things of the home:\n").append(catalog.describe(withState = true))
     if (context.isNotBlank()) append('\n').append(context.trim())
 }.trim()
+
+/** The lists for the assistant, each with what is still to do in it; null items when they could not be read. */
+fun listsContext(lists: List<Pair<String, List<String>?>>): String =
+    "Lists, with what is still to do in each:\n" + lists.joinToString("\n") { (name, items) ->
+        "- \"$name\": " + when {
+            items == null -> "(could not be read)"
+            items.isEmpty() -> "(empty)"
+            else -> items.take(50).joinToString("; ") + if (items.size > 50) "; and ${items.size - 50} more" else ""
+        }
+    }
+
+/**
+ * The list meant by [said]: the same name, else the same once case, accents, spaces and dashes
+ * are left out, else the only one whose name holds the other ("todo" for "To-do list").
+ */
+fun <T> closestList(lists: List<T>, said: String, name: (T) -> String): T? {
+    fun key(text: String) = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD)
+        .replace(Regex("""[^\p{L}\p{N}]"""), "").lowercase()
+    val wanted = key(said)
+    if (wanted.isEmpty()) return null
+    return lists.find { name(it).trim().equals(said.trim(), ignoreCase = true) }
+        ?: lists.find { key(name(it)) == wanted }
+        ?: lists.filter { key(name(it)).let { n -> n.isNotEmpty() && (wanted in n || n in wanted) } }.singleOrNull()
+}
 
 /** The readings of a sensor of the last week, a line a day: what the model needs to tell how it went. */
 fun historyLine(name: String, readings: List<Reading>, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): String {
