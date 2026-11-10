@@ -813,6 +813,8 @@ internal fun MusicFullScreen() {
                     label = "cover",
                 )
                 val lift by animateDpAsState(if (now.playing) 24.dp else 6.dp, label = "cover shadow")
+                // A swipe on the cover changes song: to the left the next one, to the right the one before.
+                val swipe = remember { Animatable(0f) }
                 Artwork(
                     now,
                     28.dp,
@@ -820,6 +822,23 @@ internal fun MusicFullScreen() {
                         .widthIn(max = 420.dp)
                         .fillMaxWidth()
                         .aspectRatio(1f)
+                        .draggable(
+                            rememberDraggableState { delta -> scope.launch { swipe.snapTo(swipe.value + delta) } },
+                            Orientation.Horizontal,
+                            onDragStopped = { speed ->
+                                val far = swipe.value
+                                when {
+                                    far < -200f || speed < -1500f -> MusicPlayer.next(context)
+                                    far > 200f || speed > 1500f -> MusicPlayer.previousTrack(context)
+                                }
+                                swipe.animateTo(0f, spring(dampingRatio = 0.7f))
+                            },
+                        )
+                        .graphicsLayer {
+                            translationX = swipe.value
+                            rotationZ = swipe.value / 60f
+                            alpha = 1f - (kotlin.math.abs(swipe.value) / 900f).coerceAtMost(0.5f)
+                        }
                         .graphicsLayer { scaleX = scale; scaleY = scale }
                         .shadow(lift, RoundedCornerShape(28.dp)),
                 )

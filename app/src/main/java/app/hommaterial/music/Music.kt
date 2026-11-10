@@ -372,6 +372,9 @@ object MusicPlayer {
 
     fun previous(context: Context) = withController(context) { it.seekToPrevious() }
 
+    /** The song before, even when this one is past its start: for a swipe on the cover. */
+    fun previousTrack(context: Context) = withController(context) { it.seekToPreviousMediaItem() }
+
     fun setShuffle(context: Context, on: Boolean) = withController(context) { it.shuffleModeEnabled = on }
 
     /** Off, then the whole queue again and again, then the same track. */
