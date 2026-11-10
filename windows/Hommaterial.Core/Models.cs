@@ -23,6 +23,8 @@ public sealed class HomeData
     public List<Device> Devices { get; set; } = [];
     public Dictionary<string, DeviceState> States { get; set; } = [];
     public string Theme { get; set; } = "Default";
+    /// <summary>"Material" or "Skeuo": how the app is drawn.</summary>
+    public string Look { get; set; } = "Material";
     public string Marketplace { get; set; } = "amazon.it";
     public DateTimeOffset? UpdatedAt { get; set; }
     public Dictionary<string, string> Rooms { get; set; } = [];

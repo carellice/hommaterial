@@ -143,9 +143,9 @@ internal fun AutomationsDialog(state: UiState, vm: HomeViewModel, onDismiss: () 
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        ScreenSurface {
             Column {
-                TopAppBar(
+                AppTopBar(
                     title = { Text(str(R.string.s_automations)) },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
@@ -175,7 +175,7 @@ internal fun AutomationsDialog(state: UiState, vm: HomeViewModel, onDismiss: () 
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 trailingContent = {
                                     Row {
-                                        Switch(
+                                        AppSwitch(
                                             checked = automation.enabled,
                                             onCheckedChange = { vm.setAutomationEnabled(automation, it) },
                                         )

@@ -114,6 +114,7 @@ public static class BackupCodec
         root["groups"] = Node(home.Groups); root["macros"] = Node(home.Macros); root["order"] = Node(home.Order);
         root["alerts"] = Node(home.Alerts); root["remoteButtons"] = Node(home.RemoteButtons); root["hiddenRemotes"] = Node(home.HiddenRemotes);
         root["theme"] = home.Theme == "Light" ? 1 : home.Theme == "Dark" ? 2 : 0;
+        root["look"] = home.Look == "Skeuo" ? 1 : 0;
         root["layout"] = home.Layout; root["language"] = home.Language;
         root["monitor"] = Node(home.Monitor);
         root["schedules"] = Node(home.Schedules.Where(s => !s.IsTimer).Select(s => new { s.Id, s.Action, s.Label, s.At, s.Hour, s.Minute, s.Days, s.Enabled }));
@@ -146,7 +147,7 @@ public static class BackupCodec
                 HiddenRemotes = Read<HashSet<string>>("hiddenRemotes", []), Monitor = Read("monitor", new MonitorSettings()),
                 Schedules = Read<List<HomeSchedule>>("schedules", []), Automations = Read<List<AutomationRule>>("automations", []),
                 Layout = Math.Clamp(Read("layout", 0), 0, 1), Language = Read("language", "auto"),
-                Theme = Read("theme", 0) switch { 1 => "Light", 2 => "Dark", _ => "Default" }, BackupExtras = (JsonObject)root.DeepClone()
+                Theme = Read("theme", 0) switch { 1 => "Light", 2 => "Dark", _ => "Default" }, Look = Read("look", 0) == 1 ? "Skeuo" : "Material", BackupExtras = (JsonObject)root.DeepClone()
             };
             if (home.Groups.Any(g => g is null || string.IsNullOrWhiteSpace(g.Id) || g.Devices is null) || home.Macros.Any(m => m is null || string.IsNullOrWhiteSpace(m.Id))) throw new JsonException();
             foreach (var s in home.Schedules)
@@ -191,7 +192,7 @@ public static class BackupCodec
         if (Has("tiles")) { target.Order = imported.Order; target.TileSpans = imported.TileSpans; }
         if (Has("alerts")) target.Alerts = imported.Alerts;
         if (Has("remotes")) target.RemoteButtons = imported.RemoteButtons;
-        if (Has("settings")) { target.Theme = imported.Theme; target.Layout = imported.Layout; target.Language = imported.Language; }
+        if (Has("settings")) { target.Theme = imported.Theme; target.Look = imported.Look; target.Layout = imported.Layout; target.Language = imported.Language; }
         if (Has("schedules")) target.Schedules = target.Schedules.Where(s => s.IsTimer).Concat(imported.Schedules).ToList();
         if (Has("automations")) { target.Automations = imported.Automations; target.Tripped.Clear(); }
         if (selected is null) target.BackupExtras = (JsonObject)imported.BackupExtras.DeepClone();

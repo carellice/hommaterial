@@ -202,7 +202,7 @@ private val REMINDERS = listOf(
 private fun ReminderChips(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         for ((minutes, label) in REMINDERS) {
-            FilterChip(selected = selected == minutes, onClick = { onSelect(minutes) }, label = { Text(str(label)) })
+            AppFilterChip(selected = selected == minutes, onClick = { onSelect(minutes) }, label = { Text(str(label)) })
         }
     }
 }
@@ -216,14 +216,14 @@ private fun MatchActions(state: UiState, vm: HomeViewModel, match: Match) {
         Modifier.fillMaxWidth().padding(top = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
-        FilledTonalButton(onClick = { choosing = true }) {
+        AppTonalButton(onClick = { choosing = true }) {
             Icon(if (state.teamReminder > 0) Icons.Outlined.NotificationsActive else Icons.Outlined.Notifications, null, Modifier.size(18.dp))
             Text(
                 str(REMINDERS.find { it.first == state.teamReminder }?.takeIf { it.first > 0 }?.second ?: R.string.team_reminder),
                 Modifier.padding(start = 8.dp),
             )
         }
-        FilledTonalButton(onClick = { vm.addMatchToCalendar(match) }) {
+        AppTonalButton(onClick = { vm.addMatchToCalendar(match) }) {
             Icon(Icons.Outlined.Event, null, Modifier.size(18.dp))
             Text(str(R.string.team_add_calendar), Modifier.padding(start = 8.dp))
         }
@@ -413,7 +413,7 @@ internal fun TeamScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     // Rows animate in the first time they show, not every time they scroll back into sight.
     val seen = remember(team.id) { mutableSetOf<String>() }
 
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    ScreenSurface {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
             item(key = "hero") {
                 Box(Modifier.fillMaxWidth().background(brush)) {
@@ -747,7 +747,7 @@ private fun TeamPicker(vm: HomeViewModel, current: FavoriteTeam?, onPick: (Favor
         text = {
             Column {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (l in LEAGUES) FilterChip(selected = league == l.id, onClick = { league = l.id }, label = { Text(l.name) })
+                    for (l in LEAGUES) AppFilterChip(selected = league == l.id, onClick = { league = l.id }, label = { Text(l.name) })
                 }
                 val teams = leagues?.find { it.first.id == league }?.second
                 Box(Modifier.fillMaxWidth().height(400.dp), contentAlignment = Alignment.Center) {

@@ -97,15 +97,13 @@ internal fun MacroTile(macro: Macro, state: UiState, vm: HomeViewModel) {
     var editing by remember { mutableStateOf(false) }
     if (editing) MacroEditor(macro, state, vm, onDismiss = { editing = false })
     val locked = LocalHomeLook.current.locked
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(20.dp),
+    TileSurface(
+        on = false,
         modifier = Modifier
             .fillMaxWidth()
-            .height(LocalHomeLook.current.tileHeight)
-            .clip(RoundedCornerShape(20.dp))
-            // Behind the PIN of the monitor the panel only runs them.
-            .combinedClickable(onClick = { vm.runMacro(macro) }, onLongClick = { if (!locked) editing = true }),
+            .height(LocalHomeLook.current.tileHeight),
+        // Behind the PIN of the monitor the panel only runs them.
+        clicks = Modifier.combinedClickable(onClick = { vm.runMacro(macro) }, onLongClick = { if (!locked) editing = true }),
     ) {
         TileBody(
             icon = Icons.Outlined.AutoAwesome,
@@ -212,9 +210,9 @@ internal fun MacroEditor(macro: Macro?, state: UiState, vm: HomeViewModel, onDis
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        ScreenSurface {
             Column {
-                TopAppBar(
+                AppTopBar(
                     title = { Text(str(if (macro == null) R.string.macro_new else R.string.macro_edit)) },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {

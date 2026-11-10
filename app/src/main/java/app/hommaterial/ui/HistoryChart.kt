@@ -59,7 +59,7 @@ fun HistoryCharts(readings: List<Reading>) {
     Column(Modifier.padding(top = 20.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (choice in SPANS) {
-                FilterChip(selected = span == choice, onClick = { span = choice }, label = { Text(str(choice.first)) })
+                AppFilterChip(selected = span == choice, onClick = { span = choice }, label = { Text(str(choice.first)) })
             }
         }
         if (shown.size < 2) {

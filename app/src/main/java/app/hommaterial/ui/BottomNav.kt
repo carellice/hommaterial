@@ -12,6 +12,10 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -102,12 +106,7 @@ internal fun FloatingBottomBar(
         enter = slideInVertically(spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow)) { it * 2 } + fadeIn(),
         exit = slideOutVertically(spring(stiffness = Spring.StiffnessMedium)) { it * 2 } + fadeOut(),
     ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            tonalElevation = 3.dp,
-            shadowElevation = 8.dp,
-        ) {
+        val tabs = @Composable {
             Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 val shown = TABS.filter { (notes || it.key != TAB_NOTES) && (music || it.key != TAB_MUSIC) }
                 // Five tabs fit on a narrow phone only a little closer together.
@@ -115,20 +114,41 @@ internal fun FloatingBottomBar(
                 for (tab in shown) TabPill(tab, tab.key == current, padding) { onSelect(tab.key) }
             }
         }
+        if (LocalSkeuo.current) {
+            Box(Modifier.skeuoTabBar(RoundedCornerShape(22.dp))) { tabs() }
+        } else {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                tonalElevation = 3.dp,
+                shadowElevation = 8.dp,
+            ) { tabs() }
+        }
     }
 }
 
 @Composable
 private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.unit.Dp, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val skeuo = LocalSkeuo.current
+    // In the black bar of the skeuomorphic look the chosen tab sits on glass, its icon lit.
     val background by animateColorAsState(
-        if (selected) colors.secondaryContainer else colors.secondaryContainer.copy(alpha = 0f),
+        when {
+            skeuo -> Color.Transparent
+            selected -> colors.secondaryContainer
+            else -> colors.secondaryContainer.copy(alpha = 0f)
+        },
         label = "tab background",
     )
     val content by animateColorAsState(
-        if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant,
+        when {
+            skeuo -> if (selected) Color.White else Color(0xFF9C9C9C)
+            selected -> colors.onSecondaryContainer
+            else -> colors.onSurfaceVariant
+        },
         label = "tab content",
     )
+    val shape = if (skeuo) RoundedCornerShape(15.dp) else CircleShape
     // The icon of the tab just chosen gives a little bounce.
     val scale by animateFloatAsState(
         if (selected) 1f else 0.92f,
@@ -138,8 +158,9 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
     Row(
         Modifier
             .height(48.dp)
-            .clip(CircleShape)
+            .clip(shape)
             .background(background)
+            .then(if (skeuo && selected) Modifier.background(SkeuoTabGlass).border(1.dp, Color(0x99000000), shape) else Modifier)
             .selectable(selected = selected, role = Role.Tab, onClick = onClick)
             .padding(horizontal = padding),
         verticalAlignment = Alignment.CenterVertically,
@@ -147,7 +168,7 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
         Icon(
             if (selected) tab.selectedIcon else tab.icon,
             contentDescription = if (selected) null else str(tab.label),
-            tint = content,
+            tint = if (skeuo && selected) skeuoLitIcon() else content,
             modifier = Modifier.size(24.dp).graphicsLayer { scaleX = scale; scaleY = scale },
         )
         AnimatedVisibility(

@@ -132,15 +132,13 @@ internal fun RemoteTile(remote: Remote, state: UiState, vm: HomeViewModel) {
             open = true
         }
     }
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(20.dp),
+    TileSurface(
+        on = false,
         modifier = Modifier
             .fillMaxWidth()
             .height(LocalHomeLook.current.tileHeight)
-            .alpha(if (remote.id in state.hiddenRemotes) 0.5f else 1f)
-            .clip(RoundedCornerShape(20.dp))
-            .clickable { open = true },
+            .alpha(if (remote.id in state.hiddenRemotes) 0.5f else 1f),
+        clicks = Modifier.clickable { open = true },
     ) {
         TileBody(
             icon = iconFor(remote),
@@ -202,7 +200,7 @@ private fun RemoteSheet(remote: Remote, state: UiState, vm: HomeViewModel, onDis
                 else -> {
                     Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         for ((label, command) in POWER_BUTTONS) {
-                            FilledTonalButton({ vm.sendRemote(remote, command) }, Modifier.weight(1f)) {
+                            AppTonalButton({ vm.sendRemote(remote, command) }, Modifier.weight(1f)) {
                                 Text(str(label))
                             }
                         }
@@ -448,7 +446,7 @@ private fun TvControls(remote: Remote, vm: HomeViewModel) {
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(12.dp))
-        FilledTonalButton(onClick = { vm.sendRemote(remote, "SetChannel", channel) }, enabled = channel.isNotEmpty()) {
+        AppTonalButton(onClick = { vm.sendRemote(remote, "SetChannel", channel) }, enabled = channel.isNotEmpty()) {
             Text(str(R.string.remote_channel_go))
         }
     }
@@ -510,10 +508,10 @@ private fun AcControls(remote: Remote, setting: AcSetting, vm: HomeViewModel) {
     Choices(R.string.ac_mode, AC_MODES, setting.mode.coerceAtLeast(1)) { adjust(setting.copy(mode = it)) }
     Choices(R.string.ac_fan_speed, AC_FANS, setting.fan) { adjust(setting.copy(fan = it)) }
     Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        FilledTonalButton(onClick = { vm.sendAc(remote, setting, on = true) }, modifier = Modifier.weight(1f)) {
+        AppTonalButton(onClick = { vm.sendAc(remote, setting, on = true) }, modifier = Modifier.weight(1f)) {
             Text(str(R.string.ac_send))
         }
-        FilledTonalButton(onClick = { vm.sendAc(remote, setting, on = false) }, modifier = Modifier.weight(1f)) {
+        AppTonalButton(onClick = { vm.sendAc(remote, setting, on = false) }, modifier = Modifier.weight(1f)) {
             Text(str(R.string.turn_off))
         }
     }
@@ -524,7 +522,7 @@ private fun Choices(@StringRes title: Int, choices: List<Pair<Int, Int>>, select
     Text(str(title), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp))
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         for ((value, label) in choices) {
-            FilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(str(label)) })
+            AppFilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(str(label)) })
         }
     }
 }

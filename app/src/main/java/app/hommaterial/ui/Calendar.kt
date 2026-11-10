@@ -250,21 +250,27 @@ internal fun CalendarPage(model: CalendarModel, state: UiState, vm: HomeViewMode
             val events = model.events
             when {
                 events == null && model.failed -> CalendarMessage(Icons.Outlined.EventBusy, str(R.string.calendar_failed)) {
-                    FilledTonalButton(onClick = { model.reload(state) }) { Text(str(R.string.calendar_retry)) }
+                    AppTonalButton(onClick = { model.reload(state) }) { Text(str(R.string.calendar_retry)) }
                 }
                 events == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 model.visible(state).isEmpty() -> CalendarMessage(Icons.Outlined.CalendarMonth, str(R.string.calendar_none_chosen)) {
-                    FilledTonalButton(onClick = onSettings) { Text(str(R.string.calendar_open_settings)) }
+                    AppTonalButton(onClick = onSettings) { Text(str(R.string.calendar_open_settings)) }
                 }
                 else -> Agenda(events, model, state, onOpen = { editing = it })
             }
         }
         if (model.defaultCalendar(state) != null) {
+            val skeuo = LocalSkeuo.current
             ExtendedFloatingActionButton(
                 onClick = { creating = true },
                 icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
                 text = { Text(str(R.string.calendar_new)) },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = BOTTOM_BAR_SPACE + 8.dp),
+                // In the skeuomorphic look a gel key in the accent.
+                containerColor = if (skeuo) Color.Transparent else androidx.compose.material3.FloatingActionButtonDefaults.containerColor,
+                contentColor = if (skeuo) Color.White else androidx.compose.material3.contentColorFor(androidx.compose.material3.FloatingActionButtonDefaults.containerColor),
+                elevation = if (skeuo) androidx.compose.material3.FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp) else androidx.compose.material3.FloatingActionButtonDefaults.elevation(),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = BOTTOM_BAR_SPACE + 8.dp)
+                    .skeuoRaised(RoundedCornerShape(16.dp), lit = true, elevation = 6.dp),
             )
         }
     }
@@ -321,10 +327,13 @@ private fun Agenda(events: List<CalendarEvent>, model: CalendarModel, state: UiS
 /** An event in the agenda: the color of its calendar, when, what and where. */
 @Composable
 private fun EventRow(event: CalendarEvent, calendar: CalendarInfo?, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val skeuo = LocalSkeuo.current
+    val shape = RoundedCornerShape(if (skeuo) 12.dp else 18.dp)
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(18.dp),
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).clickable(onClick = onClick),
+        color = if (skeuo) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = shape,
+        modifier = modifier.fillMaxWidth().skeuoPanel(shape).clip(shape).clickable(onClick = onClick),
     ) {
         Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(5.dp).fillMaxHeight().clip(CircleShape).background(colorOf(calendar)))
@@ -395,11 +404,11 @@ private fun CalendarSetupCard(state: UiState, vm: HomeViewModel, onSettings: () 
     val ask = rememberCalendarPermission(vm)
     if (ServerSync.active) {
         CalendarMessage(Icons.Outlined.CalendarMonth, str(R.string.calendar_server_title), str(R.string.calendar_server_text), modifier) {
-            FilledTonalButton(onClick = onSettings) { Text(str(R.string.calendar_open_settings)) }
+            AppTonalButton(onClick = onSettings) { Text(str(R.string.calendar_open_settings)) }
         }
     } else {
         CalendarMessage(Icons.Outlined.CalendarMonth, str(R.string.calendar_device_title), str(R.string.calendar_device_text), modifier) {
-            FilledTonalButton(onClick = ask) { Text(str(R.string.calendar_allow)) }
+            AppTonalButton(onClick = ask) { Text(str(R.string.calendar_allow)) }
         }
     }
 }
@@ -548,9 +557,9 @@ private fun EventEditor(event: CalendarEvent?, model: CalendarModel, state: UiSt
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        ScreenSurface {
             Column {
-                TopAppBar(
+                AppTopBar(
                     title = { Text(str(if (event == null) R.string.calendar_new else R.string.calendar_edit)) },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, contentDescription = str(R.string.cancel)) }
@@ -613,7 +622,7 @@ private fun EventEditor(event: CalendarEvent?, model: CalendarModel, state: UiSt
                         Column(Modifier.padding(vertical = 4.dp)) {
                             ListItem(
                                 headlineContent = { Text(str(R.string.calendar_all_day)) },
-                                trailingContent = { Switch(checked = allDay, onCheckedChange = { allDay = it; if (it) end = maxOf(end, midnight(dayOf(start).plusDays(1))) }, enabled = canEdit) },
+                                trailingContent = { AppSwitch(checked = allDay, onCheckedChange = { allDay = it; if (it) end = maxOf(end, midnight(dayOf(start).plusDays(1))) }, enabled = canEdit) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             )
                             WhenRow(str(R.string.calendar_start), start, allDay, canEdit, onDate = { picking = "startDate" }, onTime = { picking = "startTime" })
@@ -804,7 +813,7 @@ private fun GoogleSetup(state: UiState, vm: HomeViewModel) {
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
             )
-            FilledTonalButton(
+            AppTonalButton(
                 onClick = {
                     busy = true
                     scope.launch {
@@ -818,13 +827,13 @@ private fun GoogleSetup(state: UiState, vm: HomeViewModel) {
         if (state.calendarClient && !changingKeys) {
             Text(str(R.string.gcal_step6_title), style = MaterialTheme.typography.titleSmall)
             Text(str(R.string.gcal_step6_text), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            FilledTonalButton(onClick = { scope.launch { vm.googleAuthUrl()?.let(uri::openUri) } }) {
+            AppTonalButton(onClick = { scope.launch { vm.googleAuthUrl()?.let(uri::openUri) } }) {
                 Icon(Icons.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(str(R.string.gcal_sign_in))
             }
             OutlinedTextField(address, { address = it.trim() }, label = { Text(str(R.string.gcal_paste)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            FilledTonalButton(
+            AppTonalButton(
                 onClick = {
                     busy = true
                     scope.launch {

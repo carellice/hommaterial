@@ -605,7 +605,7 @@ function BrightnessSlider({ brightness, onChange }) {
   const [value, setValue] = useState(brightness);
   useEffect(() => setValue(brightness), [brightness]);
   return html`<input type="range" min="1" max="100" value=${value} aria-label=${str('brightness')}
-    onInput=${(e) => setValue(Number(e.target.value))} onChange=${(e) => onChange(Number(e.target.value))} />`;
+    style=${`--fill:${value}%`} onInput=${(e) => setValue(Number(e.target.value))} onChange=${(e) => onChange(Number(e.target.value))} />`;
 }
 
 /** The temperatures above and below which a sensor notifies. */

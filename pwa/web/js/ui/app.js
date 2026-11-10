@@ -16,12 +16,14 @@ function isNight(at, from, to) {
   return from <= to ? hour >= from && hour < to : hour >= from || hour < to;
 }
 
-function useTheme(theme, accent) {
+function useTheme(theme, accent, look) {
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 1) root.dataset.theme = 'light';
     else if (theme === 2) root.dataset.theme = 'dark';
     else delete root.dataset.theme;
+    if (look === 1) root.dataset.look = 'skeuo';
+    else delete root.dataset.look;
     // The colors of the accent, after app.css so that they win over its own.
     let style = document.getElementById('accent');
     if (!style) {
@@ -33,7 +35,7 @@ function useTheme(theme, accent) {
     // The bar of the browser takes the color of the background chosen in the app.
     const background = getComputedStyle(root).getPropertyValue('--background').trim();
     document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => meta.setAttribute('content', background));
-  }, [theme, accent]);
+  }, [theme, accent, look]);
 }
 
 /** Keeps the screen lit while [on], taking the lock again whenever the page comes back in sight. */
@@ -81,7 +83,7 @@ export function App() {
   const [resting, setResting] = useState(false);
   const touches = useRef(0);
   const [touched, setTouched] = useState(0);
-  useTheme(s.theme, s.accent);
+  useTheme(s.theme, s.accent, s.look);
   useResume(s.account, s.loggedIn);
   useEffect(() => {
     store.checkSession();

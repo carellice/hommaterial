@@ -62,6 +62,8 @@ fun OnboardingScreen(onAccept: () -> Unit) {
     var accepted by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
+        modifier = Modifier.screenTexture(),
+        containerColor = screenColor(),
         bottomBar = {
             Surface(tonalElevation = 3.dp) {
                 Column(Modifier.navigationBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp)) {
@@ -78,7 +80,7 @@ fun OnboardingScreen(onAccept: () -> Unit) {
                             modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp),
                         )
                     }
-                    Button(onClick = onAccept, enabled = accepted, modifier = Modifier.fillMaxWidth()) {
+                    AppButton(onClick = onAccept, enabled = accepted, modifier = Modifier.fillMaxWidth()) {
                         Text(str(R.string.continue_))
                     }
                 }

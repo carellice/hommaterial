@@ -188,6 +188,8 @@ data class UiState(
     val layout: Int = LAYOUT_GRID,
     /** 0 follows the phone, 1 is always light, 2 always dark. */
     val theme: Int = 0,
+    /** How the app is drawn: [app.hommaterial.ui.LOOK_MATERIAL] or [app.hommaterial.ui.LOOK_SKEUO]. */
+    val look: Int = 0,
     /** The color of the app: one of the accents, or [ACCENT_AUTO] for that of the wallpaper. */
     val accent: String = ACCENT_AUTO,
     /** How this tablet behaves as the panel of the home. */
@@ -440,6 +442,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             readAloud = settings.getBoolean("readAloud", false),
             hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
             theme = settings.getInt("theme", 0),
+            look = settings.getInt("look", 0),
             accent = settings.getString("accent", null) ?: ACCENT_AUTO,
             layout = settings.getInt("layout", LAYOUT_GRID),
             monitor = runCatching {
@@ -594,6 +597,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 marketplace = auth.marketplace,
                 autoUpdate = it.autoUpdate,
                 theme = it.theme,
+                look = it.look,
                 accent = it.accent,
                 layout = it.layout,
                 monitor = it.monitor,
@@ -1233,6 +1237,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(theme = theme) }
     }
 
+    fun setLook(look: Int) {
+        settings.edit().putInt("look", look).apply()
+        _state.update { it.copy(look = look) }
+    }
+
     fun setAccent(accent: String) {
         settings.edit().putString("accent", accent).apply()
         _state.update { it.copy(accent = accent) }
@@ -1840,6 +1849,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .put("haptics", s.haptics)
             .put("hapticLevel", s.hapticLevel)
             .put("theme", s.theme)
+            .put("look", s.look)
             .put("accent", s.accent)
             .put("remoteButtons", JSONObject(s.remoteButtons.mapValues { JSONArray(it.value) }))
             .put("hiddenRemotes", JSONArray(s.hiddenRemotes))
@@ -1974,6 +1984,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .putBoolean("haptics", backup.optBoolean("haptics", true))
             .putInt("hapticLevel", backup.optInt("hapticLevel", HAPTIC_LEVEL_DEFAULT).coerceIn(HAPTIC_LEVEL_MIN, 100))
             .putInt("theme", backup.optInt("theme", 0).coerceIn(0, 2))
+            .putInt("look", backup.optInt("look", 0).coerceIn(0, 1))
             .putString("accent", backup.optString("accent", ACCENT_AUTO).ifBlank { ACCENT_AUTO })
             .putInt("layout", backup.optInt("layout", 0).coerceIn(0, 1))
             .apply()
@@ -1998,6 +2009,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 haptics = settings.getBoolean("haptics", true),
                 hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
                 theme = settings.getInt("theme", 0),
+                look = settings.getInt("look", 0),
                 accent = settings.getString("accent", null) ?: ACCENT_AUTO,
             )
         }

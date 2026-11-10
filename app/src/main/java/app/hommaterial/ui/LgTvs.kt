@@ -196,7 +196,7 @@ internal fun LgControls(remote: Remote, state: UiState, vm: HomeViewModel) {
         )
         for ((label, icon, key) in keys) {
             // Narrow margins, as three of them share the width with their names written out.
-            FilledTonalButton(
+            AppTonalButton(
                 onClick = { press(key) },
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
@@ -221,12 +221,12 @@ internal fun LgControls(remote: Remote, state: UiState, vm: HomeViewModel) {
         }
     }
     Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        FilledTonalButton(onClick = { choosingSource = true }, modifier = Modifier.weight(1f)) {
+        AppTonalButton(onClick = { choosingSource = true }, modifier = Modifier.weight(1f)) {
             Icon(Icons.AutoMirrored.Outlined.Input, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(str(R.string.lgtv_source), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        FilledTonalButton(onClick = { typing = true }, modifier = Modifier.weight(1f)) {
+        AppTonalButton(onClick = { typing = true }, modifier = Modifier.weight(1f)) {
             Icon(Icons.Outlined.Keyboard, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(str(R.string.lgtv_keyboard), maxLines = 1, overflow = TextOverflow.Ellipsis)

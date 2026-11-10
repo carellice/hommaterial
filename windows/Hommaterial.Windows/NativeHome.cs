@@ -260,7 +260,7 @@ public sealed partial class MainWindow
             var isOn = current?.Power == true;
             var description = entry.Device is null ? status : current?.Description ?? "Stato da aggiornare";
             statusLabel.Text = (home.Favorites.Contains(entry.Key) ? "★  " : "") + description;
-            icon.Foreground = isOn ? AppPalette.Accent(button.ActualTheme) : Muted;
+            icon.Foreground = Skeuo.On ? (isOn ? new SolidColorBrush(Colors.White) : Skeuo.Engraved(button.ActualTheme == ElementTheme.Dark)) : isOn ? AppPalette.Accent(button.ActualTheme) : Muted;
             button.IsEnabled = !pending.Contains(entry.Key);
             AutomationProperties.SetName(button, entry.Name + ", " + description);
             AppPalette.ApplyCard(button, isOn, highlighted);

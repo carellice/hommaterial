@@ -126,7 +126,7 @@ internal fun NotesPage(model: NotesModel, state: UiState, vm: HomeViewModel) {
             when {
                 notes == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     if (model.failed && !model.loading) {
-                        FilledTonalButton(onClick = model::reload) { Text(str(R.string.lists_retry)) }
+                        AppTonalButton(onClick = model::reload) { Text(str(R.string.lists_retry)) }
                     } else {
                         CircularProgressIndicator()
                     }
@@ -181,9 +181,9 @@ private fun NoteDialog(note: NotionNote, ai: Boolean, vm: HomeViewModel, onDismi
         blocks = read
     }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        ScreenSurface {
             Column {
-                TopAppBar(
+                AppTopBar(
                     title = { Text(note.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, contentDescription = str(R.string.close)) }
@@ -295,7 +295,7 @@ internal fun NotionSettings(state: UiState, vm: HomeViewModel) {
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
             )
-            FilledTonalButton(
+            AppTonalButton(
                 onClick = {
                     busy = true
                     scope.launch {

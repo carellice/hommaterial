@@ -117,7 +117,7 @@ internal fun TimerChoices(canTurnOn: Boolean = false, onChoose: (minutes: Int, o
     if (canTurnOn) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for ((value, label) in listOf(false to R.string.turn_off, true to R.string.turn_on)) {
-                FilterChip(
+                AppFilterChip(
                     selected = on == value,
                     onClick = { on = value },
                     label = { Text(str(label)) },
@@ -247,9 +247,9 @@ internal fun SchedulesDialog(state: UiState, vm: HomeViewModel, onDismiss: () ->
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        ScreenSurface {
             Column {
-                TopAppBar(
+                AppTopBar(
                     title = { Text(str(R.string.s_schedules)) },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
@@ -281,7 +281,7 @@ internal fun SchedulesDialog(state: UiState, vm: HomeViewModel, onDismiss: () ->
                                     Row {
                                         // One that runs once is either waiting or deleted.
                                         if (schedule.days.isNotEmpty()) {
-                                            Switch(
+                                            AppSwitch(
                                                 checked = schedule.enabled,
                                                 onCheckedChange = { vm.setScheduleEnabled(schedule, it) },
                                             )
@@ -327,8 +327,8 @@ private fun WhenDialog(onPick: (at: Long, days: Set<Int>) -> Unit, onDismiss: ()
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(timed, onClick = { timed = true }, label = { Text(str(R.string.schedule_at_time)) })
-                    FilterChip(!timed, onClick = { timed = false }, label = { Text(str(R.string.schedule_in_a_while)) })
+                    AppFilterChip(timed, onClick = { timed = true }, label = { Text(str(R.string.schedule_at_time)) })
+                    AppFilterChip(!timed, onClick = { timed = false }, label = { Text(str(R.string.schedule_in_a_while)) })
                 }
                 if (timed) {
                     TimeInput(state = time, modifier = Modifier.padding(top = 16.dp))
@@ -338,7 +338,7 @@ private fun WhenDialog(onPick: (at: Long, days: Set<Int>) -> Unit, onDismiss: ()
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         for (day in WEEK) {
-                            FilterChip(
+                            AppFilterChip(
                                 selected = day in days,
                                 onClick = { days = if (day in days) days - day else days + day },
                                 label = { Text(dayName(day)) },
@@ -358,7 +358,7 @@ private fun WhenDialog(onPick: (at: Long, days: Set<Int>) -> Unit, onDismiss: ()
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         for (choice in IN_MINUTES) {
-                            FilterChip(
+                            AppFilterChip(
                                 selected = choice == minutes,
                                 onClick = { minutes = choice },
                                 label = { Text(duration(choice)) },

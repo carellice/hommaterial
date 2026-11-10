@@ -202,7 +202,7 @@ internal fun MonitorSettings(state: UiState, vm: HomeViewModel) {
             val ready = mapOf(REST_TEAM to (state.team != null), REST_LISTS to state.loggedIn, REST_CALENDAR to state.calendarReady)
             for ((item, label) in REST_LABELS.filter { ready[it.first] != false }) {
                 val shown = item in monitor.restItems
-                FilterChip(
+                AppFilterChip(
                     selected = shown,
                     onClick = {
                         val items = if (shown) monitor.restItems - item else monitor.restItems + item

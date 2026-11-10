@@ -263,6 +263,9 @@
     <string name="theme_auto">Automatico</string>
     <string name="theme_light">Chiaro</string>
     <string name="theme_dark">Scuro</string>
+    <string name="look">Stile</string>
+    <string name="look_material">Material</string>
+    <string name="look_skeuo">Skeuomorfismo</string>
     <string name="widget_order">Ordine</string>
     <string name="move_up">Sposta su</string>
     <string name="move_down">Sposta giù</string>
@@ -966,7 +969,7 @@
     <string name="settings_group_voice">Voce e assistente</string>
     <string name="settings_group_home">Casa e dispositivi</string>
     <string name="settings_group_system">Dati e sistema</string>
-    <string name="settings_keys_appearance">tema, scuro, chiaro, notte, colore, colori, accento, sfondo, aspetto, disposizione, griglia, elenco, lista, vibrazione, lingua, stile, grafica</string>
+    <string name="settings_keys_appearance">tema, scuro, chiaro, notte, colore, colori, accento, sfondo, aspetto, disposizione, griglia, elenco, lista, vibrazione, lingua, stile, grafica, skeuomorfismo, material</string>
     <string name="settings_keys_notifications">notifiche, avvisi, push, messaggi</string>
     <string name="settings_keys_team">calcio, squadra, tifo, club, partita, serie a, serie b, classifica, risultati, sport, pallone</string>
     <string name="settings_keys_server">server, casa, casaos, sincronizzazione, web, browser, pwa, indirizzo, collega</string>

@@ -129,6 +129,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -367,8 +369,10 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
     val alerts = state.alerts.filterKeys { it in names }
 
     Scaffold(
+        modifier = Modifier.screenTexture(),
+        containerColor = screenColor(),
         topBar = {
-            TopAppBar(
+            AppTopBar(
                 title = { Text(str(R.string.settings)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -382,7 +386,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             val update = state.update
             if (update != null) {
                 Surface(tonalElevation = 3.dp) {
-                    Button(
+                    AppButton(
                         onClick = vm::installUpdate,
                         enabled = state.updateProgress == null,
                         modifier = Modifier
@@ -424,10 +428,13 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
         @Composable
         fun Group(@StringRes title: Int) {
             if (searching) return
+            // In the skeuomorphic look, the engraved capitals of a grouped table.
+            val skeuo = LocalSkeuoMaterials.current
             Text(
-                str(title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
+                if (skeuo != null) str(title).uppercase() else str(title),
+                style = if (skeuo != null) MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, shadow = skeuo.emboss)
+                else MaterialTheme.typography.titleSmall,
+                color = if (skeuo != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(start = 8.dp, top = 12.dp),
             )
         }
@@ -448,6 +455,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             Section(R.string.s_appearance) {
                 val themes = listOf(R.string.theme_auto, R.string.theme_light, R.string.theme_dark)
                 Chips(R.string.theme, themes.mapIndexed { i, label -> i to str(label) }, state.theme, vm::setTheme)
+                Chips(R.string.look, listOf(LOOK_MATERIAL to str(R.string.look_material), LOOK_SKEUO to str(R.string.look_skeuo)), state.look, vm::setLook)
                 AccentPicker(state.accent, vm::setAccent)
                 val layouts = listOf(LAYOUT_GRID to str(R.string.layout_grid), LAYOUT_LIST to str(R.string.layout_list))
                 Chips(R.string.layout, layouts, state.layout, vm::setLayout)
@@ -897,7 +905,13 @@ private fun Accordion(
     content: @Composable () -> Unit,
 ) {
     val turn by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(20.dp)) {
+    val skeuo = LocalSkeuo.current
+    Surface(
+        color = if (skeuo) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(if (skeuo) 12.dp else 20.dp),
+        modifier = Modifier.skeuoPanel(RoundedCornerShape(12.dp)),
+    ) {
         Column {
             Row(
                 Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(horizontal = 16.dp, vertical = 12.dp),
@@ -905,10 +919,16 @@ private fun Accordion(
             ) {
                 sectionIcon(title)?.let { icon ->
                     Box(
-                        Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
+                        if (skeuo) Modifier.size(40.dp).skeuoBadge()
+                        else Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(22.dp))
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            tint = if (skeuo) Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(22.dp),
+                        )
                     }
                     Spacer(Modifier.width(16.dp))
                 }
@@ -1015,7 +1035,7 @@ internal fun Chips(
         Text(str(title), style = MaterialTheme.typography.bodyLarge)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for ((value, label) in choices) {
-                FilterChip(
+                AppFilterChip(
                     selected = value == selected,
                     onClick = {
                         haptic(Haptic.Tick)
@@ -1156,7 +1176,7 @@ internal fun Toggle(@StringRes title: Int, @StringRes text: Int, checked: Boolea
         title = str(title),
         text = str(text),
         onClick = { change(!checked) },
-        trailing = { Switch(checked = checked, onCheckedChange = change) },
+        trailing = { AppSwitch(checked = checked, onCheckedChange = change) },
     )
 }
 

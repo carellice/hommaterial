@@ -97,6 +97,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationDrawerItem
@@ -132,6 +133,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -290,8 +292,10 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
     Scaffold(
+        modifier = Modifier.screenTexture(),
+        containerColor = screenColor(),
         topBar = {
-            TopAppBar(
+            AppTopBar(
                 title = {
                     val typed = query
                     if (tab == TAB_LISTS) {
@@ -341,13 +345,13 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
                         }
                         VoiceButton(vm, correcting = state.correcting)
                         OverflowMenu(state, vm, onSettings, onArrange = { arranging = true })
-                        return@TopAppBar
+                        return@AppTopBar
                     }
                     if (query != null) {
                         IconButton(onClick = { query = null }) {
                             Icon(Icons.Outlined.Close, contentDescription = str(R.string.search_close))
                         }
-                        return@TopAppBar
+                        return@AppTopBar
                     }
                     // Without a side bar to sit in, the clock of the monitor goes up here.
                     if (clock && pages.size == 1) {
@@ -874,9 +878,9 @@ private fun Entry.Tile(state: UiState, vm: HomeViewModel) = when (this) {
 private fun ArrangeDialog(state: UiState, vm: HomeViewModel, onDismiss: () -> Unit) {
     val sections = homeSections(PAGE_ALL, state)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        ScreenSurface {
             Column {
-                TopAppBar(
+                AppTopBar(
                     title = { Text(str(R.string.arrange)) },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
@@ -996,15 +1000,12 @@ private fun GroupTile(group: Group, devices: List<Device>, state: UiState, vm: H
     val colors = MaterialTheme.colorScheme
     var details by remember { mutableStateOf(false) }
     if (details) GroupSheet(group, devices, state, vm, onDismiss = { details = false })
-    Surface(
-        color = if (lit > 0) colors.primaryContainer else colors.surfaceContainerHigh,
-        contentColor = if (lit > 0) colors.onPrimaryContainer else colors.onSurface,
-        shape = RoundedCornerShape(20.dp),
+    TileSurface(
+        on = lit > 0,
         modifier = Modifier
             .fillMaxWidth()
-            .height(LocalHomeLook.current.tileHeight)
-            .clip(RoundedCornerShape(20.dp))
-            .combinedClickable(onClick = onToggle, onLongClick = { details = true }),
+            .height(LocalHomeLook.current.tileHeight),
+        clicks = Modifier.combinedClickable(onClick = onToggle, onLongClick = { details = true }),
     ) {
         TileBody(
             icon = Icons.Outlined.Layers,
@@ -1045,10 +1046,10 @@ private fun GroupSheet(group: Group, devices: List<Device>, state: UiState, vm: 
             }
 
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FilledTonalButton(onClick = { vm.setRoomPower(devices, true) }, modifier = Modifier.weight(1f)) {
+                AppTonalButton(onClick = { vm.setRoomPower(devices, true) }, modifier = Modifier.weight(1f)) {
                     Text(str(R.string.all_on))
                 }
-                FilledTonalButton(onClick = { vm.setRoomPower(devices, false) }, modifier = Modifier.weight(1f)) {
+                AppTonalButton(onClick = { vm.setRoomPower(devices, false) }, modifier = Modifier.weight(1f)) {
                     Text(str(R.string.all_off))
                 }
             }
@@ -1112,7 +1113,7 @@ private fun GroupSheet(group: Group, devices: List<Device>, state: UiState, vm: 
                         )
                     }
                     if (id in state.busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Switch(
+                    AppSwitch(
                         checked = power == true,
                         onCheckedChange = { vm.setPower(device, it) },
                         modifier = Modifier.padding(start = 12.dp),
@@ -1203,18 +1204,18 @@ internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: St
     // As a row of a list: the icon, the name over the state, the symbols at the end.
     if (LocalHomeLook.current.list) {
         Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(listOf(22.dp, 24.dp, 30.dp)[size]))
+            Icon(icon, contentDescription = null, tint = LocalTileIcon.current.takeOrElse { LocalContentColor.current }, modifier = Modifier.size(listOf(22.dp, 24.dp, 30.dp)[size]))
             Column(Modifier.padding(horizontal = 16.dp).weight(1f)) {
                 Text(
                     name,
-                    style = if (size == 2) type.titleMedium else type.titleSmall,
+                    style = if (size == 2) type.titleMedium.onTile() else type.titleSmall.onTile(),
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     told,
-                    style = if (size == 2) type.bodyMedium else type.bodySmall,
+                    style = if (size == 2) type.bodyMedium.onTile() else type.bodySmall.onTile(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.alpha(0.75f),
@@ -1226,14 +1227,14 @@ internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: St
     }
     Column(Modifier.padding(listOf(12.dp, 14.dp, 18.dp)[size])) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(listOf(22.dp, 26.dp, 36.dp)[size]))
+            Icon(icon, contentDescription = null, tint = LocalTileIcon.current.takeOrElse { LocalContentColor.current }, modifier = Modifier.size(listOf(22.dp, 26.dp, 36.dp)[size]))
             Spacer(Modifier.weight(1f))
             Corner()
         }
         Spacer(Modifier.weight(1f))
         Text(
             name,
-            style = if (size == 2) type.titleLarge else type.titleSmall,
+            style = if (size == 2) type.titleLarge.onTile() else type.titleSmall.onTile(),
             fontWeight = FontWeight.SemiBold,
             // A compact tile has no room for a name on two lines.
             maxLines = if (size == 0) 1 else 2,
@@ -1241,7 +1242,7 @@ internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: St
         )
         Text(
             told,
-            style = if (size == 2) type.bodyLarge else type.bodySmall,
+            style = if (size == 2) type.bodyLarge.onTile() else type.bodySmall.onTile(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.alpha(0.75f),
@@ -1323,7 +1324,8 @@ private fun Title(updatedAt: Long?) {
             Text(
                 ageText(updatedAt, now),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // On the metal bar of the skeuomorphic look the words stay white, a little dimmer.
+                color = if (LocalSkeuo.current) LocalContentColor.current.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -1488,16 +1490,13 @@ private fun DeviceTile(
         }
     }
 
-    Surface(
-        color = if (on) colors.primaryContainer else colors.surfaceContainerHigh,
-        contentColor = if (on) colors.onPrimaryContainer else colors.onSurface,
-        shape = RoundedCornerShape(20.dp),
+    TileSurface(
+        on = on,
         modifier = Modifier
             .fillMaxWidth()
             .height(LocalHomeLook.current.tileHeight)
-            .alpha(if (hidden) 0.5f else 1f)
-            .clip(RoundedCornerShape(20.dp))
-            .combinedClickable(
+            .alpha(if (hidden) 0.5f else 1f),
+        clicks = Modifier.combinedClickable(
                 onClick = {
                     when {
                         // A sensor has nothing to switch: a touch opens it, as holding does.
@@ -1575,10 +1574,10 @@ private fun DeviceSheet(
 
             if (device.hasPower) {
                 Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FilledTonalButton(onClick = { vm.setPower(device, true) }, modifier = Modifier.weight(1f)) {
+                    AppTonalButton(onClick = { vm.setPower(device, true) }, modifier = Modifier.weight(1f)) {
                         Text(str(R.string.turn_on))
                     }
-                    FilledTonalButton(onClick = { vm.setPower(device, false) }, modifier = Modifier.weight(1f)) {
+                    AppTonalButton(onClick = { vm.setPower(device, false) }, modifier = Modifier.weight(1f)) {
                         Text(str(R.string.turn_off))
                     }
                 }
@@ -1782,7 +1781,7 @@ private fun AlertSettings(alert: Alert, temperature: Double?, onChange: (Alert) 
 @Composable
 private fun AlertRow(@StringRes label: Int, threshold: Double?, default: Double, onChange: (Double?) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Switch(checked = threshold != null, onCheckedChange = { onChange(if (it) default else null) })
+        AppSwitch(checked = threshold != null, onCheckedChange = { onChange(if (it) default else null) })
         Text(str(label, degrees(threshold ?: default)), modifier = Modifier.padding(start = 12.dp).weight(1f))
         if (threshold != null) {
             IconButton(onClick = { onChange(threshold - 0.5) }) {

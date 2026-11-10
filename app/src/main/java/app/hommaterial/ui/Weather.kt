@@ -207,7 +207,7 @@ internal fun WeatherSettings(state: UiState, vm: HomeViewModel) {
     Setting(
         title = str(R.string.weather_home),
         onClick = { if (state.weather == null) picking = true else vm.setWeather(null) },
-        trailing = { Switch(checked = state.weather != null, onCheckedChange = { if (it) picking = true else vm.setWeather(null) }) },
+        trailing = { AppSwitch(checked = state.weather != null, onCheckedChange = { if (it) picking = true else vm.setWeather(null) }) },
     )
     state.weather?.let { Setting(title = str(R.string.weather_place), text = it.name, onClick = { picking = true }) }
     if (picking) PlacePicker(vm, onPick = { vm.setWeather(it); picking = false }, onDismiss = { picking = false })

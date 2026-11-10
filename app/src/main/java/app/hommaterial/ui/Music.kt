@@ -317,11 +317,11 @@ internal fun MusicNowBar(enabled: Boolean, visible: Boolean, modifier: Modifier 
 @Composable
 private fun PlayButtons(list: List<Track>, play: (List<Track>, Int, Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilledTonalButton(onClick = { play(list, 0, false) }, modifier = Modifier.weight(1f)) {
+        AppTonalButton(onClick = { play(list, 0, false) }, modifier = Modifier.weight(1f)) {
             Icon(Icons.Outlined.PlayArrow, contentDescription = null)
             Text(str(R.string.music_play), Modifier.padding(start = 8.dp))
         }
-        FilledTonalButton(onClick = { play(list, 0, true) }, modifier = Modifier.weight(1f)) {
+        AppTonalButton(onClick = { play(list, 0, true) }, modifier = Modifier.weight(1f)) {
             Icon(Icons.Outlined.Shuffle, contentDescription = null)
             Text(str(R.string.music_shuffle), Modifier.padding(start = 8.dp))
         }

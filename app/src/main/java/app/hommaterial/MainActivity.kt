@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +46,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.hommaterial.data.ServerSync
 import app.hommaterial.quick.EXTRA_TAB
 import app.hommaterial.ui.accentScheme
+import app.hommaterial.ui.LOOK_SKEUO
+import app.hommaterial.ui.LocalSkeuo
+import app.hommaterial.ui.LocalSkeuoMaterials
+import app.hommaterial.ui.ScreenSurface
+import app.hommaterial.ui.SkeuoMaterials
+import app.hommaterial.ui.SkeuoShapes
+import app.hommaterial.ui.skeuoScheme
 import app.hommaterial.ui.HomeScreen
 import app.hommaterial.ui.LocalHaptics
 import app.hommaterial.ui.LoginScreen
@@ -82,9 +90,12 @@ class MainActivity : ComponentActivity() {
                 else -> isSystemInDarkTheme()
             }
             // The icons of the system bars must stay readable on the theme chosen in the app.
-            DisposableEffect(dark) {
+            val skeuo = state.look == LOOK_SKEUO
+            DisposableEffect(dark, skeuo) {
                 val style = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
-                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                // The bar on top of the skeuomorphic look is dark metal: its icons go white.
+                val top = if (skeuo) SystemBarStyle.dark(Color.TRANSPARENT) else style
+                enableEdgeToEdge(statusBarStyle = top, navigationBarStyle = style)
                 onDispose {}
             }
             // A panel on a wall stays lit, uses the whole screen and never comes back to the app:
@@ -150,7 +161,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-            HommaterialTheme(dark, state.accent, haptics = state.haptics, hapticLevel = state.hapticLevel) {
+            HommaterialTheme(dark, state.accent, state.look, haptics = state.haptics, hapticLevel = state.hapticLevel) {
                 val haptic = LocalHaptics.current
                 LaunchedEffect(vm, haptic) { vm.haptics.collect(haptic) }
                 // Every return to the app shows fresh states.
@@ -244,12 +255,19 @@ private fun isNight(at: Long, from: Int, to: Int): Boolean {
 }
 
 @Composable
-private fun HommaterialTheme(dark: Boolean, accent: String, haptics: Boolean, hapticLevel: Int, content: @Composable () -> Unit) {
-    val colors = accentScheme(accent, dark, LocalContext.current)
-    MaterialTheme(colorScheme = colors) {
-        // Painted behind every screen: what a sliding screen uncovers is the theme, not the window.
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            ProvideHaptics(haptics, hapticLevel, content)
+private fun HommaterialTheme(dark: Boolean, accent: String, look: Int, haptics: Boolean, hapticLevel: Int, content: @Composable () -> Unit) {
+    val accentColors = accentScheme(accent, dark, LocalContext.current)
+    val skeuo = look == LOOK_SKEUO
+    val colors = if (skeuo) skeuoScheme(accentColors, dark) else accentColors
+    MaterialTheme(colorScheme = colors, shapes = if (skeuo) SkeuoShapes else MaterialTheme.shapes) {
+        CompositionLocalProvider(
+            LocalSkeuo provides skeuo,
+            LocalSkeuoMaterials provides if (skeuo) remember(dark, colors) { SkeuoMaterials(dark, colors) } else null,
+        ) {
+            // Painted behind every screen: what a sliding screen uncovers is the theme, not the window.
+            ScreenSurface {
+                ProvideHaptics(haptics, hapticLevel, content)
+            }
         }
     }
 }

@@ -261,7 +261,7 @@ internal fun ListsPage(model: ListsModel, bottomSpace: Int) {
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    FilledTonalButton(onClick = model::reload, modifier = Modifier.padding(top = 16.dp)) {
+                    AppTonalButton(onClick = model::reload, modifier = Modifier.padding(top = 16.dp)) {
                         Text(str(R.string.lists_retry))
                     }
                 }
@@ -419,7 +419,13 @@ private fun Segments(
     val widths = remember { mutableStateMapOf<Int, Int>() }
     // A few lists share the width; more scroll sideways.
     val fits = segments.size <= 3
-    Surface(shape = CircleShape, color = colors.surfaceContainerHigh, modifier = modifier.fillMaxWidth()) {
+    val skeuo = LocalSkeuo.current
+    Surface(
+        shape = if (skeuo) RoundedCornerShape(12.dp) else CircleShape,
+        color = if (skeuo) Color.Transparent else colors.surfaceContainerHigh,
+        contentColor = colors.onSurface,
+        modifier = modifier.fillMaxWidth().skeuoRaised(RoundedCornerShape(12.dp), elevation = 1.dp),
+    ) {
         Box(
             (if (fits) Modifier.fillMaxWidth() else Modifier.horizontalScroll(rememberScrollState()))
                 .padding(4.dp),
@@ -442,8 +448,7 @@ private fun Segments(
                             },
                         )
                         .height(44.dp)
-                        .clip(CircleShape)
-                        .background(colors.primary),
+                        .then(if (skeuo) Modifier.skeuoBadge(RoundedCornerShape(9.dp)) else Modifier.clip(CircleShape).background(colors.primary)),
                 )
             }
             Row(if (fits) Modifier.fillMaxWidth() else Modifier) {
@@ -560,8 +565,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsGrouped(
             bottomStart = if (index == shown.lastIndex) big else small,
             bottomEnd = if (index == shown.lastIndex) big else small,
         )
-        Box(Modifier.animateItem().padding(bottom = 2.dp)) {
-            ItemRow(item, model, list, shape)
+        // In the skeuomorphic look the items are the lines of one sheet of a legal pad.
+        val skeuo = LocalSkeuo.current
+        Box(Modifier.animateItem().padding(bottom = if (skeuo) 0.dp else 2.dp)) {
+            ItemRow(item, model, list, if (skeuo) RoundedCornerShape(if (index == 0) 4.dp else 0.dp) else shape)
         }
     }
 }
@@ -625,12 +632,12 @@ private fun AddField(onAdd: (String) -> Unit) {
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { add() }),
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            focusedContainerColor = LocalSkeuoMaterials.current?.field ?: MaterialTheme.colorScheme.surfaceContainerHigh,
+            unfocusedContainerColor = LocalSkeuoMaterials.current?.field ?: MaterialTheme.colorScheme.surfaceContainerHigh,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
         ),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).skeuoInset(CircleShape),
     )
 }
 
@@ -643,10 +650,12 @@ private fun ItemRow(item: AlexaItem, model: ListsModel, list: AlexaList, shape: 
     if (editing) {
         ItemEditDialog(item.name, onSave = { model.rename(list.id, item, it) }, onDismiss = { editing = false })
     }
+    val pad = LocalSkeuoMaterials.current
     Surface(
         shape = shape,
-        color = colors.surfaceContainer,
-        modifier = Modifier.fillMaxWidth().clip(shape).clickable { editing = true },
+        color = if (pad != null) pad.paper else colors.surfaceContainer,
+        contentColor = colors.onSurface,
+        modifier = Modifier.fillMaxWidth().clip(shape).legalPadLine().clickable { editing = true },
     ) {
         Row(
             Modifier.heightIn(min = 60.dp).padding(start = 4.dp, end = 4.dp),
@@ -964,7 +973,7 @@ internal fun ListsEditDialog(model: ListsModel, views: ListViews, onChange: (Lis
                     }
                 }
                 if (source.size >= 2) {
-                    FilledTonalButton(onClick = { merging = true }, modifier = Modifier.padding(top = 12.dp)) {
+                    AppTonalButton(onClick = { merging = true }, modifier = Modifier.padding(top = 12.dp)) {
                         Icon(Icons.AutoMirrored.Outlined.MergeType, contentDescription = null, modifier = Modifier.size(18.dp))
                         Text(str(R.string.list_merge), modifier = Modifier.padding(start = 8.dp))
                     }

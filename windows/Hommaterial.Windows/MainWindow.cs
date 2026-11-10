@@ -17,6 +17,7 @@ public sealed partial class MainWindow : Window
     readonly NavigationView navigation = new() { PaneDisplayMode = NavigationViewPaneDisplayMode.Auto,
         OpenPaneLength = 244, IsBackButtonVisible = NavigationViewBackButtonVisible.Collapsed, IsSettingsVisible = true };
     readonly Grid root = new();
+    Grid titleBar = new();
     readonly StackPanel page = new() { Spacing = 22, Padding = new Thickness(32, 24, 32, 32) };
     readonly InfoBar notice = new() { IsOpen = false, IsClosable = true, Margin = new Thickness(32, 8, 32, 0) };
     readonly ProgressBar progress = new() { IsIndeterminate = true, Visibility = Visibility.Collapsed, Height = 3 };
@@ -43,7 +44,7 @@ public sealed partial class MainWindow : Window
             presenter.PreferredMinimumWidth = 520;
         root.RowDefinitions.Add(new() { Height = new GridLength(44) });
         root.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
-        var title = new Grid { Padding = new Thickness(20, 0, 0, 0) };
+        var title = titleBar = new Grid { Padding = new Thickness(20, 0, 0, 0) };
         var brand = Row(10);
         brand.VerticalAlignment = VerticalAlignment.Center;
         brand.Children.Add(new Image { Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", "Logo.png"))), Width = 22, Height = 22 });
@@ -80,7 +81,13 @@ public sealed partial class MainWindow : Window
         };
         Content = root;
         InitializeNativeFeatures(body, scroll);
+        // The demo for screenshots can show the skeuomorphic look without touching the saved settings.
+        var args = Environment.GetCommandLineArgs();
+        if (args.Contains("--demo") && args.Contains("--skeuo")) home.Look = "Skeuo";
+        if (args.Contains("--demo") && args.Contains("--dark")) home.Theme = "Dark";
         ApplyTheme();
+        // Following Windows from light to dark, the skeuomorphic look changes its materials too.
+        root.ActualThemeChanged += (_, _) => { if (Skeuo.On && !Skeuo.Refreshing) { ApplyTheme(); Render(); } };
         RebuildNavigation();
         Render();
         polling.Tick += async (_, _) => { if (!dialogOpen) { if (demo) await runtime.ReceiveAsync(home.States, DateTimeOffset.Now.ToUnixTimeMilliseconds()); else if (client.IsLoggedIn) await RefreshAsync(false); } };
@@ -126,8 +133,10 @@ public sealed partial class MainWindow : Window
         return button;
     }
     static Border Card(UIElement content) => new() { Child = content, CornerRadius = new CornerRadius(12),
-        Padding = new Thickness(20), Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
-        BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"], BorderThickness = new Thickness(1) };
+        Padding = new Thickness(20),
+        Background = Skeuo.On ? Skeuo.Panel(Skeuo.Dark) : (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
+        BorderBrush = Skeuo.On ? Skeuo.Edge(Skeuo.Dark) : (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+        BorderThickness = Skeuo.On ? new Thickness(1, 1, 1, 2) : new Thickness(1) };
     void ShowError(Exception error)
     {
         LocalStore.Log(error);
@@ -136,7 +145,11 @@ public sealed partial class MainWindow : Window
     void Message(string message, InfoBarSeverity severity = InfoBarSeverity.Informational)
     { notice.Title = ""; notice.Message = message; notice.Severity = severity; notice.IsOpen = true; }
     void Save() { if (!demo) store.Save(home); }
-    void ApplyTheme() => root.RequestedTheme = home.Theme switch { "Light" => ElementTheme.Light, "Dark" => ElementTheme.Dark, _ => ElementTheme.Default };
+    void ApplyTheme()
+    {
+        root.RequestedTheme = home.Theme switch { "Light" => ElementTheme.Light, "Dark" => ElementTheme.Dark, _ => ElementTheme.Default };
+        Skeuo.Apply(this, root, titleBar, home.Look == "Skeuo");
+    }
 
     void RebuildNavigation()
     {
@@ -307,9 +320,11 @@ public sealed partial class MainWindow : Window
     void StartDemo()
     {
         if (busy || dialogOpen || pending.Count > 0) return;
-        demo = true; home = DemoHome.Create(); selected = "all"; query = ""; search.Text = "";
+        // The demo keeps the theme and the style the window already shows.
+        demo = true; home = DemoHome.Create() is var sample ? WithLook(sample) : home; selected = "all"; query = ""; search.Text = "";
         notice.IsOpen = false; RebuildNavigation(); Render();
     }
+    HomeData WithLook(HomeData sample) { sample.Theme = home.Theme; sample.Look = home.Look; return sample; }
     async Task LeaveDemoAndLoginAsync()
     {
         if (busy || dialogOpen || pending.Count > 0) return;
@@ -365,7 +380,7 @@ public sealed partial class MainWindow : Window
             {
                 await loginClient.CompleteLoginAsync(attempt, redirect.Text.Trim());
                 store.SaveToken(pendingToken ?? throw new InvalidOperationException("Token Amazon mancante."));
-                home = new HomeData { Theme = home.Theme, Marketplace = loginClient.Market.Domain }; SyncLgRemotes();
+                home = new HomeData { Theme = home.Theme, Look = home.Look, Marketplace = loginClient.Market.Domain }; SyncLgRemotes();
                  Save(); connected = true;
                 client.Dispose(); client = NewClient(); dialog.Hide();
             }

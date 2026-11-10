@@ -1,0 +1,572 @@
+/*
+ * The skeuomorphic look, chosen in Settings → Appearance → Style: linen and leather, glossy keys,
+ * lit tiles, inset fields and a legal pad for the lists. It only applies under html[data-look="skeuo"],
+ * set by ui/app.js; the Material look of app.css stays untouched underneath.
+ * html:root wins over the :root rules the accent writes at run time (shared/accents.js).
+ */
+
+/* ——— Materials, light ——— */
+html:root[data-look="skeuo"] {
+  --background: #E4DED2;
+  --surface: #E4DED2;
+  --surface-container-lowest: #FFFEFA;
+  --surface-container-low: #F3EFE6;
+  --surface-container: #F7F4EC;
+  --surface-container-high: #EEE9DE;
+  --surface-container-highest: #E3DDD0;
+  --on-surface: #2E2820;
+  --on-background: #2E2820;
+  --on-surface-variant: #625A4E;
+  --outline: #988F81;
+  --outline-variant: #CBC3B5;
+  --secondary-container: #E6E0D3;
+  --on-secondary-container: #3A3328;
+
+  --sk-texture:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='a'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.035' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.25 0 0 0 0 0.18 0 0 0 0 0.08 0.22 0 0 0 0'/%3E%3C/filter%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.035 0.9' numOctaves='2' seed='8' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.35 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)'/%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
+  --sk-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.09 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --sk-raise: linear-gradient(180deg, #FFFFFF 0%, #F6F2EA 50%, #ECE6DA 51%, #E2DBCD 100%);
+  --sk-raise-press: linear-gradient(180deg, #D9D2C3, #E8E2D6);
+  --sk-panel: linear-gradient(180deg, #FFFEFB, #F5F1E8);
+  --sk-edge: rgba(70, 52, 25, 0.26);
+  --sk-hi: rgba(255, 255, 255, 0.95);
+  --sk-lo: rgba(0, 0, 0, 0.06);
+  --sk-drop: 0 1px 1px rgba(60, 40, 10, 0.16), 0 3px 7px rgba(60, 40, 10, 0.16);
+  --sk-emboss: 0 1px 0 rgba(255, 255, 255, 0.85);
+  --sk-engrave: #8B8274;
+  --sk-field: #FFFFFF;
+  --sk-paper: #FFFCE9;
+  --sk-rule: rgba(84, 132, 205, 0.32);
+  --sk-margin: rgba(214, 78, 78, 0.5);
+  --sk-tint: var(--primary);
+  --sk-metal: color-mix(in srgb, var(--primary) 52%, #6E7886);
+  --sk-metal-hi: color-mix(in srgb, var(--sk-metal) 55%, white);
+  --sk-gel-top: color-mix(in srgb, var(--sk-tint) 62%, white);
+  --sk-gel-mid: color-mix(in srgb, var(--sk-tint) 88%, white);
+  --sk-gel-low: color-mix(in srgb, var(--sk-tint) 82%, black);
+  --sk-gel-edge: color-mix(in srgb, var(--sk-tint) 55%, black);
+  color-scheme: light;
+}
+
+/* ——— Materials, dark: leather and gunmetal ——— */
+html:root[data-look="skeuo"][data-theme="dark"] {
+  --background: #26221E;
+  --surface: #26221E;
+  --surface-container-lowest: #1C1916;
+  --surface-container-low: #2E2A25;
+  --surface-container: #36312B;
+  --surface-container-high: #3E3832;
+  --surface-container-highest: #48423A;
+  --on-surface: #EFE8DC;
+  --on-background: #EFE8DC;
+  --on-surface-variant: #BDB3A4;
+  --outline: #85796A;
+  --outline-variant: #4D463D;
+  --secondary-container: #4A433A;
+  --on-secondary-container: #EFE8DC;
+
+  --sk-texture:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='a'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.06' numOctaves='3' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0 0 0 0'/%3E%3C/filter%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.9 0 0 0 0 0.8 0.07 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)'/%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
+  --sk-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.05 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --sk-raise: linear-gradient(180deg, #57514A 0%, #48423B 50%, #3E3832 51%, #34302A 100%);
+  --sk-raise-press: linear-gradient(180deg, #2A2621, #36312B);
+  --sk-panel: linear-gradient(180deg, #403A33, #35302A);
+  --sk-edge: rgba(0, 0, 0, 0.7);
+  --sk-hi: rgba(255, 255, 255, 0.13);
+  --sk-lo: rgba(0, 0, 0, 0.25);
+  --sk-drop: 0 1px 1px rgba(0, 0, 0, 0.5), 0 3px 8px rgba(0, 0, 0, 0.45);
+  --sk-emboss: 0 -1px 0 rgba(0, 0, 0, 0.75);
+  --sk-engrave: #A1978A;
+  --sk-field: #1E1B18;
+  --sk-paper: #3B3529;
+  --sk-rule: rgba(120, 160, 230, 0.2);
+  --sk-margin: rgba(230, 100, 100, 0.35);
+  --sk-tint: color-mix(in srgb, var(--primary-container) 70%, var(--primary));
+  --sk-metal: color-mix(in srgb, var(--primary-container) 35%, #2E3238);
+  --sk-metal-hi: color-mix(in srgb, var(--sk-metal) 80%, white);
+  --sk-gel-top: color-mix(in srgb, var(--sk-tint) 60%, white);
+  --sk-gel-mid: color-mix(in srgb, var(--sk-tint) 85%, white);
+  --sk-gel-low: color-mix(in srgb, var(--sk-tint) 70%, black);
+  --sk-gel-edge: color-mix(in srgb, var(--sk-tint) 40%, black);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  html:root[data-look="skeuo"]:not([data-theme="light"]) {
+    --background: #26221E;
+    --surface: #26221E;
+    --surface-container-lowest: #1C1916;
+    --surface-container-low: #2E2A25;
+    --surface-container: #36312B;
+    --surface-container-high: #3E3832;
+    --surface-container-highest: #48423A;
+    --on-surface: #EFE8DC;
+    --on-background: #EFE8DC;
+    --on-surface-variant: #BDB3A4;
+    --outline: #85796A;
+    --outline-variant: #4D463D;
+    --secondary-container: #4A433A;
+    --on-secondary-container: #EFE8DC;
+    --sk-texture:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='a'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.06' numOctaves='3' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0 0 0 0'/%3E%3C/filter%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.9 0 0 0 0 0.8 0.07 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)'/%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
+    --sk-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.05 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    --sk-raise: linear-gradient(180deg, #57514A 0%, #48423B 50%, #3E3832 51%, #34302A 100%);
+    --sk-raise-press: linear-gradient(180deg, #2A2621, #36312B);
+    --sk-panel: linear-gradient(180deg, #403A33, #35302A);
+    --sk-edge: rgba(0, 0, 0, 0.7);
+    --sk-hi: rgba(255, 255, 255, 0.13);
+    --sk-lo: rgba(0, 0, 0, 0.25);
+    --sk-drop: 0 1px 1px rgba(0, 0, 0, 0.5), 0 3px 8px rgba(0, 0, 0, 0.45);
+    --sk-emboss: 0 -1px 0 rgba(0, 0, 0, 0.75);
+    --sk-engrave: #A1978A;
+    --sk-field: #1E1B18;
+    --sk-paper: #3B3529;
+    --sk-rule: rgba(120, 160, 230, 0.2);
+    --sk-margin: rgba(230, 100, 100, 0.35);
+    --sk-tint: color-mix(in srgb, var(--primary-container) 70%, var(--primary));
+  --sk-metal: color-mix(in srgb, var(--primary-container) 35%, #2E3238);
+  --sk-metal-hi: color-mix(in srgb, var(--sk-metal) 80%, white);
+    --sk-gel-top: color-mix(in srgb, var(--sk-tint) 60%, white);
+    --sk-gel-mid: color-mix(in srgb, var(--sk-tint) 85%, white);
+    --sk-gel-low: color-mix(in srgb, var(--sk-tint) 70%, black);
+    --sk-gel-edge: color-mix(in srgb, var(--sk-tint) 40%, black);
+    color-scheme: dark;
+  }
+}
+
+/* ——— The table the app lies on ——— */
+[data-look="skeuo"] body,
+[data-look="skeuo"] .full-dialog,
+[data-look="skeuo"] .reply-screen,
+[data-look="skeuo"] .full-dialog.chat {
+  background-color: var(--background);
+  background-image: var(--sk-texture);
+}
+[data-look="skeuo"] body { font-family: 'Helvetica Neue', Helvetica, 'Roboto Flex', Roboto, system-ui, sans-serif; }
+[data-look="skeuo"] .section-header,
+[data-look="skeuo"] .settings-group,
+[data-look="skeuo"] .cal-day-title,
+[data-look="skeuo"] .list-header,
+[data-look="skeuo"] .team-title,
+[data-look="skeuo"] .empty { text-shadow: var(--sk-emboss); }
+[data-look="skeuo"] .section-header .title-small,
+[data-look="skeuo"] .settings-group { text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; font-size: 12px; }
+[data-look="skeuo"] .settings-group { color: var(--on-surface-variant); }
+
+/* ——— The bar on top: brushed metal tinted by the accent ——— */
+[data-look="skeuo"] .top-bar {
+  position: relative;
+  z-index: 3;
+  color: #FFFFFF;
+  background:
+    var(--sk-grain),
+    linear-gradient(180deg, var(--sk-metal-hi) 0%, var(--sk-metal) 52%, color-mix(in srgb, var(--sk-metal) 82%, black) 100%);
+  border-bottom: 1px solid color-mix(in srgb, var(--sk-metal) 45%, black);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 2px 5px rgba(0, 0, 0, 0.28);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.45);
+}
+[data-look="skeuo"] .top-bar .title-large { font-weight: 700; font-size: 20px; }
+[data-look="skeuo"] .top-bar .icon-btn { color: rgba(255, 255, 255, 0.95); }
+[data-look="skeuo"] .top-bar .icon { filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.4)); }
+[data-look="skeuo"] .top-bar .icon-btn:hover { background: rgba(255, 255, 255, 0.14); }
+[data-look="skeuo"] .top-bar input.search { color: #FFFFFF; }
+[data-look="skeuo"] .top-bar input.search::placeholder { color: rgba(255, 255, 255, 0.7); }
+[data-look="skeuo"] .top-bar .faint { color: rgba(255, 255, 255, 0.78); }
+
+/* ——— Tiles: ivory keys that light up ——— */
+[data-look="skeuo"] .tile {
+  background: var(--sk-raise);
+  color: var(--on-surface);
+  border: 1px solid var(--sk-edge);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 var(--sk-hi), inset 0 -1px 0 var(--sk-lo), var(--sk-drop);
+  text-shadow: var(--sk-emboss);
+  transition: background 0.25s, color 0.25s, box-shadow 0.25s, transform 0.1s;
+}
+[data-look="skeuo"] .tile .main-icon { color: var(--sk-engrave); filter: drop-shadow(var(--sk-emboss)); transition: color 0.25s, filter 0.25s; }
+[data-look="skeuo"] .tile:active {
+  transform: translateY(1px);
+  background: var(--sk-raise-press);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.28), 0 1px 0 var(--sk-hi);
+}
+[data-look="skeuo"] .tile.on {
+  background:
+    radial-gradient(120% 90% at 20% 0%, rgba(255, 255, 255, 0.35), transparent 60%),
+    linear-gradient(180deg, var(--sk-gel-top) 0%, var(--sk-gel-mid) 50%, var(--sk-tint) 51%, var(--sk-gel-low) 100%);
+  color: #FFFFFF;
+  border-color: var(--sk-gel-edge);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.38);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 0 14px rgba(255, 255, 255, 0.14), 0 0 14px color-mix(in srgb, var(--sk-tint) 40%, transparent), var(--sk-drop);
+}
+[data-look="skeuo"] .tile.on .main-icon {
+  color: #FFFFFF;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85)) drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+[data-look="skeuo"] .tile.on .corner { opacity: 0.85; color: #FFFFFF; }
+[data-look="skeuo"] .tile.on:active { background: linear-gradient(180deg, var(--sk-gel-low), var(--sk-tint)); box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4); }
+[data-look="skeuo"] .marked { outline-color: var(--primary); border-radius: 16px; }
+
+/* ——— Panels: grouped tables, cards and boxes ——— */
+[data-look="skeuo"] .card,
+[data-look="skeuo"] .cal-event,
+[data-look="skeuo"] .cal-step,
+[data-look="skeuo"] .cal-home,
+[data-look="skeuo"] .timer-row,
+[data-look="skeuo"] .team-box,
+[data-look="skeuo"] .reply-action,
+[data-look="skeuo"] .list-picker,
+[data-look="skeuo"] .note-card {
+  background: var(--sk-panel);
+  border: 1px solid var(--sk-edge);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 var(--sk-hi), var(--sk-drop);
+}
+[data-look="skeuo"] .cal-event:hover,
+[data-look="skeuo"] .note-card:hover { background: var(--sk-raise); }
+[data-look="skeuo"] .card .list-item + .list-item,
+[data-look="skeuo"] .accordion-body .list-item { border-top: 1px solid var(--sk-lo); box-shadow: inset 0 1px 0 var(--sk-hi); }
+[data-look="skeuo"] .accordion.open .accordion-head { border-bottom: 1px solid var(--sk-lo); }
+[data-look="skeuo"] .section-icon,
+[data-look="skeuo"] .note-icon,
+[data-look="skeuo"] .list-picker-icon {
+  border-radius: 10px;
+  color: #FFFFFF;
+  background:
+    radial-gradient(130% 70% at 50% 0%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.08) 60%, transparent 61%),
+    linear-gradient(180deg, var(--sk-gel-mid), var(--sk-gel-low));
+  border: 1px solid var(--sk-gel-edge);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+[data-look="skeuo"] .section-icon .icon,
+[data-look="skeuo"] .note-icon .icon { filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.35)); }
+
+/* ——— Buttons: gel, ivory and brushed keys ——— */
+[data-look="skeuo"] .filled-btn,
+[data-look="skeuo"] .icon-btn.filled,
+[data-look="skeuo"] .add-send,
+[data-look="skeuo"] .pad-key.primary {
+  background: linear-gradient(180deg, var(--sk-gel-top) 0%, var(--sk-gel-mid) 50%, var(--sk-tint) 51%, var(--sk-gel-low) 100%);
+  color: #FFFFFF;
+  border: 1px solid var(--sk-gel-edge);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+[data-look="skeuo"] .filled-btn,
+[data-look="skeuo"] .tonal-btn,
+[data-look="skeuo"] .outlined-btn { border-radius: 10px; font-weight: 700; }
+[data-look="skeuo"] .tonal-btn,
+[data-look="skeuo"] .outlined-btn,
+[data-look="skeuo"] .icon-btn.tonal,
+[data-look="skeuo"] .chip,
+[data-look="skeuo"] .key,
+[data-look="skeuo"] .pad-key,
+[data-look="skeuo"] .rocker,
+[data-look="skeuo"] .fab.extended,
+[data-look="skeuo"] .pull .ball,
+[data-look="skeuo"] .listen-mic,
+[data-look="skeuo"] .reply-source {
+  background: var(--sk-raise);
+  color: var(--on-surface);
+  border: 1px solid var(--sk-edge);
+  text-shadow: var(--sk-emboss);
+  box-shadow: inset 0 1px 0 var(--sk-hi), inset 0 -1px 0 var(--sk-lo), 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+[data-look="skeuo"] .outlined-btn { color: var(--primary); }
+[data-look="skeuo"] .key { border-radius: 12px; }
+[data-look="skeuo"] .rocker button + button { border-top: 1px solid var(--sk-lo); box-shadow: inset 0 1px 0 var(--sk-hi); }
+[data-look="skeuo"] .fab.extended { border-radius: 14px; box-shadow: inset 0 1px 0 var(--sk-hi), 0 6px 14px rgba(0, 0, 0, 0.3); }
+[data-look="skeuo"] .filled-btn:active,
+[data-look="skeuo"] .icon-btn.filled:active,
+[data-look="skeuo"] .add-send:active,
+[data-look="skeuo"] .pad-key.primary:active { background: linear-gradient(180deg, var(--sk-gel-low), var(--sk-tint)); box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4); }
+[data-look="skeuo"] .tonal-btn:active,
+[data-look="skeuo"] .outlined-btn:active,
+[data-look="skeuo"] .icon-btn.tonal:active,
+[data-look="skeuo"] .chip:active,
+[data-look="skeuo"] .key:active,
+[data-look="skeuo"] .pad-key:active,
+[data-look="skeuo"] .rocker button:active,
+[data-look="skeuo"] .fab.extended:active {
+  background: var(--sk-raise-press);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.3);
+  filter: none;
+}
+[data-look="skeuo"] .filled-btn:disabled,
+[data-look="skeuo"] .tonal-btn:disabled,
+[data-look="skeuo"] .icon-btn.filled:disabled { background: var(--sk-raise-press); color: var(--on-surface-variant); border-color: var(--sk-edge); box-shadow: none; opacity: 0.6; text-shadow: none; }
+[data-look="skeuo"] .text-btn { text-shadow: var(--sk-emboss); font-weight: 700; }
+/* Chips are the keys of a segmented control: the chosen one stays pressed and lit. */
+[data-look="skeuo"] .chip { border-radius: 9px; }
+[data-look="skeuo"] .chip.selected {
+  background: linear-gradient(180deg, var(--sk-gel-low), var(--sk-tint));
+  color: #FFFFFF;
+  border-color: var(--sk-gel-edge);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 0 var(--sk-hi);
+}
+[data-look="skeuo"] .key.removing { background: linear-gradient(180deg, #E26A5E, #B3261E); color: #FFFFFF; text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4); }
+[data-look="skeuo"] .key.add { background: transparent; border: 2px dashed var(--outline); box-shadow: none; }
+[data-look="skeuo"] .swatch { border: 1px solid rgba(0, 0, 0, 0.35); background-image: radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.05) 55%, transparent 56%); }
+[data-look="skeuo"] .swatch.selected { box-shadow: 0 0 0 3px var(--surface-container-lowest), 0 0 0 5px var(--on-surface), 0 2px 6px rgba(0, 0, 0, 0.35); }
+
+/* ——— The switch, as on a phone of 2012 ——— */
+[data-look="skeuo"] .switch {
+  width: 58px;
+  height: 30px;
+  border-radius: 15px;
+  border: 1px solid rgba(0, 0, 0, 0.32);
+  background: linear-gradient(180deg, #D8D4CC, #F7F5F1);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+[data-look="skeuo"] .switch::after {
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(180deg, #FFFFFF, #D9D9D9);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45), inset 0 1px 0 #FFFFFF;
+  transition: left 0.22s cubic-bezier(0.3, 1.4, 0.6, 1), background 0.2s;
+}
+[data-look="skeuo"] .switch.on {
+  background: linear-gradient(180deg, var(--sk-gel-low), var(--sk-tint) 60%, var(--sk-gel-mid));
+  border-color: var(--sk-gel-edge);
+}
+[data-look="skeuo"] .switch.on::after { left: 28px; top: 0; width: 28px; height: 28px; background: linear-gradient(180deg, #FFFFFF, #D9D9D9); }
+
+/* ——— Fields: cut into the surface ——— */
+[data-look="skeuo"] .field input,
+[data-look="skeuo"] .field textarea,
+[data-look="skeuo"] .field select,
+[data-look="skeuo"] .settings-search,
+[data-look="skeuo"] .add-field,
+[data-look="skeuo"] .chat-field,
+[data-look="skeuo"] .cal-when input {
+  background: var(--sk-field);
+  border: 1px solid var(--sk-edge);
+  border-radius: 10px;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.16), 0 1px 0 var(--sk-hi);
+}
+[data-look="skeuo"] .add-field,
+[data-look="skeuo"] .settings-search,
+[data-look="skeuo"] .chat-field { border-radius: 999px; }
+[data-look="skeuo"] .chat-field:focus { border-width: 1px; padding: 16px 20px; }
+[data-look="skeuo"] .field input:focus,
+[data-look="skeuo"] .field textarea:focus,
+[data-look="skeuo"] .chat-field:focus,
+[data-look="skeuo"] .settings-search:focus-within,
+[data-look="skeuo"] .add-field:focus-within {
+  border: 1px solid var(--primary);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.16), 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+/* The Material focus thickens the border and takes the pixel back from the padding: here it stays 1px. */
+[data-look="skeuo"] .field input:focus,
+[data-look="skeuo"] .field textarea:focus { padding: 14px 16px; }
+/* The slider: a groove cut in the surface and a chrome knob. */
+[data-look="skeuo"] input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; height: 40px; }
+[data-look="skeuo"] input[type="range"]::-webkit-slider-runnable-track {
+  height: 9px; border-radius: 5px; border: 1px solid var(--sk-edge);
+  background: linear-gradient(90deg, var(--sk-gel-low), var(--sk-tint)) 0 / var(--fill, 0%) 100% no-repeat, var(--sk-field);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 0 var(--sk-hi);
+}
+[data-look="skeuo"] input[type="range"]::-moz-range-track { height: 9px; border-radius: 5px; border: 1px solid var(--sk-edge); background: var(--sk-field); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35); }
+[data-look="skeuo"] input[type="range"]::-moz-range-progress { height: 9px; border-radius: 5px; background: linear-gradient(180deg, var(--sk-gel-mid), var(--sk-gel-low)); }
+[data-look="skeuo"] input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 26px; height: 26px; margin-top: -9.5px; border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  background: radial-gradient(circle at 50% 35%, #FFFFFF, #E6E6E6 45%, #B9B9B9 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 #FFFFFF;
+}
+[data-look="skeuo"] input[type="range"]::-moz-range-thumb {
+  width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.3);
+  background: radial-gradient(circle at 50% 35%, #FFFFFF, #E6E6E6 45%, #B9B9B9 100%); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+[data-look="skeuo"] .progress,
+[data-look="skeuo"] .list-progress,
+[data-look="skeuo"] .record-bar { background: var(--sk-field); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35); border: 1px solid var(--sk-edge); height: 10px; border-radius: 5px; }
+[data-look="skeuo"] .progress span,
+[data-look="skeuo"] .list-progress span { background: linear-gradient(180deg, var(--sk-gel-top), var(--sk-tint) 55%, var(--sk-gel-low)); border-radius: 5px; }
+
+/* ——— Floating pieces: dialogs, sheets, menus ——— */
+[data-look="skeuo"] .dialog,
+[data-look="skeuo"] .menu {
+  background: var(--sk-grain), var(--sk-panel);
+  border: 1px solid var(--sk-edge);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 var(--sk-hi), 0 22px 50px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+[data-look="skeuo"] .menu { border-radius: 12px; }
+[data-look="skeuo"] .menu button + button { border-top: 1px solid var(--sk-lo); }
+[data-look="skeuo"] .dialog > .head { text-shadow: var(--sk-emboss); }
+[data-look="skeuo"] .dialog > .actions { border-top: 1px solid var(--sk-lo); box-shadow: inset 0 1px 0 var(--sk-hi); margin-top: 6px; }
+[data-look="skeuo"] .sheet,
+[data-look="skeuo"] .side-panel {
+  background-color: var(--background);
+  background-image: var(--sk-texture);
+  border: 1px solid var(--sk-edge);
+  border-bottom: none;
+  border-radius: 18px 18px 0 0;
+  box-shadow: inset 0 1px 0 var(--sk-hi), 0 -8px 30px rgba(0, 0, 0, 0.35);
+}
+[data-look="skeuo"] .side-panel { border-radius: 18px 0 0 18px; border-right: none; border-bottom: 1px solid var(--sk-edge); }
+[data-look="skeuo"] .sheet .handle { width: 44px; height: 6px; border-radius: 3px; opacity: 1; background: var(--sk-field); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 0 var(--sk-hi); }
+[data-look="skeuo"] .snackbar,
+[data-look="skeuo"] .listen-panel {
+  background: linear-gradient(180deg, rgba(70, 70, 70, 0.94), rgba(18, 18, 18, 0.94) 52%, rgba(6, 6, 6, 0.95));
+  color: #F4F4F4;
+  border: 1px solid rgba(0, 0, 0, 0.8);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 8px 24px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 -1px 0 #000000;
+}
+[data-look="skeuo"] .listen-panel { border-radius: 20px; }
+[data-look="skeuo"] .listen-panel .listen-text { color: #D6D6D6; }
+[data-look="skeuo"] .listen-panel .listen-text.heard { color: #FFFFFF; }
+[data-look="skeuo"] .listen-panel .icon-btn { color: #E0E0E0; }
+[data-look="skeuo"] .listen-panel.ready .listen-mic { background: linear-gradient(180deg, var(--sk-gel-top), var(--sk-tint) 55%, var(--sk-gel-low)); color: #FFFFFF; }
+[data-look="skeuo"] .warning,
+[data-look="skeuo"] .banner { border: 1px solid rgba(120, 20, 10, 0.4); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), var(--sk-drop); background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.25), transparent); }
+
+/* ——— The bottom bar: a glossy black tab bar ——— */
+[data-look="skeuo"] .bottom-bar {
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.06) 50%, transparent 51%),
+    linear-gradient(180deg, #3A3A3A, #0C0C0C);
+  border: 1px solid #000000;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 8px 22px rgba(0, 0, 0, 0.4), 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+[data-look="skeuo"] .tab-pill { border-radius: 14px; color: #9C9C9C; text-shadow: 0 -1px 0 #000000; }
+[data-look="skeuo"] .tab-pill:hover { background: rgba(255, 255, 255, 0.06); }
+[data-look="skeuo"] .tab-pill.selected {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.07));
+  color: #FFFFFF;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+[data-look="skeuo"] .tab-pill.selected .icon {
+  color: color-mix(in srgb, var(--sk-tint) 45%, white);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--sk-tint) 85%, white));
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ——— Side bars on wide screens ——— */
+[data-look="skeuo"] .side-item,
+[data-look="skeuo"] .rail-item .pill { border-radius: 10px; }
+[data-look="skeuo"] .side-item { text-shadow: var(--sk-emboss); }
+[data-look="skeuo"] .side-item.selected,
+[data-look="skeuo"] .rail-item.selected .pill,
+[data-look="skeuo"] .list-choice.selected,
+[data-look="skeuo"] .team-pick.selected,
+[data-look="skeuo"] .table-line.mine {
+  background: linear-gradient(180deg, var(--sk-gel-mid), var(--sk-gel-low));
+  color: #FFFFFF;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* ——— The lists: a segmented control and a legal pad ——— */
+[data-look="skeuo"] .segments {
+  border-radius: 12px;
+  background: var(--sk-raise);
+  border: 1px solid var(--sk-edge);
+  box-shadow: inset 0 1px 0 var(--sk-hi), 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+[data-look="skeuo"] .segment { border-radius: 9px; text-shadow: var(--sk-emboss); font-weight: 700; }
+[data-look="skeuo"] .segment.selected { color: #FFFFFF; text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4); }
+[data-look="skeuo"] .segment-pill {
+  border-radius: 9px;
+  background: linear-gradient(180deg, var(--sk-gel-low), var(--sk-tint) 60%, var(--sk-gel-mid));
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35), 0 1px 0 var(--sk-hi);
+}
+[data-look="skeuo"] .item-group {
+  gap: 0;
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+  background-color: var(--sk-paper);
+  background-image: var(--sk-grain), linear-gradient(90deg, transparent 51px, var(--sk-margin) 51px, var(--sk-margin) 53px, transparent 53px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 6px 14px rgba(60, 40, 10, 0.16);
+  border-top: 22px solid color-mix(in srgb, var(--sk-tint) 30%, #8C2F2F);
+}
+[data-look="skeuo"] .item-row,
+[data-look="skeuo"] .item-row:first-child,
+[data-look="skeuo"] .item-row:last-child {
+  background: transparent;
+  border-radius: 0;
+  border-bottom: 1px solid var(--sk-rule);
+}
+[data-look="skeuo"] .item-row:hover { background: rgba(255, 230, 120, 0.12); }
+[data-look="skeuo"] .item-name { padding-left: 14px; font-size: 17px; }
+[data-look="skeuo"] .check-circle {
+  border: 1px solid var(--sk-edge);
+  background: var(--sk-field);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 0 var(--sk-hi);
+}
+[data-look="skeuo"] .item-row.checked .check-circle {
+  background: radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.5), transparent 60%), linear-gradient(180deg, #6CC24A, #3A8C22);
+  border-color: #2C6A18;
+  color: #FFFFFF;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+[data-look="skeuo"] .done-header { text-shadow: var(--sk-emboss); }
+[data-look="skeuo"] .segment-count { box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3); }
+[data-look="skeuo"] .list-empty-icon,
+[data-look="skeuo"] .cal-badge {
+  background: radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.5), transparent 60%), linear-gradient(180deg, var(--sk-gel-mid), var(--sk-gel-low));
+  color: #FFFFFF;
+  border: 1px solid var(--sk-gel-edge);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), var(--sk-drop);
+}
+
+/* ——— Notes: sheets of paper ——— */
+[data-look="skeuo"] .note-card { background: var(--sk-grain), linear-gradient(180deg, var(--sk-paper), color-mix(in srgb, var(--sk-paper) 92%, black)); }
+[data-look="skeuo"] .note-text {
+  background-color: var(--sk-paper);
+  background-image: var(--sk-grain);
+  border-radius: 4px;
+  padding: 16px 18px 32px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 6px 16px rgba(60, 40, 10, 0.16);
+}
+[data-look="skeuo"] .note-text pre { background: var(--sk-field); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2); }
+
+/* ——— Chat, cards of the weather and of the team: glass over color ——— */
+[data-look="skeuo"] .chat-bubble { border: 1px solid var(--sk-edge); box-shadow: inset 0 1px 0 var(--sk-hi), 0 1px 2px rgba(0, 0, 0, 0.18); background-image: var(--sk-panel); }
+[data-look="skeuo"] .chat-bubble.mine {
+  background-image: linear-gradient(180deg, var(--sk-gel-top), var(--sk-gel-mid) 50%, var(--sk-tint) 51%, var(--sk-gel-low));
+  color: #FFFFFF;
+  border-color: var(--sk-gel-edge);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.35);
+}
+[data-look="skeuo"] .weather-card,
+[data-look="skeuo"] .team-card {
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), var(--sk-drop);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.35);
+}
+[data-look="skeuo"] .weather-card::after,
+[data-look="skeuo"] .team-card::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 50% 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04));
+  pointer-events: none;
+}
+[data-look="skeuo"] .weather-day { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+
+/* ——— First run ——— */
+[data-look="skeuo"] .step::before {
+  background: radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.5), transparent 60%), linear-gradient(180deg, var(--sk-gel-mid), var(--sk-gel-low));
+  color: #FFFFFF;
+  border: 1px solid var(--sk-gel-edge);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+[data-look="skeuo"] .account-icon { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); }
+[data-look="skeuo"] code { background: var(--sk-field); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2); }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-look="skeuo"] .switch::after, [data-look="skeuo"] .tile { transition: none; }
+}
+[data-look="skeuo"] .segment.selected .segment-count { color: #FFFFFF; background: rgba(255, 255, 255, 0.2); }

@@ -183,13 +183,13 @@ internal fun AssistantSetupDialog(state: UiState, vm: HomeViewModel, onDismiss: 
                 when (step) {
                     0 -> {
                         Text(str(R.string.assistant_step1_text))
-                        FilledTonalButton(onClick = { links.openUri(SIGN_UP_URL) }, modifier = Modifier.padding(top = 16.dp)) {
+                        AppTonalButton(onClick = { links.openUri(SIGN_UP_URL) }, modifier = Modifier.padding(top = 16.dp)) {
                             Text(str(R.string.assistant_open_signup))
                         }
                     }
                     1 -> {
                         Text(str(R.string.assistant_step2_text))
-                        FilledTonalButton(onClick = { links.openUri(WORKERS_AI_URL) }, modifier = Modifier.padding(vertical = 16.dp)) {
+                        AppTonalButton(onClick = { links.openUri(WORKERS_AI_URL) }, modifier = Modifier.padding(vertical = 16.dp)) {
                             Text(str(R.string.assistant_open_dashboard))
                         }
                         OutlinedTextField(
@@ -210,7 +210,7 @@ internal fun AssistantSetupDialog(state: UiState, vm: HomeViewModel, onDismiss: 
                     }
                     2 -> {
                         Text(str(R.string.assistant_step3_text))
-                        FilledTonalButton(onClick = { links.openUri(WORKERS_AI_URL) }, modifier = Modifier.padding(vertical = 16.dp)) {
+                        AppTonalButton(onClick = { links.openUri(WORKERS_AI_URL) }, modifier = Modifier.padding(vertical = 16.dp)) {
                             Text(str(R.string.assistant_open_dashboard))
                         }
                         OutlinedTextField(
@@ -433,7 +433,7 @@ internal fun AssistantSettings(state: UiState, vm: HomeViewModel) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val labels = listOf(R.string.assistant_model_big, R.string.assistant_model_small)
             ASSISTANT_MODELS.forEachIndexed { i, model ->
-                FilterChip(
+                AppFilterChip(
                     selected = assistant.model == model,
                     onClick = { vm.setAssistantModel(model) },
                     label = { Text(str(labels[i])) },
@@ -638,7 +638,7 @@ private fun ChatBubble(line: ChatLine, current: Boolean, vm: HomeViewModel) {
                                 if (at >= 0) chatLines[at] = line.copy(actions = emptyList())
                                 vm.dismissReply()
                             }) { Text(str(R.string.cancel)) }
-                            Button(onClick = vm::confirmAgent) { Text(str(R.string.ai_confirm)) }
+                            AppButton(onClick = vm::confirmAgent) { Text(str(R.string.ai_confirm)) }
                         }
                     }
                 }

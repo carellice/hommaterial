@@ -141,6 +141,7 @@ function initialState() {
     showHidden: false,
     layout: settings.get('layout', LAYOUT_GRID),
     theme: settings.get('theme', 0),
+    look: settings.get('look', 0),
     accent: settings.get('accent', 'auto'),
     language: settings.get('language', 'auto'),
     monitor: monitorFromJson(settings.get('monitor', {})),
@@ -1606,6 +1607,11 @@ export function setTheme(theme) {
   update({ theme });
 }
 
+export function setLook(look) {
+  settings.set('look', look);
+  update({ look });
+}
+
 export function setAccent(accent) {
   settings.set('accent', accent);
   update({ accent });
@@ -1746,12 +1752,13 @@ async function restore(backup, selected) {
     lgTvs: Array.isArray(backup.lgTvs) ? backup.lgTvs : null,
   });
   const theme = clamp(Number(backup.theme ?? 0), 0, 2);
+  const look = clamp(Number(backup.look ?? 0), 0, 1);
   const layout = clamp(Number(backup.layout ?? 0), 0, 1);
   const language = backup.language || 'auto';
   const accent = typeof backup.accent === 'string' && backup.accent ? backup.accent : 'auto';
-  settings.edit({ theme, accent, layout, language });
+  settings.edit({ theme, look, accent, layout, language });
   applyLanguage(language);
-  update({ theme, accent, layout, language });
+  update({ theme, look, accent, layout, language });
   if (selected.includes('monitor') && backup.monitor) setMonitor(monitorFromJson(backup.monitor));
   await sync(true);
   if (answer.switchBot) refresh();

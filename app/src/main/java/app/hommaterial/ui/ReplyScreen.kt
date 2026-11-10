@@ -188,13 +188,13 @@ fun ReplyScreen(reply: VoiceReply, readAloud: Boolean, vm: HomeViewModel) {
                     }
                     if (reply.actions.isNotEmpty() && !reply.waiting) {
                         Row(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                            FilledTonalButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(str(R.string.cancel)) }
+                            AppTonalButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(str(R.string.cancel)) }
                             Spacer(Modifier.width(12.dp))
-                            Button(onClick = vm::confirmAgent, modifier = Modifier.weight(1f)) { Text(str(R.string.ai_confirm)) }
+                            AppButton(onClick = vm::confirmAgent, modifier = Modifier.weight(1f)) { Text(str(R.string.ai_confirm)) }
                         }
                     }
                     if (text != null) {
-                        Button(
+                        AppButton(
                             onClick = {
                                 if (speaking) {
                                     tts.stop()

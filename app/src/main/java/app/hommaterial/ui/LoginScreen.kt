@@ -56,8 +56,10 @@ fun LoginScreen(state: UiState, vm: HomeViewModel) {
     if (linking || state.serverBusy && config == null) ServerLinkDialog(state, vm, onDismiss = { linking = false })
     if (state.serverChoice) ServerChoiceDialog(vm)
     Scaffold(
+        modifier = Modifier.screenTexture(),
+        containerColor = screenColor(),
         topBar = {
-            TopAppBar(
+            AppTopBar(
                 title = { Text(str(R.string.login_title)) },
                 actions = {
                     if (!state.signingIn) {

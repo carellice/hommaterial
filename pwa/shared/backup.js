@@ -8,7 +8,7 @@ export function createBackup(s, switchBot = null, assistantKeys = null) {
     schedules: s.schedules ?? [], automations: s.automations ?? [], layout: s.layout ?? 0, language: s.language ?? 'auto',
     shortcuts: s.shortcuts ?? null, widget: s.widget ?? {}, tiles: s.tiles ?? Array(10).fill(null),
     alerts: s.alerts ?? {}, autoUpdate: s.autoUpdate ?? true, haptics: s.haptics ?? true, hapticLevel: s.hapticLevel ?? 70,
-    theme: s.theme ?? 0, accent: s.accent ?? 'auto',
+    theme: s.theme ?? 0, look: s.look ?? 0, accent: s.accent ?? 'auto',
     remoteButtons: s.remoteButtons ?? {}, hiddenRemotes: s.hiddenRemotes ?? [], monitor: s.monitor ?? {},
   };
   // Work with a detached object, so sanitizing never changes the running app state.
@@ -64,7 +64,7 @@ export const BACKUP_SECTIONS = [
   ['remotes', 's_remotes', ['remoteButtons', 'lgTvs']],
   ['schedules', 's_schedules', ['schedules']], ['automations', 's_automations', ['automations']],
   ['alerts', 'alerts_title', ['alerts']], ['shortcuts', 'backup_shortcuts', ['shortcuts', 'widget', 'tiles']],
-  ['settings', 'backup_settings', ['autoUpdate', 'haptics', 'hapticLevel', 'theme', 'accent', 'layout', 'language']],
+  ['settings', 'backup_settings', ['autoUpdate', 'haptics', 'hapticLevel', 'theme', 'look', 'accent', 'layout', 'language']],
   ['assistant', 'backup_assistant', ['assistant']],
   ['monitor', 'backup_monitor_title', ['monitor']], ['keys', 'backup_keys', ['switchBot', 'assistantKeys']],
 ];
