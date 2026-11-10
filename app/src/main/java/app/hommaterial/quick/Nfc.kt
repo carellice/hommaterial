@@ -11,6 +11,8 @@ import android.nfc.tech.NdefFormatable
 import android.os.Bundle
 import androidx.annotation.StringRes
 import app.hommaterial.R
+import app.hommaterial.data.Cache
+import java.security.MessageDigest
 
 // hommaterial://nfc/<kind>/<id>[/on|off]: what a tag written by the app holds.
 private const val SCHEME = "hommaterial"
@@ -21,12 +23,19 @@ internal const val NFC_MACRO = "macro"
 internal const val NFC_ON = "on"
 internal const val NFC_OFF = "off"
 
+// Marks a short code in place of the id: Alexa ids run to hundreds of characters, too many for small tags.
+private const val CODE = "~"
+
+/** The short code a tag holds for [id]: 40 bits of its hash, plenty to tell one home's devices apart. */
+internal fun nfcCode(id: String): String =
+    MessageDigest.getInstance("SHA-256").digest(id.toByteArray()).take(5).joinToString("") { "%02x".format(it) }
+
 /** What a tag asks for: a device or group switched [power] (toggled without it), or a custom device run. */
 internal fun nfcUri(kind: String, id: String, power: Boolean? = null): Uri = Uri.Builder()
     .scheme(SCHEME)
     .authority(HOST)
     .appendPath(kind)
-    .appendPath(id)
+    .appendPath(CODE + nfcCode(id))
     .apply { power?.let { appendPath(if (it) NFC_ON else NFC_OFF) } }
     .build()
 
@@ -73,7 +82,18 @@ class NfcActivity : Activity() {
         super.onCreate(savedInstanceState)
         val segments = intent.data?.takeIf { it.scheme == SCHEME && it.host == HOST }?.pathSegments.orEmpty()
         val kind = segments.getOrNull(0)
-        val id = segments.getOrNull(1)
+        val id = segments.getOrNull(1)?.let { written ->
+            // Tags written before the short codes hold the whole id.
+            if (!written.startsWith(CODE)) return@let written
+            val cache = Cache(this)
+            val ids = when (kind) {
+                NFC_DEVICE -> cache.devices().map { it.applianceId }
+                NFC_GROUP -> cache.groups().map { it.id }
+                NFC_MACRO -> cache.macros().map { it.id }
+                else -> emptyList()
+            }
+            ids.find { nfcCode(it) == written.removePrefix(CODE) }
+        }
         if (id != null) {
             val toggle = Intent(this, ToggleReceiver::class.java)
             when (kind) {
