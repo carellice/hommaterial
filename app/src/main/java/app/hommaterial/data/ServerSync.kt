@@ -105,6 +105,18 @@ object ServerSync {
 
     fun encode(id: String): String = URLEncoder.encode(id, "UTF-8").replace("+", "%20")
 
+    /** The address of the song at [path] of the music of the account; "" without a server. */
+    fun musicUrl(path: String): String = store.config.value?.let { it.url + "/api/music/file?path=" + encode(path) }.orEmpty()
+
+    /** The address of the picture of the song at [path]. */
+    fun coverUrl(path: String): String = store.config.value?.let { it.url + "/api/music/cover?path=" + encode(path) }.orEmpty()
+
+    /** The session of the account, for what the player and the downloads ask of the server by themselves. */
+    fun sessionToken(): String? = if (::store.isInitialized) store.config.value?.token else null
+
+    /** Whether [url] is an address of the home server, which wants the session. */
+    fun isServerUrl(url: String): Boolean = store.config.value?.url?.let { url.startsWith(it) } == true
+
     /** Sends a change in the background, telling the sync status when it fails. */
     fun send(method: String, path: String, body: JSONObject? = null) {
         if (!active) return

@@ -96,6 +96,16 @@ automazioni li esegue il server (il telefono smette di farlo da sé, per non far
 - Le notifiche push arrivano ai browser; l'app Android mostra le sue da sé.
 - Per l'HTTPS in casa installa sul telefono il certificato del server, come per il browser.
 
+## Musica
+
+La pagina **Musica** suona i brani della cartella della musica scelta all'installazione
+(di solito `/DATA/Media/Music`): ogni account ha la sua sottocartella, con il suo nome.
+Si caricano dalla pagina, brani o cartelle intere, oppure si copiano lì direttamente.
+Sui server installati prima della musica, l'aggiornamento notturno collega da solo
+`/DATA/Media/Music` (o `/opt/hommaterial/music`) e ci sposta quello già caricato:
+`hommaterial-aggiorna` si aggiorna dopo ogni passaggio, quindi serve fino alla seconda notte.
+L'app Android la ascolta in streaming e la scarica per quando non c'è rete.
+
 ## Aggiornamenti
 
 Se l'hai scelto all'installazione, ogni notte verso le 4 il server controlla su GitHub se c'è

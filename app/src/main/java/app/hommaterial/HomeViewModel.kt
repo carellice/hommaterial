@@ -858,7 +858,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     /** Plays, pauses or moves the music of the phone as asked in what was [heard]; false when not about it. */
     private fun playMusic(heard: List<String>): Boolean {
         val context = getApplication<Application>()
-        if (MusicLibrary.folder.value == null) return false
+        if (!MusicLibrary.enabled()) return false
         val command = parseMusic(heard, MusicLibrary.load(context), MusicPlayer.now.value.queued) ?: return false
         val said = when (command) {
             is MusicCommand.Play -> {

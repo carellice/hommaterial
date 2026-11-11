@@ -8,6 +8,9 @@ import android.widget.Toast
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.DownloadDone
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -143,6 +146,8 @@ import app.hommaterial.R
 import app.hommaterial.quick.clock
 import app.hommaterial.data.SettingsSearch
 import app.hommaterial.music.MusicLibrary
+import app.hommaterial.music.MusicDownloads
+import app.hommaterial.data.ServerSync
 import app.hommaterial.music.MusicPlayer
 import app.hommaterial.music.NowPlaying
 import app.hommaterial.music.Track
@@ -196,7 +201,10 @@ fun MusicPage() {
     BackHandler(enabled = !searching && opened != null) { opened = null }
     BackHandler(enabled = !searching && opened == null && view == 3 && path.isNotEmpty()) { path = path.substringBeforeLast('/', "") }
 
-    val all = tracks.orEmpty()
+    val server by MusicLibrary.server.collectAsState()
+    val offline by MusicLibrary.offline.collectAsState()
+    val downloaded by MusicDownloads.downloaded.collectAsState()
+    val all = tracks.orEmpty().let { list -> if (server && offline) list.filter { it.uri in downloaded } else list }
     val play = { list: List<Track>, start: Int, shuffle: Boolean -> MusicPlayer.play(context, list, start, shuffle) }
     val bottom = PaddingValues(bottom = BOTTOM_BAR_SPACE)
 
@@ -204,6 +212,13 @@ fun MusicPage() {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                 SettingsSearchField(query, str(R.string.music_search_hint)) { query = it }
+            }
+            if (server && offline) {
+                Row(Modifier.padding(horizontal = 24.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(str(R.string.music_offline), style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp))
+                }
             }
             if (all.isEmpty()) {
                 Column(
@@ -213,7 +228,7 @@ fun MusicPage() {
                 ) {
                     if (scanning || tracks == null) CircularProgressIndicator()
                     Text(
-                        str(if (scanning || tracks == null) R.string.music_reading else R.string.music_empty),
+                        str(if (scanning || tracks == null) R.string.music_reading else if (server) R.string.music_server_empty else R.string.music_empty),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 16.dp),
@@ -325,6 +340,7 @@ private fun PlayButtons(list: List<Track>, play: (List<Track>, Int, Boolean) -> 
             Icon(Icons.Outlined.Shuffle, contentDescription = null)
             Text(str(R.string.music_shuffle), Modifier.padding(start = 8.dp))
         }
+        DownloadButton(list)
     }
 }
 
@@ -382,6 +398,10 @@ private fun TrackRow(track: Track, current: Boolean, playing: Boolean, modifier:
         },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (track.uri in MusicDownloads.downloaded.collectAsState().value) {
+                    Icon(Icons.Outlined.DownloadDone, contentDescription = str(R.string.music_downloaded),
+                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 8.dp).size(18.dp))
+                }
                 if (track.duration > 0) Text(duration(track.duration))
                 QueueMenu(track)
             }
@@ -389,6 +409,26 @@ private fun TrackRow(track: Track, current: Boolean, playing: Boolean, modifier:
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = modifier.clickable(onClick = onClick),
     )
+}
+
+/** Downloads the songs of [list] of the home server that are not yet on the phone; done, a tick. */
+@Composable
+private fun DownloadButton(list: List<Track>) {
+    val context = LocalContext.current
+    val server by MusicLibrary.server.collectAsState()
+    val downloaded by MusicDownloads.downloaded.collectAsState()
+    val waiting by MusicDownloads.waiting.collectAsState()
+    if (!server || list.isEmpty()) return
+    val all = list.all { it.uri in downloaded }
+    when {
+        all -> Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.DownloadDone, contentDescription = str(R.string.music_downloaded), tint = MaterialTheme.colorScheme.primary)
+        }
+        waiting > 0 -> Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }
+        else -> IconButton(onClick = { MusicDownloads.download(context, list) }) {
+            Icon(Icons.Outlined.Download, contentDescription = str(R.string.music_download))
+        }
+    }
 }
 
 /** Plays a song after the one that plays, or at the end of the queue. */
@@ -419,6 +459,16 @@ private fun QueueMenu(track: Track) {
                     Toast.makeText(context, str(R.string.music_queued, track.title), Toast.LENGTH_SHORT).show()
                 },
             )
+            if (track.uri.startsWith("http") && track.uri !in MusicDownloads.downloaded.value) {
+                DropdownMenuItem(
+                    text = { Text(str(R.string.music_download)) },
+                    leadingIcon = { Icon(Icons.Outlined.Download, contentDescription = null) },
+                    onClick = {
+                        open = false
+                        MusicDownloads.download(context, listOf(track))
+                    },
+                )
+            }
         }
     }
 }
@@ -459,10 +509,14 @@ private object Covers {
     suspend fun load(context: Context, uri: String): Bitmap? = withContext(Dispatchers.IO) {
         found.get(uri)?.let { return@withContext it }
         if (uri in none) return@withContext null
-        val bytes = runCatching {
+        val remote = uri.startsWith("http")
+        val local = if (remote) MusicDownloads.local(context, uri)?.let { Uri.fromFile(it) } else Uri.parse(uri)
+        val bytes = if (local == null) {
+            Uri.parse(uri).getQueryParameter("path")?.let { MusicDownloads.fetch(ServerSync.coverUrl(it)) }
+        } else runCatching {
             val retriever = MediaMetadataRetriever()
             try {
-                retriever.setDataSource(context, Uri.parse(uri))
+                retriever.setDataSource(context, local)
                 retriever.embeddedPicture
             } finally {
                 retriever.release()
@@ -1013,6 +1067,34 @@ internal fun MusicSettings() {
     val scanning by MusicLibrary.scanning.collectAsState()
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) MusicLibrary.choose(context, uri)
+    }
+    val server by MusicLibrary.server.collectAsState()
+    if (ServerSync.active) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Text(str(R.string.music_source), style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AppFilterChip(selected = !server, onClick = { if (server) MusicLibrary.useServer(context, false) }, label = { Text(str(R.string.music_source_phone)) })
+                AppFilterChip(selected = server, onClick = { if (!server) MusicLibrary.useServer(context, true) }, label = { Text(str(R.string.music_source_server)) })
+            }
+        }
+    }
+    if (server && ServerSync.active) {
+        val downloaded by MusicDownloads.downloaded.collectAsState()
+        val size by produceState(0L, downloaded) { value = withContext(Dispatchers.IO) { MusicDownloads.size(context) } }
+        Setting(
+            title = str(R.string.music_rescan),
+            text = if (scanning) str(R.string.music_reading) else str(R.string.music_source_server_text) + "\n" + plural(R.plurals.music_tracks, tracks.orEmpty().size),
+            onClick = if (scanning) null else ({ MusicLibrary.refresh(context) }),
+        )
+        Setting(title = str(R.string.music_download_all), onClick = { MusicDownloads.download(context, tracks.orEmpty()) })
+        if (downloaded.isNotEmpty()) {
+            Setting(
+                title = str(R.string.music_downloads_delete),
+                text = str(R.string.music_downloads, downloaded.size, android.text.format.Formatter.formatShortFileSize(context, size)),
+                onClick = { MusicDownloads.deleteAll(context) },
+            )
+        }
+        return
     }
     // "primary:Music/Rock" is shown as "Music/Rock".
     val name = folder?.let { runCatching { DocumentsContract.getTreeDocumentId(Uri.parse(it)).substringAfter(':') }.getOrNull() }

@@ -243,7 +243,7 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     val hasNotes = state.notionLinked && state.notionNotes.isNotEmpty()
     if (tab == TAB_NOTES && !hasNotes) tab = TAB_HOME
     // The music has a page once its folder is chosen in the settings.
-    val hasMusic = MusicLibrary.folder.collectAsState().value != null
+    val hasMusic = MusicLibrary.folder.collectAsState().value != null || MusicLibrary.server.collectAsState().value
     if (tab == TAB_MUSIC && !hasMusic) tab = TAB_HOME
     val musicScanning by MusicLibrary.scanning.collectAsState()
     val context = LocalContext.current

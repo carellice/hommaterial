@@ -23,6 +23,11 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionToken
 import app.hommaterial.MainActivity
+import app.hommaterial.data.ServerSync
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
@@ -62,6 +67,7 @@ data class Track(
 object MusicLibrary {
     private const val PREFS = "music"
     private const val KEY_FOLDER = "folder"
+    private const val KEY_SERVER = "server"
     private val AUDIO_EXTENSIONS = setOf("mp3", "flac", "m4a", "aac", "ogg", "oga", "opus", "wav", "wma", "mka")
 
     private val _folder = MutableStateFlow<String?>(null)
@@ -73,6 +79,15 @@ object MusicLibrary {
     /** Null until read from the file; ordered by artist, album and track number. */
     val tracks: StateFlow<List<Track>?> = _tracks.asStateFlow()
     val scanning = MutableStateFlow(false)
+
+    /** Whether the music comes from the folder of the account on the home server instead of the phone. */
+    val server = MutableStateFlow(false)
+
+    /** Whether the home server could not be reached last time: then only the downloaded songs are shown. */
+    val offline = MutableStateFlow(false)
+
+    /** Whether there is music to show at all: a folder of the phone, or the home server. */
+    fun enabled(): Boolean = server.value || _folder.value != null
     private val mutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -87,11 +102,27 @@ object MusicLibrary {
     }
 
     fun init(context: Context) {
-        _folder.value = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        _folder.value = prefs.getString(KEY_FOLDER, null)
+        server.value = prefs.getBoolean(KEY_SERVER, false) && ServerSync.active
+        MusicDownloads.init(context)
         Thread { load(context) }.start()
     }
 
-    private fun cacheFile(context: Context) = File(context.filesDir, "music.json")
+    /** Takes the music from the home server, or again from the phone, and reads it. */
+    fun useServer(context: Context, on: Boolean) {
+        val app = context.applicationContext
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_SERVER, on).apply()
+        server.value = on
+        offline.value = false
+        synchronized(this) { _tracks.value = null }
+        scope.launch {
+            load(app)
+            scan(app)
+        }
+    }
+
+    private fun cacheFile(context: Context) = File(context.filesDir, if (server.value) "music-server.json" else "music.json")
 
     /** The tracks known, read from the file when they are not yet. */
     @Synchronized
@@ -141,6 +172,7 @@ object MusicLibrary {
 
     /** Reads the folder again: new files are added, removed ones go, changed ones are read again. */
     suspend fun scan(context: Context) = mutex.withLock {
+        if (server.value) return@withLock scanServer(context)
         val tree = _folder.value?.let(Uri::parse) ?: return@withLock
         scanning.value = true
         try {
@@ -160,6 +192,34 @@ object MusicLibrary {
         } catch (e: Exception) {
             // A folder that is gone, or no longer allowed, leaves what was known as it was.
             Log.w("Music", "scan failed", e)
+        } finally {
+            scanning.value = false
+        }
+    }
+
+    /** Asks the home server for the songs of the account; without it, what was known stays, marked offline. */
+    private suspend fun scanServer(context: Context) {
+        scanning.value = true
+        try {
+            val answer = ServerSync.call("GET", "/api/music")
+            val array = answer.optJSONArray("tracks") ?: JSONArray()
+            val list = (0 until array.length()).map { i ->
+                val o = array.getJSONObject(i)
+                Track(
+                    ServerSync.musicUrl(o.getString("path")), o.optString("title"), o.optString("artist"), o.optString("album"),
+                    o.optString("albumKey"), o.optString("folder"), o.optInt("disc"), o.optInt("number"),
+                    o.optLong("duration"), o.optLong("modified"),
+                )
+            }.sortedWith(
+                compareBy<Track>({ it.artist.lowercase() }, { it.album.lowercase() }, { it.disc }, { it.number }, { it.title.lowercase() }),
+            )
+            withContext(Dispatchers.IO) { save(context, list) }
+            _tracks.value = list
+            offline.value = false
+        } catch (e: java.io.IOException) {
+            offline.value = true
+        } catch (e: Exception) {
+            Log.w("Music", "server scan failed", e)
         } finally {
             scanning.value = false
         }
@@ -424,7 +484,14 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        // The songs of the home server want the session of the account, added to each request.
+        val http = DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)
+        val withSession = ResolvingDataSource.Factory(DefaultDataSource.Factory(this, http)) { spec ->
+            val token = ServerSync.sessionToken()
+            if (token != null && ServerSync.isServerUrl(spec.uri.toString())) spec.withAdditionalHeaders(mapOf("X-Session" to token)) else spec
+        }
         val player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(withSession))
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
                 true,
@@ -443,7 +510,13 @@ class PlaybackService : MediaSessionService() {
                     controller: MediaSession.ControllerInfo,
                     mediaItems: MutableList<MediaItem>,
                 ): ListenableFuture<MutableList<MediaItem>> =
-                    Futures.immediateFuture(mediaItems.map { it.buildUpon().setUri(it.mediaId).build() }.toMutableList())
+                    Futures.immediateFuture(
+                        mediaItems.map { item ->
+                            // A song of the server that is on the phone plays from there, also without a network.
+                            val local = MusicDownloads.local(this@PlaybackService, item.mediaId)
+                            item.buildUpon().setUri(local?.let { Uri.fromFile(it) } ?: Uri.parse(item.mediaId)).build()
+                        }.toMutableList(),
+                    )
             })
             .build()
     }

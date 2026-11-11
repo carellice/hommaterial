@@ -141,6 +141,11 @@ collegati al proprio account Alexa.
   alle 7:30» mette 6:30, 6:40, 6:50… fino alle 7:30. «Spegni tutte le sveglie» spegne
   la prossima e apre l'Orologio sulle altre: Android non lascia a un'altra app
   spegnerne più di una alla volta. Una frase che accende o spegne qualcosa resta ai dispositivi.
+- Con il server di casa, la musica può venire da lì: in **Impostazioni → Musica**,
+  «Musica da» → **Server di casa**, e i brani della tua cartella sul server
+  suonano in streaming. **Scarica** (su un brano, un album, un artista, o
+  «Scarica tutto») li tiene anche sul telefono: senza rete si vedono e suonano
+  solo quelli. Si caricano dalla pagina **Musica** della versione web.
 - Su Android c'è un lettore musicale: in **Impostazioni → Musica** scegli una
   cartella del telefono (con le sue sottocartelle) e compare la pagina **Musica**
   nella barra in basso, con brani, album, artisti e cartelle. La musica continua
