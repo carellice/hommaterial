@@ -105,11 +105,16 @@ internal fun FloatingBottomBar(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The application bar of Windows Phone slides straight in and out, with no bounce, as on the web.
+    val metroEase = androidx.compose.animation.core.CubicBezierEasing(0.1f, 0.9f, 0.2f, 1f)
+    val metroBar = LocalMetro.current
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
-        enter = slideInVertically(spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow)) { it * 2 } + fadeIn(),
-        exit = slideOutVertically(spring(stiffness = Spring.StiffnessMedium)) { it * 2 } + fadeOut(),
+        enter = if (metroBar) slideInVertically(androidx.compose.animation.core.tween(260, easing = metroEase)) { it * 2 }
+        else slideInVertically(spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow)) { it * 2 } + fadeIn(),
+        exit = if (metroBar) slideOutVertically(androidx.compose.animation.core.tween(200, easing = metroEase)) { it * 2 }
+        else slideOutVertically(spring(stiffness = Spring.StiffnessMedium)) { it * 2 } + fadeOut(),
     ) {
         val tabs = @Composable {
             Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -168,17 +173,24 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
     val shape = if (skeuo) corners(15.dp) else CircleShape
     // The icon of the tab just chosen gives a little bounce.
     val scale by animateFloatAsState(
-        if (selected) 1f else 0.92f,
+        if (selected || metro) 1f else 0.92f,
         spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "tab icon",
     )
     Row(
         Modifier
-            .height(48.dp)
-            .clip(shape)
+            // Modern UI: room for the ring and its word under it, no rounded ripple, the tilt of a tile instead.
+            .height(if (metro) 58.dp else 48.dp)
+            .then(if (metro) Modifier.metroTilt() else Modifier.clip(shape))
             .background(background)
             .then(if (skeuo && selected) Modifier.background(SkeuoTabGlass).border(1.dp, Color(0x99000000), shape) else Modifier)
-            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .selectable(
+                selected = selected,
+                interactionSource = null,
+                indication = if (metro) null else androidx.compose.material3.ripple(),
+                role = Role.Tab,
+                onClick = onClick,
+            )
             .padding(horizontal = padding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -193,7 +205,7 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
         if (metro) {
             // The ring of an icon of the application bar, filled with the accent when chosen, its word under it.
             val ring by animateColorAsState(if (selected) colors.primary else Color.Transparent, label = "tab ring")
-            androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Box(
                     Modifier.size(36.dp).clip(CircleShape).background(ring).border(2.dp, if (selected) colors.primary else content, CircleShape),
                     contentAlignment = Alignment.Center,
