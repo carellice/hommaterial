@@ -234,6 +234,8 @@ data class UiState(
     val reply: VoiceReply? = null,
     /** Whether those answers are read aloud at once. */
     val readAloud: Boolean = false,
+    /** Whether "portami a…" starts the navigation at once; off, Google Maps opens on the route and waits for Avvia. */
+    val navigateAtOnce: Boolean = true,
     /** Whether what the assistant leaves to others goes to Alexa; off, the assistant answers everything itself. */
     val askAlexa: Boolean = true,
     /** Whether a key for searching the web is set. */
@@ -482,6 +484,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             autoUpdate = settings.getBoolean("autoUpdate", true),
             haptics = settings.getBoolean("haptics", true),
             readAloud = settings.getBoolean("readAloud", false),
+            navigateAtOnce = settings.getBoolean("navigateAtOnce", true),
             askAlexa = settings.getBoolean("askAlexa", true),
             webSearch = webSearchOn(),
             hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
@@ -1057,9 +1060,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _messages.tryEmit(said)
     }
 
-    /** Navigation in Google Maps, or a map of any app when there is no Google Maps. */
+    /** Navigation in Google Maps, started or only shown as the route as chosen in the Settings; a map of any app when there is no Google Maps. */
     private fun mapsIntent(address: String): Intent {
-        val maps = Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + Uri.encode(address))).setPackage(GOOGLE_MAPS)
+        val uri = if (_state.value.navigateAtOnce) "google.navigation:q=" + Uri.encode(address)
+        else "https://www.google.com/maps/dir/?api=1&destination=" + Uri.encode(address)
+        val maps = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).setPackage(GOOGLE_MAPS)
         val installed = getApplication<Application>().packageManager.resolveActivity(maps, 0) != null
         return if (installed) maps else Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(address)))
     }
@@ -1968,6 +1973,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun setAskAlexa(on: Boolean) {
         settings.edit().putBoolean("askAlexa", on).apply()
         _state.update { it.copy(askAlexa = on) }
+    }
+
+    fun setNavigateAtOnce(on: Boolean) {
+        settings.edit().putBoolean("navigateAtOnce", on).apply()
+        _state.update { it.copy(navigateAtOnce = on) }
     }
 
     fun setReadAloud(on: Boolean) {

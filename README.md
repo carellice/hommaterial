@@ -136,6 +136,8 @@ collegati al proprio account Alexa.
   navigazione. «Portami a casa di Flavio» prende l'indirizzo dai contatti; se
   ne ha più di uno chiede quale. La prima volta chiede il permesso per contatti
   e telefonate; con più numeri o più contatti dallo stesso nome chiede chi.
+  In **Impostazioni**, «Avvia subito la navigazione» spenta apre solo il percorso
+  in Google Maps, e la navigazione parte toccando Avvia.
 - Su Android, a voce o nella chat, timer e sveglie si impostano nell'app Orologio
   del telefono: «imposta un timer di 10 minuti», «timer di un'ora e mezza»,
   «sveglia alle 7», «svegliami alle 6 e mezza», «svegliami tra 20 minuti».

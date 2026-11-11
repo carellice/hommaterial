@@ -850,6 +850,8 @@
     <string name="ask_alexa">Pass to Alexa what the assistant does not know</string>
     <string name="ask_alexa_text">Off, the voice assistant no longer talks to Alexa: the AI assistant set up answers everything. For this device only.</string>
     <string name="read_aloud">Always read answers aloud</string>
+    <string name="navigate_at_once">Start navigation at once</string>
+    <string name="navigate_at_once_text">With "take me to…" Google Maps starts navigating right away. Off, it opens the route to the destination and navigation starts when you tap Start. For this device only.</string>
     <string name="read_aloud_text">The answers of Alexa and of the AI assistant are read as soon as they come, with the most natural voice of the device. For this device only.</string>
     <string name="ai_title">AI assistant</string>
     <string name="ai_thinking">Thinking…</string>
