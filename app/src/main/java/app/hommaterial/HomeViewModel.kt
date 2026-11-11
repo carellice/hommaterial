@@ -844,8 +844,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val context = getApplication<Application>()
         val command = parseClock(heard) ?: return false
         if (command is ClockCommand.Alarms) return setAlarms(command.times)
+        if (command is ClockCommand.DismissAlarms) return dismissAlarms()
         val (intent, said) = when (command) {
-            is ClockCommand.Alarms -> return true
+            is ClockCommand.Alarms, ClockCommand.DismissAlarms -> return true
             is ClockCommand.Timer -> Intent(AlarmClock.ACTION_SET_TIMER)
                 .putExtra(AlarmClock.EXTRA_LENGTH, command.seconds)
                 .putExtra(AlarmClock.EXTRA_SKIP_UI, true) to str(R.string.voice_timer_set, durationText(command.seconds))
@@ -889,9 +890,43 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 delay(600)
                 runCatching { context.startActivity(alarm(time)) }
             }
+            // Told only at the end: the panel of the assistant closes after the answer, and with it this loop.
+            _haptics.tryEmit(Haptic.Confirm)
+            _messages.tryEmit(str(R.string.voice_alarms_set, times.size, clock(times.first()), clock(times.last())))
         }
-        _haptics.tryEmit(Haptic.Confirm)
-        _messages.tryEmit(str(R.string.voice_alarms_set, times.size, clock(times.first()), clock(times.last())))
+        return true
+    }
+
+    /**
+     * Switches off the next alarm of the clock app, which Android tells, and leaves the clock app open on
+     * the others. No more than that: asked for all at once the clock app only shows a list to pick from,
+     * and once it is open Android lets no app in the background ask it anything else.
+     */
+    private fun dismissAlarms(): Boolean {
+        val context = getApplication<Application>()
+        val next = context.getSystemService(android.app.AlarmManager::class.java).nextAlarmClock?.triggerTime
+        if (next == null) {
+            _haptics.tryEmit(Haptic.Reject)
+            _messages.tryEmit(str(R.string.voice_no_alarms))
+            return true
+        }
+        val time = java.util.Calendar.getInstance().apply { timeInMillis = next }
+        val hour = time.get(java.util.Calendar.HOUR_OF_DAY)
+        val minute = time.get(java.util.Calendar.MINUTE)
+        val intent = Intent(AlarmClock.ACTION_DISMISS_ALARM)
+            .putExtra(AlarmClock.EXTRA_ALARM_SEARCH_MODE, AlarmClock.ALARM_SEARCH_MODE_TIME)
+            .putExtra(AlarmClock.EXTRA_HOUR, hour)
+            .putExtra(AlarmClock.EXTRA_MINUTES, minute)
+            .putExtra(AlarmClock.EXTRA_IS_PM, hour >= 12)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(intent)
+            _haptics.tryEmit(Haptic.Confirm)
+            _messages.tryEmit(str(R.string.voice_alarms_dismissed, "%d:%02d".format(hour, minute)))
+        } catch (e: ActivityNotFoundException) {
+            _haptics.tryEmit(Haptic.Reject)
+            _messages.tryEmit(str(R.string.voice_no_clock))
+        }
         return true
     }
 

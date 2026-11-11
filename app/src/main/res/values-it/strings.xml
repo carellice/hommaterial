@@ -72,6 +72,8 @@
     <string name="voice_timer_set">Timer di %1$s avviato</string>
     <string name="voice_alarm_set">Sveglia impostata alle %1$s</string>
     <string name="voice_alarms_set">%1$d sveglie impostate dalle %2$s alle %3$s</string>
+    <string name="voice_alarms_dismissed">Spenta la sveglia delle %1$s. Android lascia spegnere a un’altra app una sola sveglia alla volta: le altre sono nell’Orologio, aperto ora</string>
+    <string name="voice_no_alarms">Nessuna sveglia da spegnere</string>
     <string name="voice_no_clock">Nessuna app orologio sul telefono per timer e sveglie</string>
     <string name="voice_not_understood">Non ho capito «%1$s»</string>
     <string name="voice_unavailable">Riconoscimento vocale non disponibile su questo telefono</string>

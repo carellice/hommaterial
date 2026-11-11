@@ -47,6 +47,19 @@ class ClockVoiceTest {
     }
 
     @Test
+    fun aSeriesAskedAsTheUserDidKeepsAllItsAlarms() {
+        val times = (parseClock(listOf("imposta delle sveglie ogni 10 minuti dalle 7 e 30 alle 8 e 30")) as? ClockCommand.Alarms)?.times
+        assertEquals(listOf(7 to 30, 7 to 40, 7 to 50, 8 to 0, 8 to 10, 8 to 20, 8 to 30), times)
+    }
+
+    @Test
+    fun everyAlarmIsSwitchedOff() {
+        for (text in listOf("spegni tutte le sveglie", "disattiva le sveglie", "cancella tutte le sveglie", "turn off all alarms")) {
+            assertEquals(text, ClockCommand.DismissAlarms, parseClock(listOf(text)))
+        }
+    }
+
+    @Test
     fun otherSentencesAreLeftAlone() {
         assertNull(parseClock(listOf("spegni la sveglia")))
         assertNull(parseClock(listOf("accendi la luce tra 10 minuti")))

@@ -275,7 +275,13 @@ sealed interface ClockCommand {
 
     /** Several alarms at once, as hour to minute, in the order they ring. */
     data class Alarms(val times: List<Pair<Int, Int>>) : ClockCommand
+
+    /** Every alarm of the clock app switched off: "spegni tutte le sveglie". */
+    data object DismissAlarms : ClockCommand
 }
+
+private val REMOVE_WORDS = setOf("cancella", "elimina", "togli", "rimuovi", "annulla", "delete", "remove", "cancel")
+private val PLURAL_ALARM_WORDS = setOf("sveglie", "alarms")
 
 private val TIMER_WORDS = setOf("timer", "countdown")
 private val ALARM_WORDS = setOf("sveglia", "sveglie", "svegliami", "svegliarmi", "alarm", "alarms", "wake")
@@ -382,6 +388,8 @@ private fun alarmSeries(words: List<String>): List<Pair<Int, Int>>? {
 fun parseClock(heard: List<String>): ClockCommand? {
     for (sentence in heard) {
         val said = words(sentence)
+        val alarmsNamed = said.any { it in PLURAL_ALARM_WORDS } || (said.any { it in ALL_WORDS } && said.any { it in ALARM_WORDS })
+        if (alarmsNamed && said.any { it in OFF_WORDS || it in REMOVE_WORDS }) return ClockCommand.DismissAlarms
         if (said.any { it in ON_WORDS || it in OFF_WORDS }) continue
         val timer = said.any { it in TIMER_WORDS }
         val alarm = said.any { it in ALARM_WORDS }
