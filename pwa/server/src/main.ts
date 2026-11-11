@@ -17,6 +17,7 @@ import { HttpError, setAccountLanguage } from './errors.ts'
 import * as lgtv from './lgtv.ts'
 import { send as push, subscribe, unsubscribe, vapidPublicKey } from './push.ts'
 import * as switchBot from './switchbot.ts'
+import * as music from './music.ts'
 
 const PORT = Number(process.env.PORT ?? 8080)
 const HTTPS_PORT = Number(process.env.HTTPS_PORT ?? 8443)
@@ -957,6 +958,18 @@ route('POST', '/api/backup/import', async (req, res) => {
   data.touch()
   ok(res)
 })
+
+// --- music: the songs of the folder of the account on the server -----------------------------
+
+route('GET', '/api/music', async (_req, res, _p, _u, user) =>
+  json(res, 200, { tracks: await music.library(user.username), folder: music.accountDir(user.username) }))
+
+route('GET', '/api/music/file', (req, res, _p, url, user) => music.stream(req, res, user.username, url.searchParams.get('path') ?? ''))
+
+route('GET', '/api/music/cover', async (_req, res, _p, url, user) => music.cover(res, user.username, url.searchParams.get('path') ?? ''))
+
+route('PUT', '/api/music/file', async (req, res, _p, url, user) =>
+  json(res, 200, { path: await music.upload(req, user.username, url.searchParams.get('path') ?? '') }))
 
 // --- push ----------------------------------------------------------------------------------------
 

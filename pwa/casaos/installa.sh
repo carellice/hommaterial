@@ -177,6 +177,12 @@ if [ "$UPDATE" = 0 ]; then
   ask "Cartella dove salvare i dati" "${DATA_DIR:-$default_data}"
   DATA_DIR="$REPLY"
 
+  info "La musica per il lettore: ogni account ha la sua sottocartella, con il suo nome."
+  default_music="/DATA/Media/Music"
+  [ -d /DATA ] || default_music="/opt/$APP/music"
+  ask "Cartella della musica" "${MUSIC_DIR:-$default_music}"
+  MUSIC_DIR="$REPLY"
+
   default_port="${PORT:-8096}"
   while true; do
     ask "Porta per aprire Hommaterial nel browser" "$default_port"
@@ -259,11 +265,17 @@ ok "Immagine $IMAGE pronta"
 # --- avvio -------------------------------------------------------------------------------------
 
 step "Avvio Hommaterial"
-mkdir -p "$APP_DIR" "$DATA_DIR"
+# Chi aggiorna con questo script da un'installazione senza musica la trova tra le cartelle dei media.
+if [ -z "${MUSIC_DIR:-}" ]; then
+  MUSIC_DIR="/DATA/Media/Music"
+  [ -d /DATA ] || MUSIC_DIR="/opt/$APP/music"
+fi
+mkdir -p "$APP_DIR" "$DATA_DIR" "$MUSIC_DIR"
 umask 077
 cat > "$ENV_FILE" <<EOF
 # Configurazione di Hommaterial, scritta da installa.sh
 DATA_DIR=$DATA_DIR
+MUSIC_DIR=$MUSIC_DIR
 PORT=$PORT
 HTTPS_PORT=$HTTPS_PORT
 HTTPS_HOSTS=$HTTPS_HOSTS
@@ -289,6 +301,9 @@ services:
       - type: bind
         source: \${DATA_DIR}
         target: /data
+      - type: bind
+        source: \${MUSIC_DIR}
+        target: /music
     environment:
       TZ: \${TZ}
       PORT: \${PORT}
@@ -306,6 +321,10 @@ services:
           description:
             en_us: "Accounts, choices and sensor history"
             it_it: "Account, scelte e storico dei sensori"
+        - container: /music
+          description:
+            en_us: "Music of the player, a folder for each account"
+            it_it: "Musica del lettore, una cartella per account"
 x-casaos:
   architectures:
     - amd64

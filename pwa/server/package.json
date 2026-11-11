@@ -12,6 +12,7 @@
     "node": ">=24"
   },
   "dependencies": {
+    "music-metadata": "11.16.1",
     "web-push": "3.6.7"
   }
 }

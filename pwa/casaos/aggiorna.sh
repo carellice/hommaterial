@@ -46,6 +46,26 @@ recreate() {
   (cd "$APP_DIR" && "${COMPOSE[@]}" --env-file "$ENV_FILE" up -d --force-recreate --remove-orphans) >/dev/null 2>&1
 }
 
+# La cartella della musica, per le installazioni di prima del lettore: va nel .env e nel compose,
+# e quello che era stato caricato nei dati di Hommaterial passa lì.
+ensure_music() {
+  local compose="$APP_DIR/docker-compose.yml"
+  [ -f "$compose" ] || return 0
+  grep -q 'target: /music$' "$compose" && return 0
+  if [ -z "${MUSIC_DIR:-}" ]; then
+    MUSIC_DIR="/DATA/Media/Music"
+    [ -d /DATA ] || MUSIC_DIR="/opt/$APP/music"
+    printf 'MUSIC_DIR=%s\n' "$MUSIC_DIR" >>"$ENV_FILE"
+  fi
+  mkdir -p "$MUSIC_DIR"
+  if [ -d "$DATA_DIR/music" ]; then
+    cp -an "$DATA_DIR/music/." "$MUSIC_DIR/" && rm -rf "$DATA_DIR/music"
+  fi
+  awk '{ print } /^        target: \/data$/ && !done { print "      - type: bind"; print "        source: ${MUSIC_DIR}"; print "        target: /music"; done = 1 }' \
+    "$compose" >"$compose.new" && mv -f "$compose.new" "$compose"
+  ok "Musica in $MUSIC_DIR"
+}
+
 wait_for() { # wait_for versione: true quando Hommaterial risponde con quella versione
   for _ in $(seq 1 60); do
     [ "$(running_version)" = "$1" ] && return 0
@@ -149,6 +169,7 @@ main() {
   fi
   docker tag "$NEW_IMAGE" "$IMAGE"
   docker rmi "$NEW_IMAGE" >/dev/null 2>&1 || true
+  ensure_music
   recreate || true
 
   if ! wait_for "$version"; then
