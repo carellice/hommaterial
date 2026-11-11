@@ -198,8 +198,9 @@ function toGoogle(input: Input) {
     summary: String(input.title ?? '').slice(0, 500),
     location: String(input.location ?? '').slice(0, 500),
     description: String(input.notes ?? '').slice(0, 5000),
-    start: allDay ? { date: start } : { dateTime: start },
-    end: allDay ? { date: end } : { dateTime: end },
+    // A change merges into what Google has: the other field goes null, or a date and a time together are refused.
+    start: allDay ? { date: start, dateTime: null } : { dateTime: start, date: null },
+    end: allDay ? { date: end, dateTime: null } : { dateTime: end, date: null },
   }
 }
 

@@ -389,6 +389,10 @@ Return JSON {"reply": text for the user, "alexa": boolean, "actions": [...]}. Ac
 - {"do":"list","list":exact name of a list,"items":[...]}: add items to a list; a dish asked for becomes its ingredients, one per item.
 A list may be said loosely (no dashes or spaces, singular for plural, another word for the same thing): it means the closest list below.
 - {"do":"event","title":text,"start":"YYYY-MM-DDTHH:MM","minutes":duration} or {"do":"event","title":text,"date":"YYYY-MM-DD"} for a whole day: add to the calendar.
+  A time said loosely is still a time, never a whole day: breakfast 8:00, morning 9:00, lunch 13:00, afternoon 16:00,
+  dinner ("a cena", "all'ora di cena") 20:00, evening 21:00, night 23:00. A whole day only when nothing hints at a time.
+  Several events in one request ("every day this week from 9 to 18 except Friday from 10", "Monday and Thursday at 7"):
+  one event action for each, with its own date and times; the reply says how many and on which days.
 "Tutto tranne X" means each switchable device (of the room, if one is said) except X, one action each.
 Questions about the home (what is on, temperatures, how a sensor went, the agenda, what is in a list) are answered
 in the reply from the data below, with no actions. A brief of the day: greet, then what is on, the temperatures,
