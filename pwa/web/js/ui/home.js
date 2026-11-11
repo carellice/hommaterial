@@ -22,6 +22,7 @@ import { TeamHomeCard, TeamScreen } from './team.js';
 import { WeatherHomeCard } from './weather.js';
 import { CalendarPage, HomeAgenda, reloadCalendar } from './calendar.js';
 import { NotesPage, reloadNotes } from './notes.js';
+import { MusicPage, PlayerBar, UploadButton, reloadMusic } from './music.js';
 
 // By size of the tiles: compact, normal, large.
 const LIST_MIN_WIDTH = 320;
@@ -166,8 +167,9 @@ export function HomeScreen({ onSettings }) {
           ? html`<${Title} updatedAt=${s.updatedAt} />`
           : html`<${SearchField} query=${query} onChange=${setQuery} onEnter=${() => found[0] && activate(found[0])} />`}
         ${tab !== TAB_HOME
-          ? html`<${RefreshButton} key=${tab} onRefresh=${() => (tab === TAB_LISTS ? reloadLists() : tab === TAB_CALENDAR ? reloadCalendar(s) : reloadNotes())} />
+          ? html`<${RefreshButton} key=${tab} onRefresh=${() => (tab === TAB_LISTS ? reloadLists() : tab === TAB_CALENDAR ? reloadCalendar(s) : tab === TAB_MUSIC ? reloadMusic() : reloadNotes())} />
             ${tab === TAB_LISTS && html`<${IconButton} icon="edit" label=${str('lists_edit')} onClick=${() => setEditingLists(true)} />`}
+            ${tab === TAB_MUSIC && html`<${UploadButton} />`}
             <${VoiceButton} /><${OverflowMenu} s=${s} onSettings=${onSettings} onArrange=${() => setArranging(true)} />`
           : query != null
           ? html`<${IconButton} icon="close" label=${str('search_close')} onClick=${() => setQuery(null)} />`
@@ -179,6 +181,7 @@ export function HomeScreen({ onSettings }) {
       </div>
       ${tab === TAB_LISTS ? html`<div class=${`body-row tab-page ${from}`} key="lists"><${ListsPage} s=${s} /></div>`
       : tab === TAB_CALENDAR ? html`<div class=${`body-row tab-page ${from}`} key="calendar"><${CalendarPage} s=${s} onSettings=${onSettings} /></div>`
+      : tab === TAB_MUSIC ? html`<div class=${`body-row tab-page ${from}`} key="music"><${MusicPage} /></div>`
       : tab === TAB_NOTES ? html`<div class="body-row tab-page from-right" key="notes"><${NotesPage} s=${s} /></div>` : html`
       <div class="body-row tab-page from-left" key="home">
         ${pages.length > 1 && query == null && html`
@@ -195,6 +198,7 @@ export function HomeScreen({ onSettings }) {
           </div>
         <//>
       </div>`}
+      ${query == null && !typing && html`<${PlayerBar} />`}
       <${BottomBar} current=${tab} visible=${query == null && !typing} notes=${hasNotes} onSelect=${setTab} />
       ${arranging && html`<${ArrangeDialog} s=${s} onDismiss=${() => setArranging(false)} />`}
       ${editingLists && html`<${ListsEditDialog} s=${s} onDismiss=${() => setEditingLists(false)} />`}
@@ -207,9 +211,10 @@ const TAB_HOME = 'home';
 const TAB_LISTS = 'lists';
 const TAB_CALENDAR = 'calendar';
 const TAB_NOTES = 'notes';
+const TAB_MUSIC = 'music';
 const TABS = [
   [TAB_HOME, 'nav_home', 'home'], [TAB_LISTS, 's_lists', 'checklist'], [TAB_CALENDAR, 's_calendar', 'calendar_month'],
-  [TAB_NOTES, 's_notes', 'description'],
+  [TAB_MUSIC, 's_music', 'library_music'], [TAB_NOTES, 's_notes', 'description'],
 ];
 
 /** Reads the page again from Alexa, Notion or the calendar, without waiting for a pull. */

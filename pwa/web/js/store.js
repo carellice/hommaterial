@@ -203,7 +203,7 @@ export function onMessage(listener) {
   return () => messageListeners.delete(listener);
 }
 
-function say(text) {
+export function say(text) {
   for (const listener of messageListeners) listener(text);
 }
 
