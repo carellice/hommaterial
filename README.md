@@ -131,13 +131,14 @@ collegati al proprio account Alexa.
 - Su Android, a voce o nella chat, timer e sveglie si impostano nell'app Orologio
   del telefono: «imposta un timer di 10 minuti», «timer di un'ora e mezza»,
   «sveglia alle 7», «svegliami alle 6 e mezza», «svegliami tra 20 minuti».
-  Una frase che accende o spegne qualcosa resta ai dispositivi.
+  Anche più sveglie insieme: «imposta delle sveglie ogni 10 minuti dalle 6:30
+  alle 7:30» mette 6:30, 6:40, 6:50… fino alle 7:30. Una frase che accende o spegne qualcosa resta ai dispositivi.
 - Su Android c'è un lettore musicale: in **Impostazioni → Musica** scegli una
   cartella del telefono (con le sue sottocartelle) e compare la pagina **Musica**
   nella barra in basso, con brani, album, artisti e cartelle. La musica continua
   in background, con i comandi nella notifica e nella schermata di blocco. Un tocco
   sulla barra del brano apre il lettore a tutto schermo (copertina, avanzamento,
-  casuale e ripeti); il campo in alto cerca tra brani, album, artisti e cartelle. Con la
+  casuale e ripeti, timer di spegnimento con l'icona della luna); il campo in alto cerca tra brani, album, artisti e cartelle. Con la
   voce: «riproduci tutta la musica in modo casuale», «riproduci la musica di
   Claudio Baglioni», «metti l'album …»; mentre suona, «pausa», «riprendi»,
   «canzone successiva», «brano precedente».

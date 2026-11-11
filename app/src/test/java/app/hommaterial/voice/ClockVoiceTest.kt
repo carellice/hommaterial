@@ -33,6 +33,20 @@ class ClockVoiceTest {
     }
 
     @Test
+    fun alarmSeriesAreRead() {
+        val series = { text: String -> (parseClock(listOf(text)) as? ClockCommand.Alarms)?.times }
+        assertEquals(
+            listOf(6 to 30, 6 to 40, 6 to 50, 7 to 0, 7 to 10, 7 to 20, 7 to 30),
+            series("imposta delle sveglie ogni 10 minuti dalle 6:30 alle 7:30"),
+        )
+        assertEquals(listOf(6 to 0, 6 to 15, 6 to 30), series("sveglie ogni quarto d'ora dalle 6 alle 6 e mezza"))
+        assertEquals(listOf(23 to 30, 0 to 0, 0 to 30, 1 to 0), series("sveglie ogni mezz'ora dalle 23 e 30 all'una"))
+        assertEquals(listOf(6 to 0, 6 to 5, 6 to 10), series("set alarms every 5 minutes from 6 to 6 10"))
+        assertEquals(listOf(7 to 0, 7 to 20), series("dalle 7 alle 7 e 20 sveglie ogni 20 minuti"))
+        assertEquals(7 to 0, alarm("sveglia alle 7"))
+    }
+
+    @Test
     fun otherSentencesAreLeftAlone() {
         assertNull(parseClock(listOf("spegni la sveglia")))
         assertNull(parseClock(listOf("accendi la luce tra 10 minuti")))

@@ -73,6 +73,7 @@
     <string name="voice_open_app">Opening %1$s</string>
     <string name="voice_timer_set">Timer set for %1$s</string>
     <string name="voice_alarm_set">Alarm set for %1$s</string>
+    <string name="voice_alarms_set">%1$d alarms set from %2$s to %3$s</string>
     <string name="voice_no_clock">No clock app on the phone for timers and alarms</string>
     <string name="voice_not_understood">I did not understand “%1$s”</string>
     <string name="voice_unavailable">Speech recognition is not available on this phone</string>
@@ -1105,6 +1106,10 @@
     <string name="music_add_queue">Add to queue</string>
     <string name="music_queued_next">“%1$s” plays next</string>
     <string name="music_queued">“%1$s” added to the queue</string>
+    <string name="music_sleep">Sleep timer</string>
+    <string name="music_sleep_minutes">%1$d minutes</string>
+    <string name="music_sleep_off">Turn off the timer</string>
+    <string name="music_sleep_until">Stops at %1$s</string>
     <string name="music_queue">Queue</string>
     <string name="music_queue_empty">Nothing plays after this song</string>
     <string name="music_remove">Remove from the queue</string>

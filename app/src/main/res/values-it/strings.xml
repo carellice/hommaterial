@@ -71,6 +71,7 @@
     <string name="voice_open_app">Apro %1$s</string>
     <string name="voice_timer_set">Timer di %1$s avviato</string>
     <string name="voice_alarm_set">Sveglia impostata alle %1$s</string>
+    <string name="voice_alarms_set">%1$d sveglie impostate dalle %2$s alle %3$s</string>
     <string name="voice_no_clock">Nessuna app orologio sul telefono per timer e sveglie</string>
     <string name="voice_not_understood">Non ho capito «%1$s»</string>
     <string name="voice_unavailable">Riconoscimento vocale non disponibile su questo telefono</string>
@@ -1095,6 +1096,10 @@
     <string name="music_add_queue">Aggiungi alla coda</string>
     <string name="music_queued_next">«%1$s» sarà il prossimo</string>
     <string name="music_queued">«%1$s» aggiunto alla coda</string>
+    <string name="music_sleep">Timer di spegnimento</string>
+    <string name="music_sleep_minutes">%1$d minuti</string>
+    <string name="music_sleep_off">Togli il timer</string>
+    <string name="music_sleep_until">Si ferma alle %1$s</string>
     <string name="music_queue">Coda di riproduzione</string>
     <string name="music_queue_empty">Dopo questo brano non c\'è altro</string>
     <string name="music_remove">Togli dalla coda</string>

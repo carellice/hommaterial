@@ -272,10 +272,18 @@ sealed interface ClockCommand {
     data class Timer(val seconds: Int) : ClockCommand
 
     data class Alarm(val hour: Int, val minute: Int) : ClockCommand
+
+    /** Several alarms at once, as hour to minute, in the order they ring. */
+    data class Alarms(val times: List<Pair<Int, Int>>) : ClockCommand
 }
 
 private val TIMER_WORDS = setOf("timer", "countdown")
-private val ALARM_WORDS = setOf("sveglia", "svegliami", "svegliarmi", "alarm", "wake")
+private val ALARM_WORDS = setOf("sveglia", "sveglie", "svegliami", "svegliarmi", "alarm", "alarms", "wake")
+private val EVERY_WORDS = setOf("ogni", "every")
+private val FROM_WORDS = setOf("dalle", "dall", "da", "from")
+private val UNTIL_WORDS = setOf("alle", "all", "a", "to", "until")
+// More than this is surely a misunderstanding, and too many alarms to set in the clock app one by one.
+private const val MAX_ALARMS = 30
 private val NUMBER_WORDS = mapOf(
     "un" to 1, "uno" to 1, "una" to 1, "a" to 1, "an" to 1, "one" to 1, "due" to 2, "two" to 2, "tre" to 3, "three" to 3,
     "quattro" to 4, "four" to 4, "cinque" to 5, "five" to 5, "sei" to 6, "six" to 6, "sette" to 7, "seven" to 7,
@@ -349,9 +357,26 @@ private fun clockTime(words: List<String>, rest: List<String>): Pair<Int, Int>? 
     return hour to minute
 }
 
+/** "ogni 10 minuti dalle 6:30 alle 7:30": the alarms from one time to the other, both included; null when not said so. */
+private fun alarmSeries(words: List<String>): List<Pair<Int, Int>>? {
+    val every = words.indexOfFirst { it in EVERY_WORDS }.takeIf { it >= 0 } ?: return null
+    val from = words.indexOfFirst { it in FROM_WORDS }.takeIf { it >= 0 } ?: return null
+    // Only the words of the step: the hours after it would add up to it.
+    val step = duration(words.drop(every + 1).takeWhile { it !in FROM_WORDS })?.div(60)?.takeIf { it > 0 } ?: return null
+    val until = (from + 2 until words.size).firstOrNull { words[it] in UNTIL_WORDS } ?: return null
+    val clean = { list: List<String> -> list.filter { it != "le" && it != "ore" } }
+    val (h1, m1) = clockTime(words, clean(words.subList(from + 1, until))) ?: return null
+    val (h2, m2) = clockTime(words, clean(words.drop(until + 1))) ?: return null
+    val start = h1 * 60 + m1
+    // Past midnight the end is on the next day: "dalle 23 all'1".
+    val end = (h2 * 60 + m2).let { if (it < start) it + 24 * 60 else it }
+    return (start..end step step).take(MAX_ALARMS).map { (it / 60 % 24) to (it % 60) }
+}
+
 /**
  * Looks in what was [heard] for a timer ("imposta un timer di 10 minuti", "timer 5 minuti") or an
- * alarm ("sveglia alle 7", "svegliami alle 6 e mezza"; "svegliami tra 20 minuti" is a timer). A
+ * alarm ("sveglia alle 7", "svegliami alle 6 e mezza"; "svegliami tra 20 minuti" is a timer), or a
+ * series of alarms ("imposta delle sveglie ogni 10 minuti dalle 6:30 alle 7:30"). A
  * sentence that switches something on or off is left to the devices: "spegni la sveglia" is not one.
  */
 fun parseClock(heard: List<String>): ClockCommand? {
@@ -361,6 +386,7 @@ fun parseClock(heard: List<String>): ClockCommand? {
         val timer = said.any { it in TIMER_WORDS }
         val alarm = said.any { it in ALARM_WORDS }
         if (!timer && !alarm) continue
+        if (alarm) alarmSeries(said)?.let { return ClockCommand.Alarms(it) }
         if (alarm) clockTime(said)?.let { (h, m) -> return ClockCommand.Alarm(h, m) }
         duration(said)?.let { return ClockCommand.Timer(it.coerceAtMost(24 * 3600)) }
     }

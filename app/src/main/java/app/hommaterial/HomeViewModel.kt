@@ -843,7 +843,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private fun setClock(heard: List<String>): Boolean {
         val context = getApplication<Application>()
         val command = parseClock(heard) ?: return false
+        if (command is ClockCommand.Alarms) return setAlarms(command.times)
         val (intent, said) = when (command) {
+            is ClockCommand.Alarms -> return true
             is ClockCommand.Timer -> Intent(AlarmClock.ACTION_SET_TIMER)
                 .putExtra(AlarmClock.EXTRA_LENGTH, command.seconds)
                 .putExtra(AlarmClock.EXTRA_SKIP_UI, true) to str(R.string.voice_timer_set, durationText(command.seconds))
@@ -860,6 +862,36 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             _haptics.tryEmit(Haptic.Reject)
             _messages.tryEmit(str(R.string.voice_no_clock))
         }
+        return true
+    }
+
+    /** Sets one alarm for each of [times] in the clock app, one after the other so that none goes missing. */
+    private fun setAlarms(times: List<Pair<Int, Int>>): Boolean {
+        val context = getApplication<Application>()
+        val clock = { (h, m): Pair<Int, Int> -> "%d:%02d".format(h, m) }
+        val alarm = { (h, m): Pair<Int, Int> ->
+            Intent(AlarmClock.ACTION_SET_ALARM)
+                .putExtra(AlarmClock.EXTRA_HOUR, h)
+                .putExtra(AlarmClock.EXTRA_MINUTES, m)
+                .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(alarm(times.first()))
+        } catch (e: ActivityNotFoundException) {
+            _haptics.tryEmit(Haptic.Reject)
+            _messages.tryEmit(str(R.string.voice_no_clock))
+            return true
+        }
+        viewModelScope.launch {
+            for (time in times.drop(1)) {
+                // The clock app takes one request at a time: too close together, some are lost.
+                delay(600)
+                runCatching { context.startActivity(alarm(time)) }
+            }
+        }
+        _haptics.tryEmit(Haptic.Confirm)
+        _messages.tryEmit(str(R.string.voice_alarms_set, times.size, clock(times.first()), clock(times.last())))
         return true
     }
 
