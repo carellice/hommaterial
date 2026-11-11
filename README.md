@@ -152,6 +152,9 @@ collegati al proprio account Alexa.
   suonano in streaming. **Scarica** (su un brano, un album, un artista, o
   «Scarica tutto») li tiene anche sul telefono: senza rete si vedono e suonano
   solo quelli. Si caricano dalla pagina **Musica** della versione web.
+  Mentre scarica, il cerchio mostra a che punto è e un tocco ferma i download;
+  sui brani già scaricati un tocco li toglie dal telefono: restano sul server e
+  tornano a suonare in streaming.
 - Su Android c'è un lettore musicale: in **Impostazioni → Musica** scegli una
   cartella del telefono (con le sue sottocartelle) e compare la pagina **Musica**
   nella barra in basso, con brani, album, artisti e cartelle. La musica continua

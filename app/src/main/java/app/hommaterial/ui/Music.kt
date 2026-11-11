@@ -98,6 +98,7 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -411,20 +412,29 @@ private fun TrackRow(track: Track, current: Boolean, playing: Boolean, modifier:
     )
 }
 
-/** Downloads the songs of [list] of the home server that are not yet on the phone; done, a tick. */
+/**
+ * Downloads the songs of [list] of the home server that are not yet on the phone. While downloading,
+ * a ring shows how far it has gone and a tap stops it; once all are on the phone, a tap takes them off.
+ */
 @Composable
 private fun DownloadButton(list: List<Track>) {
     val context = LocalContext.current
     val server by MusicLibrary.server.collectAsState()
     val downloaded by MusicDownloads.downloaded.collectAsState()
     val waiting by MusicDownloads.waiting.collectAsState()
+    val progress by MusicDownloads.progress.collectAsState()
     if (!server || list.isEmpty()) return
     val all = list.all { it.uri in downloaded }
     when {
-        all -> Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            Icon(Icons.Outlined.DownloadDone, contentDescription = str(R.string.music_downloaded), tint = MaterialTheme.colorScheme.primary)
+        waiting > 0 -> IconButton(onClick = { MusicDownloads.stop(context) }) {
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(progress = { progress }, modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+                Icon(Icons.Outlined.Stop, contentDescription = str(R.string.music_download_stop), modifier = Modifier.size(18.dp))
+            }
         }
-        waiting > 0 -> Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }
+        all -> IconButton(onClick = { MusicDownloads.remove(context, list) }) {
+            Icon(Icons.Outlined.DownloadDone, contentDescription = str(R.string.music_remove_downloads), tint = MaterialTheme.colorScheme.primary)
+        }
         else -> IconButton(onClick = { MusicDownloads.download(context, list) }) {
             Icon(Icons.Outlined.Download, contentDescription = str(R.string.music_download))
         }
@@ -466,6 +476,16 @@ private fun QueueMenu(track: Track) {
                     onClick = {
                         open = false
                         MusicDownloads.download(context, listOf(track))
+                    },
+                )
+            }
+            if (track.uri in MusicDownloads.downloaded.value) {
+                DropdownMenuItem(
+                    text = { Text(str(R.string.music_remove_downloads)) },
+                    leadingIcon = { Icon(Icons.Outlined.DownloadDone, contentDescription = null) },
+                    onClick = {
+                        open = false
+                        MusicDownloads.remove(context, listOf(track))
                     },
                 )
             }
@@ -1086,7 +1106,18 @@ internal fun MusicSettings() {
             text = if (scanning) str(R.string.music_reading) else str(R.string.music_source_server_text) + "\n" + plural(R.plurals.music_tracks, tracks.orEmpty().size),
             onClick = if (scanning) null else ({ MusicLibrary.refresh(context) }),
         )
-        Setting(title = str(R.string.music_download_all), onClick = { MusicDownloads.download(context, tracks.orEmpty()) })
+        val waiting by MusicDownloads.waiting.collectAsState()
+        val progress by MusicDownloads.progress.collectAsState()
+        if (waiting > 0) {
+            Setting(
+                title = str(R.string.music_download_stop),
+                text = str(R.string.music_download_progress, Math.round(progress * 100), waiting),
+                onClick = { MusicDownloads.stop(context) },
+            )
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
+        } else {
+            Setting(title = str(R.string.music_download_all), onClick = { MusicDownloads.download(context, tracks.orEmpty()) })
+        }
         if (downloaded.isNotEmpty()) {
             Setting(
                 title = str(R.string.music_downloads_delete),

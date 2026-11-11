@@ -1107,6 +1107,11 @@
     <string name="music_downloads">Brani scaricati: %1$d · %2$s</string>
     <string name="music_downloads_delete">Elimina i brani scaricati</string>
     <string name="music_downloaded">Scaricato</string>
+    <string name="music_download_stop">Ferma i download</string>
+    <string name="music_download_stopped">Download fermati</string>
+    <string name="music_download_progress">Scaricato il %1$d%% · ancora %2$d brani</string>
+    <string name="music_remove_downloads">Togli dal telefono</string>
+    <string name="music_removed">Brani tolti dal telefono: %1$d. Restano sul server e suonano in streaming</string>
     <string name="music_offline">Senza rete: solo i brani scaricati</string>
     <string name="music_songs">Brani</string>
     <string name="music_albums">Album</string>

@@ -1117,6 +1117,11 @@
     <string name="music_downloads">Downloaded songs: %1$d · %2$s</string>
     <string name="music_downloads_delete">Delete the downloaded songs</string>
     <string name="music_downloaded">Downloaded</string>
+    <string name="music_download_stop">Stop downloads</string>
+    <string name="music_download_stopped">Downloads stopped</string>
+    <string name="music_download_progress">Downloaded %1$d%% · %2$d songs to go</string>
+    <string name="music_remove_downloads">Remove from phone</string>
+    <string name="music_removed">Songs removed from the phone: %1$d. They stay on the server and play by streaming</string>
     <string name="music_offline">Offline: only the downloaded songs</string>
     <string name="music_songs">Songs</string>
     <string name="music_albums">Albums</string>

@@ -8,9 +8,13 @@ import android.widget.Toast
 import app.hommaterial.R
 import app.hommaterial.data.ServerSync
 import app.hommaterial.str
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +25,7 @@ import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.coroutines.coroutineContext
 
 /**
  * The songs of the home server kept on the phone, to play them without a network: each in a folder
@@ -35,6 +40,19 @@ object MusicDownloads {
 
     /** How many songs are still to download. */
     val waiting: StateFlow<Int> = _waiting.asStateFlow()
+    private val _progress = MutableStateFlow(0f)
+
+    /** How far the downloads asked so far have gone, from 0 to 1, the song being downloaded counted by its bytes. */
+    val progress: StateFlow<Float> = _progress.asStateFlow()
+
+    /** The songs asked since the downloads last ended, and the part of the current one already on the phone. */
+    private var total = 0
+    private var current = 0f
+    private val jobs = mutableListOf<Job>()
+
+    private fun showProgress() {
+        _progress.value = if (total == 0) 0f else ((total - _waiting.value + current) / total).coerceIn(0f, 1f)
+    }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
 
@@ -70,35 +88,98 @@ object MusicDownloads {
         val app = context.applicationContext
         val missing = tracks.filter { it.uri.startsWith("http") && it.uri !in _downloaded.value }
         if (missing.isEmpty()) return
-        _waiting.value += missing.size
+        synchronized(jobs) {
+            total += missing.size
+            _waiting.value += missing.size
+            showProgress()
+        }
         tell(app, str(R.string.music_downloading, missing.size))
-        scope.launch {
+        val job = scope.launch {
             var failed = 0
             mutex.withLock {
                 for (track in missing) {
+                    var part: File? = null
                     try {
                         val file = fileFor(app, track.uri) ?: throw IOException("no path")
                         file.parentFile?.mkdirs()
-                        val part = File(file.path + ".part")
+                        part = File(file.path + ".part")
                         open(track.uri).let { connection ->
                             try {
                                 if (connection.responseCode !in 200..299) throw IOException("HTTP ${connection.responseCode}")
-                                connection.inputStream.use { input -> part.outputStream().use { input.copyTo(it) } }
+                                val length = connection.contentLengthLong
+                                connection.inputStream.use { input ->
+                                    part.outputStream().use { output ->
+                                        val buffer = ByteArray(64 * 1024)
+                                        var read = 0L
+                                        while (true) {
+                                            coroutineContext.ensureActive()
+                                            val n = input.read(buffer)
+                                            if (n < 0) break
+                                            output.write(buffer, 0, n)
+                                            read += n
+                                            if (length > 0) {
+                                                current = read.toFloat() / length
+                                                showProgress()
+                                            }
+                                        }
+                                    }
+                                }
                             } finally {
                                 connection.disconnect()
                             }
                         }
                         if (!part.renameTo(file)) throw IOException("rename")
                         _downloaded.value = _downloaded.value + track.uri
+                    } catch (e: CancellationException) {
+                        part?.delete()
+                        throw e
                     } catch (e: Exception) {
+                        part?.delete()
                         failed++
                     } finally {
-                        _waiting.value -= 1
+                        synchronized(jobs) {
+                            _waiting.value = (_waiting.value - 1).coerceAtLeast(0)
+                            current = 0f
+                            if (_waiting.value == 0) total = 0
+                            showProgress()
+                        }
                     }
                 }
             }
             val done = missing.size - failed
             tell(app, if (failed == 0) str(R.string.music_download_done, done) else str(R.string.music_download_failed, failed))
+        }
+        synchronized(jobs) { jobs += job }
+        job.invokeOnCompletion { synchronized(jobs) { jobs -= job } }
+    }
+
+    /** Stops the downloads in progress and those waiting; the songs already downloaded stay on the phone. */
+    fun stop(context: Context) {
+        val running = synchronized(jobs) { jobs.toList() }
+        if (running.isEmpty()) return
+        running.forEach { it.cancel() }
+        scope.launch {
+            running.joinAll()
+            synchronized(jobs) {
+                // shortcut: a download asked while stopping is stopped too, which is what a user tapping stop expects.
+                _waiting.value = 0
+                total = 0
+                current = 0f
+                showProgress()
+            }
+            tell(context.applicationContext, str(R.string.music_download_stopped))
+        }
+    }
+
+    /** Takes the songs of [tracks] off the phone: they stay on the server and play again by streaming. */
+    fun remove(context: Context, tracks: List<Track>) {
+        val app = context.applicationContext
+        val kept = tracks.filter { it.uri in _downloaded.value }
+        if (kept.isEmpty()) return
+        scope.launch {
+            for (track in kept) fileFor(app, track.uri)?.delete()
+            _downloaded.value = _downloaded.value - kept.map { it.uri }.toSet()
+            tell(app, str(R.string.music_removed, kept.size))
         }
     }
 
