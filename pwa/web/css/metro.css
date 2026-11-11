@@ -321,6 +321,54 @@ html:root[data-look="metro"][data-theme="dark"] {
 [data-look="metro"] .item-row.checked .check-circle { background: var(--primary); border-color: var(--primary); color: #FFFFFF; }
 [data-look="metro"] .chat-bubble.mine { background: var(--primary); color: #FFFFFF; }
 
+/* ——— Dialogs: Cancel and Save as the framed square buttons of the phone, side by side ——— */
+[data-look="metro"] .dialog .actions { gap: 12px; }
+[data-look="metro"] .dialog .actions .text-btn {
+  flex: 1;
+  min-height: 42px;
+  border: 2px solid var(--mt-frame);
+  color: var(--on-surface);
+  font-weight: 600;
+  text-transform: lowercase;
+}
+[data-look="metro"] .dialog .actions .text-btn:hover { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+[data-look="metro"] .dialog .actions .text-btn:active { transform: perspective(600px) rotateX(6deg) scale(0.96); }
+[data-look="metro"] .dialog .actions .text-btn:disabled { border-color: color-mix(in srgb, var(--on-surface) 38%, transparent); }
+
+/* ——— The slider of Windows Phone: a flat bar filling with the accent, a narrow square thumb ——— */
+[data-look="metro"] input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; height: 40px; }
+[data-look="metro"] input[type="range"]::-webkit-slider-runnable-track {
+  height: 12px; border-radius: 0;
+  background: linear-gradient(var(--primary), var(--primary)) 0 / var(--fill, 0%) 100% no-repeat, var(--surface-container-highest);
+}
+[data-look="metro"] input[type="range"]::-moz-range-track { height: 12px; border-radius: 0; background: var(--surface-container-highest); }
+[data-look="metro"] input[type="range"]::-moz-range-progress { height: 12px; border-radius: 0; background: var(--primary); }
+[data-look="metro"] input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 28px; margin-top: -8px; border-radius: 0; border: none; background: var(--on-surface); }
+[data-look="metro"] input[type="range"]::-moz-range-thumb { width: 12px; height: 28px; border-radius: 0; border: none; background: var(--on-surface); }
+
+/* ——— Live tiles on the home: the calendar in the accent, the sky and the team each one flat color ——— */
+[data-look="metro"] .cal-home { background: var(--primary); color: #FFFFFF; transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1); }
+[data-look="metro"] .cal-home-head,
+[data-look="metro"] .cal-home .supporting,
+[data-look="metro"] .cal-tomorrow,
+[data-look="metro"] .cal-home-more { color: #FFFFFF; }
+[data-look="metro"] .cal-home .supporting { opacity: 0.8; }
+[data-look="metro"] .weather-card { background: var(--sky-b); }
+[data-look="metro"] .team-card { background: var(--team); }
+[data-look="metro"] .cal-home:active,
+[data-look="metro"] .team-card:active,
+[data-look="metro"] .weather-card:active { transform: perspective(600px) rotateX(5deg) scale(0.97); }
+
+/* ——— The side bar of a wide or turned screen: lowercase words set large, icons in rings ——— */
+[data-look="metro"] .side-item { text-transform: lowercase; font-size: 20px; font-weight: 300; min-height: 52px; }
+[data-look="metro"] .rail-item { text-transform: lowercase; }
+[data-look="metro"] .rail-item .pill { width: 42px; height: 42px; border-radius: 50%; border: 2px solid currentColor; }
+[data-look="metro"] .rail-item.selected .pill { border-color: var(--primary); }
+
+/* ——— The chat: what the assistant says on gray, what I write on the accent, both square ——— */
+[data-look="metro"] .chat-bubble { background: var(--surface-container-high); }
+[data-look="metro"] .chat-suggestions .chip { background: transparent; }
+
 @media (prefers-reduced-motion: reduce) {
   [data-look="metro"] .grid > *, [data-look="metro"] .tab-page { animation: none; }
   [data-look="metro"] .tile:active { transform: none; }

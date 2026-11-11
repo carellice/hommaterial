@@ -47,6 +47,10 @@ internal static class Metro
         "NavigationViewSelectionIndicatorForeground",
         "CardBackgroundFillColorDefaultBrush", "CardStrokeColorDefaultBrush",
         "ControlCornerRadius", "OverlayCornerRadius", "ButtonBorderThemeThickness", "ToggleSwitchOuterBorderStrokeThickness",
+        "SliderTrackFill", "SliderTrackFillPointerOver", "SliderTrackFillPressed",
+        "SliderTrackValueFill", "SliderTrackValueFillPointerOver", "SliderTrackValueFillPressed",
+        "SliderThumbBackground", "SliderThumbBackgroundPointerOver", "SliderThumbBackgroundPressed",
+        "SliderTrackThemeHeight", "SliderHorizontalThumbWidth", "SliderHorizontalThumbHeight", "SliderThumbCornerRadius",
     ];
 
     /// <summary>
@@ -97,6 +101,14 @@ internal static class Metro
         Set(new CornerRadius(0), "ControlCornerRadius", "OverlayCornerRadius");
         Set(new Thickness(2), "ButtonBorderThemeThickness");
         Set(2.0, "ToggleSwitchOuterBorderStrokeThickness");
+        // The slider of the phone: a flat bar filling with the accent and a narrow square thumb.
+        Set(TileHover(dark), "SliderTrackFill", "SliderTrackFillPointerOver", "SliderTrackFillPressed");
+        Set(new SolidColorBrush(Accent), "SliderTrackValueFill", "SliderTrackValueFillPointerOver", "SliderTrackValueFillPressed");
+        Set(ink, "SliderThumbBackground", "SliderThumbBackgroundPointerOver", "SliderThumbBackgroundPressed");
+        Set(12.0, "SliderTrackThemeHeight");
+        Set(12.0, "SliderHorizontalThumbWidth");
+        Set(28.0, "SliderHorizontalThumbHeight");
+        Set(new CornerRadius(0), "SliderThumbCornerRadius");
         Skeuo.Refresh(root);
     }
 
