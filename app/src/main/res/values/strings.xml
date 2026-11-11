@@ -777,6 +777,10 @@
     <string name="notes_open_notion">Open in Notion</string>
     <string name="notes_failed">Could not read it. Try again.</string>
     <string name="notes_empty">This note is empty</string>
+    <string name="notes_add">Add text</string>
+    <string name="notes_block_edit">Change the text</string>
+    <string name="notes_block_text">Text</string>
+    <string name="notes_block_hint">Leave it empty to delete it from the note.</string>
     <string name="lists_none">Alexa has no lists to show.</string>
     <string name="list_todo">To-do</string>
     <string name="list_shopping">Shopping</string>

@@ -14,7 +14,8 @@ export type Source = { id: string; kind: 'database' | 'page'; name: string }
 export type Item = { id: string; name: string; completed: boolean; version: number }
 export type Note = { id: string; title: string; edited: number; url: string }
 /** A block of a note as the apps show it: h1, h2, h3, p, bullet, number, todo, quote, code, divider. */
-export type Block = { kind: string; text: string; checked: boolean; depth: number }
+/** [id] and [type], the block and its type in Notion, are there to change it. */
+export type Block = { kind: string; text: string; checked: boolean; depth: number; id: string; type: string }
 
 export const linked = () => getSecret<string | null>('notion_token', null) != null
 export const workspace = () => getSecret<string>('notion_workspace', '')
@@ -213,7 +214,7 @@ export async function noteBlocks(id: string): Promise<Block[]> {
       if (kind) {
         const content = block[block.type] ?? {}
         const text = block.type === 'child_page' ? String(content.title ?? '') : plain(content.rich_text)
-        blocks.push({ kind, text, checked: block.type === 'to_do' && content.checked === true, depth })
+        blocks.push({ kind, text, checked: block.type === 'to_do' && content.checked === true, depth, id: block.id, type: block.type })
       }
       if (block.has_children && depth < 2 && block.type !== 'child_page') await read(block.id, depth + 1)
     }
@@ -221,3 +222,23 @@ export async function noteBlocks(id: string): Promise<Block[]> {
   await read(id, 0)
   return blocks
 }
+
+/** The types of Notion whose text a note can change, the same as the app's (data/Notion.kt). */
+export const EDITABLE_BLOCKS = new Set([
+  'heading_1', 'heading_2', 'heading_3', 'paragraph', 'toggle', 'callout',
+  'bulleted_list_item', 'numbered_list_item', 'to_do', 'quote', 'code',
+])
+
+/** Changes a block of a note: its text, plain, when given, and its tick for a to-do. */
+export async function editBlock(id: string, type: string, text?: string, checked?: boolean) {
+  const content: Record<string, unknown> = {}
+  if (text != null) content.rich_text = richText(text)
+  if (checked != null && type === 'to_do') content.checked = checked
+  await api('PATCH', `/blocks/${id}`, { [type]: content })
+}
+
+export const deleteBlock = (id: string) => api('DELETE', `/blocks/${id}`)
+
+/** Adds a paragraph at the end of the note [id]. */
+export const addToNote = (id: string, text: string) =>
+  api('PATCH', `/blocks/${id}/children`, { children: [{ object: 'block', type: 'paragraph', paragraph: { rich_text: richText(text) } }] })

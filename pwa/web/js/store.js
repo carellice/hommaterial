@@ -757,6 +757,24 @@ export const notionNotes = () => onList(async () => {
 
 export const notionNote = (id) => onList(async () => (await get(`/api/notion/notes/${encodeURIComponent(id)}`)).blocks);
 
+// A note of Notion changes at once, as its lists (data/Notion.kt).
+
+/** Changes the text of a block, or deletes it when the text is left empty. */
+export async function editNoteBlock(block, text) {
+  const path = `/api/notion/blocks/${encodeURIComponent(block.id)}`;
+  return (await onList(() => (text.trim() ? api('PUT', path, { type: block.type, text }) : del(path)))) != null;
+}
+
+export async function tickNoteBlock(block, checked) {
+  navigator.vibrate?.(12);
+  return (await onList(() => api('PUT', `/api/notion/blocks/${encodeURIComponent(block.id)}`, { type: block.type, checked }))) != null;
+}
+
+export async function addToNote(id, text) {
+  navigator.vibrate?.(12);
+  return (await onList(() => post(`/api/notion/notes/${encodeURIComponent(id)}/blocks`, { text }))) != null;
+}
+
 export const alexaListItems = (listId) =>
   onList(async () => (await get(`${notionPath(listId) ?? `/api/lists/${encodeURIComponent(listId)}`}/items`)).items);
 

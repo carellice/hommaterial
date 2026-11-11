@@ -61,15 +61,35 @@ data class NotionNote(val id: String, val title: String, val edited: Long, val u
 
 /**
  * A block of the text of a note, flattened to what the app shows: [kind] is one of h1, h2, h3, p,
- * bullet, number, todo, quote, code, divider; [depth] how far it is nested in a list.
+ * bullet, number, todo, quote, code, divider; [depth] how far it is nested in a list. [id] and
+ * [type], the block and its type in Notion, are there to change it; empty in a note kept from before.
  */
-data class NoteBlock(val kind: String, val text: String, val checked: Boolean = false, val depth: Int = 0) {
+data class NoteBlock(
+    val kind: String,
+    val text: String,
+    val checked: Boolean = false,
+    val depth: Int = 0,
+    val id: String = "",
+    val type: String = "",
+) {
+    /** Whether its text can be changed here: a block of text, not a divider or a page inside the note. */
+    val editable: Boolean get() = id.isNotEmpty() && type in EDITABLE_BLOCKS
+
     fun toJson(): JSONObject = JSONObject().put("kind", kind).put("text", text).put("checked", checked).put("depth", depth)
+        .put("id", id).put("type", type)
 
     companion object {
-        fun fromJson(o: JSONObject) = NoteBlock(o.optString("kind", "p"), o.optString("text"), o.optBoolean("checked"), o.optInt("depth"))
+        fun fromJson(o: JSONObject) = NoteBlock(
+            o.optString("kind", "p"), o.optString("text"), o.optBoolean("checked"), o.optInt("depth"), o.optString("id"), o.optString("type"),
+        )
     }
 }
+
+/** The types of Notion whose text a note can change, the same as the server's. */
+internal val EDITABLE_BLOCKS = setOf(
+    "heading_1", "heading_2", "heading_3", "paragraph", "toggle", "callout",
+    "bulleted_list_item", "numbered_list_item", "to_do", "quote", "code",
+)
 
 /** The secret of the integration, without the server, and what this device shows of Notion. */
 class NotionStore(context: Context) {
@@ -253,6 +273,39 @@ class Notion(private val http: OkHttpClient, private val store: NotionStore) {
         return blocks
     }
 
+    /**
+     * Changes a block of a note: its text, when given, and its tick for a to-do. The text goes plain:
+     * the bold and the links of that block are lost, the rest of the note keeps them.
+     */
+    suspend fun editBlock(block: NoteBlock, text: String? = null, checked: Boolean? = null) {
+        if (ServerSync.active) {
+            val body = JSONObject().put("type", block.type)
+            if (text != null) body.put("text", text)
+            if (checked != null) body.put("checked", checked)
+            ServerSync.call("PUT", "/api/notion/blocks/${ServerSync.encode(block.id)}", body)
+            return
+        }
+        val content = JSONObject()
+        if (text != null) content.put("rich_text", richText(text))
+        if (checked != null && block.type == "to_do") content.put("checked", checked)
+        call("PATCH", "/blocks/${block.id}", JSONObject().put(block.type, content))
+    }
+
+    suspend fun deleteBlock(block: NoteBlock) {
+        if (ServerSync.active) ServerSync.call("DELETE", "/api/notion/blocks/${ServerSync.encode(block.id)}")
+        else call("DELETE", "/blocks/${block.id}")
+    }
+
+    /** Adds a paragraph at the end of the note [id]. */
+    suspend fun addToNote(id: String, text: String) {
+        if (ServerSync.active) {
+            ServerSync.call("POST", "/api/notion/notes/${ServerSync.encode(id)}/blocks", JSONObject().put("text", text))
+            return
+        }
+        val block = JSONObject().put("object", "block").put("type", "paragraph").put("paragraph", JSONObject().put("rich_text", richText(text)))
+        call("PATCH", "/blocks/$id/children", JSONObject().put("children", JSONArray().put(block)))
+    }
+
     // --- the API ----------------------------------------------------------------------------------
 
     private suspend fun children(id: String): List<JSONObject> {
@@ -391,18 +444,19 @@ internal fun noteBlock(block: JSONObject, depth: Int): NoteBlock? {
     val type = block.optString("type")
     val content = block.optJSONObject(type)
     val text = plain(content?.optJSONArray("rich_text"))
+    val id = block.optString("id")
     return when (type) {
-        "heading_1" -> NoteBlock("h1", text, depth = depth)
-        "heading_2" -> NoteBlock("h2", text, depth = depth)
-        "heading_3" -> NoteBlock("h3", text, depth = depth)
-        "paragraph", "toggle", "callout" -> NoteBlock("p", text, depth = depth)
-        "bulleted_list_item" -> NoteBlock("bullet", text, depth = depth)
-        "numbered_list_item" -> NoteBlock("number", text, depth = depth)
-        "to_do" -> NoteBlock("todo", text, content?.optBoolean("checked") == true, depth)
-        "quote" -> NoteBlock("quote", text, depth = depth)
-        "code" -> NoteBlock("code", text, depth = depth)
-        "divider" -> NoteBlock("divider", "", depth = depth)
-        "child_page" -> NoteBlock("p", content?.optString("title").orEmpty(), depth = depth)
+        "heading_1" -> NoteBlock("h1", text, depth = depth, id = id, type = type)
+        "heading_2" -> NoteBlock("h2", text, depth = depth, id = id, type = type)
+        "heading_3" -> NoteBlock("h3", text, depth = depth, id = id, type = type)
+        "paragraph", "toggle", "callout" -> NoteBlock("p", text, depth = depth, id = id, type = type)
+        "bulleted_list_item" -> NoteBlock("bullet", text, depth = depth, id = id, type = type)
+        "numbered_list_item" -> NoteBlock("number", text, depth = depth, id = id, type = type)
+        "to_do" -> NoteBlock("todo", text, content?.optBoolean("checked") == true, depth, id, type)
+        "quote" -> NoteBlock("quote", text, depth = depth, id = id, type = type)
+        "code" -> NoteBlock("code", text, depth = depth, id = id, type = type)
+        "divider" -> NoteBlock("divider", "", depth = depth, id = id, type = type)
+        "child_page" -> NoteBlock("p", content?.optString("title").orEmpty(), depth = depth, id = id, type = type)
         else -> null
     }
 }

@@ -924,6 +924,11 @@ a { color: var(--primary); }
 .note-list.checked { color: var(--on-surface-variant); }
 .note-list.checked > span:last-child { text-decoration: line-through; }
 .note-list.checked .icon { color: var(--primary); }
+/* A piece of a note opens to be changed on a touch; its box ticks it. */
+.note-text [role="button"] { cursor: pointer; border-radius: 8px; transition: background-color .15s; }
+.note-text [role="button"]:hover, .note-text [role="button"]:focus-visible { background: color-mix(in srgb, var(--on-surface) 8%, transparent); outline: none; }
+.note-tick { all: unset; cursor: pointer; display: inline-flex; border-radius: 4px; }
+.note-tick:focus-visible { outline: 2px solid var(--primary); }
 .note-text blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--primary); color: var(--on-surface-variant); }
 .note-text pre { margin: 0; padding: 12px; border-radius: 12px; background: var(--surface-container-high); white-space: pre-wrap; font-family: ui-monospace, monospace; }
 

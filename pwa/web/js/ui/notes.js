@@ -69,13 +69,34 @@ export function NotesPage({ s }) {
     </div>`;
 }
 
-/** One note, read from Notion as it is now, with the way to open it there to change it. */
+/** The types of Notion whose text a note can change, the same as the server's (server/src/notion.ts). */
+const EDITABLE_BLOCKS = new Set([
+  'heading_1', 'heading_2', 'heading_3', 'paragraph', 'toggle', 'callout',
+  'bulleted_list_item', 'numbered_list_item', 'to_do', 'quote', 'code',
+]);
+const editable = (b) => !!b.id && EDITABLE_BLOCKS.has(b.type);
+
+/**
+ * One note, read from Notion as it is now: a touch on a piece of text changes it, a touch on a box
+ * ticks it, the button at the end adds text. Each change goes to Notion at once and the note is read again.
+ */
 function NoteView({ note, ai, onDismiss }) {
   const [blocks, setBlocks] = useState(null);
   const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    store.notionNote(note.id).then((read) => (read ? setBlocks(read) : setFailed(true)));
-  }, [note.id]);
+  const [editing, setEditing] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const read = () => store.notionNote(note.id).then((found) => (found ? (setBlocks(found), setFailed(false)) : setFailed(true)));
+  useEffect(() => { read(); }, [note.id]);
+  const tick = async (block) => {
+    setBlocks(blocks.map((it) => (it.id === block.id ? { ...it, checked: !block.checked } : it)));
+    if (!(await store.tickNoteBlock(block, !block.checked))) read();
+  };
+  // A piece of text opens to be changed on a touch, or on Enter.
+  const edit = (b) => (editable(b)
+    ? { role: 'button', tabindex: 0, onClick: () => setEditing(b),
+      onKeyDown: (e) => e.key === 'Enter' && (e.preventDefault(), setEditing(b)) }
+    : {});
+  const addButton = html`<button class="tonal-btn" style="margin-top:16px" onClick=${() => setAdding(true)}>${str('notes_add')}</button>`;
   let number = 0;
   return html`
     <${FullDialog} title=${note.title} onDismiss=${onDismiss} closeLabel=${str('close')}
@@ -85,26 +106,51 @@ function NoteView({ note, ai, onDismiss }) {
         title=${str('notes_open_notion')}><${Icon} name="open_in_new" /></a>`}`}>
       ${!blocks && !failed && html`<div style="padding:32px;text-align:center"><${Spinner} big /></div>`}
       ${failed && html`<p class="body-large faint" style="padding:32px;text-align:center">${str('notes_failed')}</p>`}
-      ${blocks && !blocks.length && html`<p class="body-large faint" style="padding:32px;text-align:center">${str('notes_empty')}</p>`}
+      ${blocks && !blocks.length && html`<div style="padding:32px;text-align:center">
+        <p class="body-large faint">${str('notes_empty')}</p>${addButton}</div>`}
       ${blocks && html`<div class="note-text">${blocks.map((b, i) => {
         number = b.kind === 'number' ? number + 1 : 0;
         const indent = `margin-left:${b.depth * 20}px`;
-        if (b.kind === 'h1') return html`<h2 key=${i} class="headline-small" style=${indent}>${b.text}</h2>`;
-        if (b.kind === 'h2') return html`<h3 key=${i} class="title-large" style=${indent}>${b.text}</h3>`;
-        if (b.kind === 'h3') return html`<h4 key=${i} class="title-medium" style=${indent}>${b.text}</h4>`;
+        if (b.kind === 'h1') return html`<h2 key=${i} class="headline-small" style=${indent} ...${edit(b)}>${b.text}</h2>`;
+        if (b.kind === 'h2') return html`<h3 key=${i} class="title-large" style=${indent} ...${edit(b)}>${b.text}</h3>`;
+        if (b.kind === 'h3') return html`<h4 key=${i} class="title-medium" style=${indent} ...${edit(b)}>${b.text}</h4>`;
         if (b.kind === 'divider') return html`<hr key=${i} />`;
         if (b.kind === 'bullet' || b.kind === 'number') {
-          return html`<div key=${i} class="note-list body-large" style=${indent}><span>${b.kind === 'bullet' ? '•' : `${number}.`}</span><span>${b.text}</span></div>`;
+          return html`<div key=${i} class="note-list body-large" style=${indent}><span>${b.kind === 'bullet' ? '•' : `${number}.`}</span><span ...${edit(b)}>${b.text}</span></div>`;
         }
         if (b.kind === 'todo') {
           return html`<div key=${i} class=${`note-list body-large ${b.checked ? 'checked' : ''}`} style=${indent}>
-            <${Icon} name=${b.checked ? 'check_box' : 'check_box_outline_blank'} /><span>${b.text}</span></div>`;
+            ${editable(b)
+              ? html`<button class="note-tick" role="checkbox" aria-checked=${b.checked} aria-label=${b.text} onClick=${() => tick(b)}>
+                  <${Icon} name=${b.checked ? 'check_box' : 'check_box_outline_blank'} /></button>`
+              : html`<${Icon} name=${b.checked ? 'check_box' : 'check_box_outline_blank'} />`}<span ...${edit(b)}>${b.text}</span></div>`;
         }
-        if (b.kind === 'quote') return html`<blockquote key=${i} class="body-large" style=${indent}>${b.text}</blockquote>`;
-        if (b.kind === 'code') return html`<pre key=${i} class="body-medium" style=${indent}>${b.text}</pre>`;
-        return b.text.trim() ? html`<p key=${i} class="body-large" style=${indent}>${b.text}</p>` : null;
-      })}</div>`}
+        if (b.kind === 'quote') return html`<blockquote key=${i} class="body-large" style=${indent} ...${edit(b)}>${b.text}</blockquote>`;
+        if (b.kind === 'code') return html`<pre key=${i} class="body-medium" style=${indent} ...${edit(b)}>${b.text}</pre>`;
+        return b.text.trim() ? html`<p key=${i} class="body-large" style=${indent} ...${edit(b)}>${b.text}</p>` : null;
+      })}
+      ${blocks.length > 0 && blocks.every((b) => b.id) && addButton}</div>`}
+      ${editing && html`<${NoteTextDialog} title=${str('notes_block_edit')} text=${editing.text} hint=${str('notes_block_hint')}
+        onDismiss=${() => setEditing(null)} onSave=${async (text) => { if (await store.editNoteBlock(editing, text)) read(); }} />`}
+      ${adding && html`<${NoteTextDialog} title=${str('notes_add')} text="" onDismiss=${() => setAdding(false)}
+        onSave=${async (text) => { if (text && await store.addToNote(note.id, text)) read(); }} />`}
     <//>`;
+}
+
+/** A piece of text to change, or to add when [text] is empty; [hint] says what an empty text does. */
+function NoteTextDialog({ title, text, hint, onSave, onDismiss }) {
+  const [typed, setTyped] = useState(text);
+  const changed = typed.trim() !== text.trim();
+  const save = () => {
+    if (!changed) return;
+    onSave(typed.trim());
+    onDismiss();
+  };
+  return html`<${Dialog} title=${title} onDismiss=${onDismiss} actions=${html`
+    <button class="text-btn" onClick=${onDismiss}>${str('cancel')}</button>
+    <button class="text-btn" disabled=${!changed} onClick=${save}>${str('save')}</button>`}>
+    <${Field} label=${str('notes_block_text')} value=${typed} onInput=${setTyped} support=${hint} multiline autofocus />
+  <//>`;
 }
 
 /**

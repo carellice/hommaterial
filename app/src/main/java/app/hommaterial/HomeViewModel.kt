@@ -2595,6 +2595,20 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun notionNote(id: String): List<NoteBlock>? =
         readKept({ Offline.note(id) }, { Offline.putNote(id, it) }) { notion.note(id) }
 
+    // A note of Notion changes at once, with internet only, as its lists.
+
+    /** Changes the text of a block, or deletes it when the text is left empty. */
+    suspend fun editNoteBlock(block: NoteBlock, text: String): Boolean =
+        guarded { if (text.isBlank()) notion.deleteBlock(block) else notion.editBlock(block, text = text) }
+
+    suspend fun tickNoteBlock(block: NoteBlock, checked: Boolean): Boolean {
+        _haptics.tryEmit(if (checked) Haptic.On else Haptic.Off)
+        return guarded { notion.editBlock(block, checked = checked) }
+    }
+
+    suspend fun addToNote(id: String, text: String): Boolean =
+        guarded { notion.addToNote(id, text) }.also { _haptics.tryEmit(if (it) Haptic.Confirm else Haptic.Reject) }
+
     /** The items as last read, with what waits: shown at once after a change. */
     fun keptListItems(listId: String): List<ListItem>? = Offline.items(listId)?.let { Offline.withPending(listId, it) }
 

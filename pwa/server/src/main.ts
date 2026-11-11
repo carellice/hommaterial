@@ -719,6 +719,35 @@ route('GET', '/api/notion/notes', async (_req, res, _p, url) => {
 
 route('GET', '/api/notion/notes/:id', async (_req, res, [id]) => json(res, 200, { blocks: await notion.noteBlocks(decodeURIComponent(id)) }))
 
+/** The id of a page or a block of Notion, checked before it goes into the path of a call. */
+const notionId = (id: string) => {
+  const value = decodeURIComponent(id)
+  if (!/^[0-9a-f-]{32,36}$/i.test(value)) throw new HttpError(400, str('something_wrong'))
+  return value
+}
+
+route('POST', '/api/notion/notes/:id/blocks', async (req, res, [id]) => {
+  const { text: typed } = await readJson<{ text?: string }>(req)
+  const value = text(typed, 20_000).trim()
+  if (!value) throw new HttpError(400, str('something_wrong'))
+  await notion.addToNote(notionId(id), value)
+  ok(res)
+})
+
+route('PUT', '/api/notion/blocks/:id', async (req, res, [id]) => {
+  const { type, text: typed, checked } = await readJson<{ type?: string; text?: string; checked?: boolean }>(req)
+  if (!type || !notion.EDITABLE_BLOCKS.has(type)) throw new HttpError(400, str('something_wrong'))
+  const value = typed == null ? undefined : text(typed, 20_000).trim()
+  if (value === '' || (value == null && typeof checked !== 'boolean')) throw new HttpError(400, str('something_wrong'))
+  await notion.editBlock(notionId(id), type, value, typeof checked === 'boolean' ? checked : undefined)
+  ok(res)
+})
+
+route('DELETE', '/api/notion/blocks/:id', async (_req, res, [id]) => {
+  await notion.deleteBlock(notionId(id))
+  ok(res)
+})
+
 // --- Google Calendar ---------------------------------------------------------------------------
 
 /** The keys of the OAuth client the user made in Google Cloud; the sign-in comes after. */

@@ -40,8 +40,13 @@ class NotionTest {
 
     @Test
     fun `the blocks of a note keep their text and their kind`() {
-        val todo = JSONObject("""{"type":"to_do","to_do":{"checked":true,"rich_text":[{"plain_text":"Latte"}]}}""")
-        assertEquals(NoteBlock("todo", "Latte", checked = true, depth = 1), noteBlock(todo, 1))
+        val todo = JSONObject("""{"id":"b1","type":"to_do","to_do":{"checked":true,"rich_text":[{"plain_text":"Latte"}]}}""")
+        val block = noteBlock(todo, 1)
+        assertEquals(NoteBlock("todo", "Latte", checked = true, depth = 1, id = "b1", type = "to_do"), block)
+        assertTrue(block!!.editable)
+        assertFalse(noteBlock(JSONObject("""{"id":"b2","type":"divider","divider":{}}"""), 0)!!.editable)
+        // A note kept from before the ids has nothing to change.
+        assertFalse(NoteBlock("p", "Vecchia").editable)
         assertNull(noteBlock(JSONObject("""{"type":"image","image":{}}"""), 0))
     }
 

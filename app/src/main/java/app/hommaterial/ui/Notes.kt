@@ -168,17 +168,39 @@ internal fun NotesPage(model: NotesModel, state: UiState, vm: HomeViewModel) {
 
 private fun edited(time: Long): String = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(time))
 
-/** One note, read from Notion as it is now, with the way to open it there to change it. */
+/**
+ * One note, read from Notion as it is now: a touch on a piece of text changes it, a touch on a box
+ * ticks it, the button at the end adds text. Each change goes to Notion at once and the note is read again.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NoteDialog(note: NotionNote, ai: Boolean, vm: HomeViewModel, onDismiss: () -> Unit) {
     val uri = LocalUriHandler.current
+    val scope = rememberCoroutineScope()
     var blocks by remember(note.id) { mutableStateOf<List<NoteBlock>?>(null) }
     var failed by remember(note.id) { mutableStateOf(false) }
-    LaunchedEffect(note.id) {
+    suspend fun read() {
         val read = vm.notionNote(note.id)
         failed = read == null
         blocks = read
+    }
+    LaunchedEffect(note.id) { read() }
+    // The block whose text is being changed; adding is a new paragraph at the end.
+    var editing by remember { mutableStateOf<NoteBlock?>(null) }
+    var adding by remember { mutableStateOf(false) }
+    editing?.let { block ->
+        NoteTextDialog(str(R.string.notes_block_edit), block.text, hint = str(R.string.notes_block_hint), onDismiss = { editing = null }) { text ->
+            scope.launch { if (vm.editNoteBlock(block, text)) read() }
+        }
+    }
+    if (adding) {
+        NoteTextDialog(str(R.string.notes_add), "", hint = null, onDismiss = { adding = false }) { text ->
+            if (text.isNotBlank()) scope.launch { if (vm.addToNote(note.id, text)) read() }
+        }
+    }
+    fun tick(block: NoteBlock, checked: Boolean) {
+        blocks = blocks?.map { if (it.id == block.id) it.copy(checked = checked) else it }
+        scope.launch { if (!vm.tickNoteBlock(block, checked)) read() }
     }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         ScreenSurface {
@@ -206,8 +228,13 @@ private fun NoteDialog(note: NotionNote, ai: Boolean, vm: HomeViewModel, onDismi
                 when {
                     shown == null && !failed -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     shown == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(str(R.string.notes_failed)) }
-                    shown.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    shown.isEmpty() -> Column(
+                        Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         Text(str(R.string.notes_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        AppTonalButton(onClick = { adding = true }, modifier = Modifier.padding(top = 16.dp)) { Text(str(R.string.notes_add)) }
                     }
                     else -> SelectionContainer {
                         Column(
@@ -218,7 +245,15 @@ private fun NoteDialog(note: NotionNote, ai: Boolean, vm: HomeViewModel, onDismi
                             var number = 0
                             for (block in shown) {
                                 number = if (block.kind == "number") number + 1 else 0
-                                NoteBlockView(block, number)
+                                NoteBlockView(
+                                    block, number,
+                                    onEdit = if (block.editable) ({ editing = block }) else null,
+                                    onTick = if (block.editable) ({ tick(block, it) }) else null,
+                                )
+                            }
+                            // Notes kept from an older version have no ids: they change once read again.
+                            if (shown.all { it.id.isNotEmpty() }) {
+                                AppTonalButton(onClick = { adding = true }, modifier = Modifier.padding(top = 12.dp)) { Text(str(R.string.notes_add)) }
                             }
                             Spacer(Modifier.height(24.dp))
                         }
@@ -229,9 +264,37 @@ private fun NoteDialog(note: NotionNote, ai: Boolean, vm: HomeViewModel, onDismi
     }
 }
 
+/** A piece of text to change, or to add when [text] is empty; [hint] says what an empty text does. */
 @Composable
-private fun NoteBlockView(block: NoteBlock, number: Int) {
+private fun NoteTextDialog(title: String, text: String, hint: String?, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var typed by remember { mutableStateOf(text) }
+    fun save() {
+        onSave(typed.trim())
+        onDismiss()
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it },
+                label = { Text(str(R.string.notes_block_text)) },
+                supportingText = hint?.let { { Text(it) } },
+                minLines = 3,
+                maxLines = 12,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = { AppTextButton(onClick = ::save, enabled = typed.trim() != text.trim()) { Text(str(R.string.save)) } },
+        dismissButton = { AppTextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
+    )
+}
+
+@Composable
+private fun NoteBlockView(block: NoteBlock, number: Int, onEdit: (() -> Unit)?, onTick: ((Boolean) -> Unit)?) {
     val indent = Modifier.padding(start = (block.depth * 20).dp)
+        .then(if (onEdit != null) Modifier.clip(corners(8.dp)).clickable(onClickLabel = str(R.string.notes_block_edit), onClick = onEdit) else Modifier)
     val type = MaterialTheme.typography
     when (block.kind) {
         "h1" -> Text(block.text, style = type.headlineSmall, fontWeight = FontWeight.Medium, modifier = indent.padding(top = 12.dp))
@@ -247,7 +310,8 @@ private fun NoteBlockView(block: NoteBlock, number: Int) {
                 if (block.checked) Icons.Outlined.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
                 contentDescription = null,
                 tint = if (block.checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(22.dp)
+                    .then(if (onTick != null) Modifier.clip(pill()).clickable { onTick(!block.checked) } else Modifier),
             )
             Spacer(Modifier.width(8.dp))
             Text(

@@ -767,6 +767,10 @@
     <string name="notes_open_notion">Apri in Notion</string>
     <string name="notes_failed">Non è stato possibile leggerla. Riprova.</string>
     <string name="notes_empty">Questa nota è vuota</string>
+    <string name="notes_add">Aggiungi testo</string>
+    <string name="notes_block_edit">Modifica il testo</string>
+    <string name="notes_block_text">Testo</string>
+    <string name="notes_block_hint">Lascialo vuoto per eliminarlo dalla nota.</string>
     <string name="lists_none">Alexa non ha liste da mostrare.</string>
     <string name="list_todo">Cose da fare</string>
     <string name="list_shopping">Spesa</string>
