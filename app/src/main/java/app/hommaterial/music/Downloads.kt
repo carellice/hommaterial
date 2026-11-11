@@ -94,6 +94,7 @@ object MusicDownloads {
             showProgress()
         }
         tell(app, str(R.string.music_downloading, missing.size))
+        DownloadService.start(app)
         val job = scope.launch {
             var failed = 0
             mutex.withLock {

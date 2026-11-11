@@ -155,6 +155,8 @@ collegati al proprio account Alexa.
   Mentre scarica, il cerchio mostra a che punto è e un tocco ferma i download;
   sui brani già scaricati un tocco li toglie dal telefono: restano sul server e
   tornano a suonare in streaming.
+  Anche con l'app chiusa i download proseguono, con l'avanzamento e il tasto
+  per fermarli nelle notifiche.
 - Su Android c'è un lettore musicale: in **Impostazioni → Musica** scegli una
   cartella del telefono (con le sue sottocartelle) e compare la pagina **Musica**
   nella barra in basso, con brani, album, artisti e cartelle. La musica continua
