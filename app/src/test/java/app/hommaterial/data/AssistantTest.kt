@@ -159,6 +159,7 @@ class AssistantTest {
             {"do":"list","list":"Spesa","items":["uova"," ","guanciale"]},
             {"do":"event","title":"Dentista","start":"2026-11-12T15:00:00"},
             {"do":"event","title":"Ferie","date":"2026-12-24"},
+            {"do":"event","title":"Lavoro","start":"2026-11-15T20:00","end":"22:00","minutes":60},
             {"do":"event","title":"Senza data"}]}""",
         )
         val plan = parseAgent(answer, catalog())
@@ -171,6 +172,7 @@ class AssistantTest {
                 AgentAction("list", list = "Spesa", items = listOf("uova", "guanciale")),
                 AgentAction("event", title = "Dentista", start = "2026-11-12T15:00", minutes = 60),
                 AgentAction("event", title = "Ferie", date = "2026-12-24"),
+                AgentAction("event", title = "Lavoro", start = "2026-11-15T20:00", minutes = 120),
             ),
             plan.actions,
         )

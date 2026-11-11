@@ -316,6 +316,9 @@ await test('the agent keeps only what names things of the home, by their key', (
       ['power', 'group:g'], ['later', 'lamp'], ['automation', 'macro:m'], ['list', 'Spesa'], ['event', 'Dentista'],
     ]);
     assert.equal(ai.parseAgent({ reply: '', alexa: true, actions: [] }, catalog).alexa, true);
+    // The end time wins over minutes; past midnight goes on to the next day.
+    assert.equal(ai.parseAgent({ reply: '', actions: [{ do: 'event', title: 'Lavoro', start: '2026-11-15T20:00', end: '22:00', minutes: 60 }] }, catalog).actions[0].minutes, 120);
+    assert.equal(ai.eventMinutes('2026-11-15T23:00', '01:00'), 120);
     assert.match(ai.agentPrompt(catalog, '', 'Italian', 'oggi', 'Lists: "Spesa"'), /Answer in Italian\. Now it is oggi\.[\s\S]*d1: device "Lampada"[\s\S]*Lists: "Spesa"$/);
   });
 });

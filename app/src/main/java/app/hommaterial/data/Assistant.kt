@@ -423,11 +423,12 @@ Return JSON {"reply": text for the user, "alexa": boolean, "actions": [...]}. Ac
   for anything more (a time of day, several actions) make the closest one and say in the reply what was left out.
 - {"do":"list","list":exact name of a list,"items":[...]}: add items to a list; a dish asked for becomes its ingredients, one per item.
 A list may be said loosely (no dashes or spaces, singular for plural, another word for the same thing): it means the closest list below.
-- {"do":"event","title":text,"start":"YYYY-MM-DDTHH:MM","minutes":duration} or {"do":"event","title":text,"date":"YYYY-MM-DD"} for a whole day: add to the calendar.
+- {"do":"event","title":text,"start":"YYYY-MM-DDTHH:MM","end":"HH:MM"} or {"do":"event","title":text,"date":"YYYY-MM-DD"} for a whole day: add to the calendar.
   A time said loosely is still a time, never a whole day: breakfast 8:00, morning 9:00, lunch 13:00, afternoon 16:00,
   dinner ("a cena", "all'ora di cena") 20:00, evening 21:00, night 23:00. A whole day only when nothing hints at a time.
   Several events in one request ("every day this week from 9 to 18 except Friday from 10", "Monday and Thursday at 7"):
   one event action for each, with its own date and times; the reply says how many and on which days.
+  A day said apart ("tranne domenica dalle 20 alle 22") takes its own start and end, not those of the others.
 "Tutto tranne X" means each switchable device (of the room, if one is said) except X, one action each.
 Questions about the home (what is on, temperatures, how a sensor went, the agenda, what is in a list) are answered
 in the reply from the data below, with no actions. A brief of the day: greet, then what is on, the temperatures,
@@ -483,6 +484,14 @@ fun historyLine(name: String, readings: List<Reading>, zone: java.time.ZoneId = 
 
 private val AUTOMATION_TRIGGERS = setOf("temperatureAbove", "temperatureBelow", "humidityAbove", "humidityBelow", "on", "off")
 
+/** The minutes from [start] ("YYYY-MM-DDTHH:MM") to [end] ("HH:MM", or a whole date and time), past midnight if earlier; null when unreadable. */
+fun eventMinutes(start: String, end: String): Int? {
+    fun clock(text: String) = Regex("""(\d{1,2}):(\d{2})""").find(text)?.destructured?.let { (h, m) -> h.toInt() * 60 + m.toInt() }
+    val from = clock(start.substringAfter('T', "")) ?: return null
+    val to = clock(end.substringAfter('T')) ?: return null
+    return (to - from).let { if (it <= 0) it + 24 * 60 else it }
+}
+
 /** Reads what the model would do, keeping only what names things of the [catalog], each by its key in the app. */
 fun parseAgent(answer: JSONObject, catalog: AssistantCatalog): AgentPlan {
     val actions = mutableListOf<AgentAction>()
@@ -529,7 +538,8 @@ fun parseAgent(answer: JSONObject, catalog: AssistantCatalog): AgentPlan {
                 val title = a.optString("title").trim()
                 val start = a.optString("start")
                 val date = a.optString("date")
-                val minutes = a.optDouble("minutes", 60.0).let { if (it.isNaN() || it < 1) 60 else Math.round(it).toInt() }
+                val minutes = eventMinutes(start, a.optString("end"))
+                    ?: a.optDouble("minutes", 60.0).let { if (it.isNaN() || it < 1) 60 else Math.round(it).toInt() }
                 if (title.isNotEmpty() && Regex("""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}.*""").matches(start)) {
                     actions += AgentAction("event", title = title, start = start.take(16), minutes = minutes.coerceIn(5, 24 * 60))
                 } else if (title.isNotEmpty() && Regex("""\d{4}-\d{2}-\d{2}""").matches(date)) {
@@ -549,7 +559,7 @@ private const val SCHEMA_AGENT = """
   "do":{"type":"string"},"target":{"type":"string"},"on":{"type":"boolean"},"minutes":{"type":"number"},
   "sensor":{"type":"string"},"when":{"type":"string"},"threshold":{"type":"number"},
   "list":{"type":"string"},"items":{"type":"array","items":{"type":"string"}},
-  "title":{"type":"string"},"start":{"type":"string"},"date":{"type":"string"}},"required":["do"]}}},
+  "title":{"type":"string"},"start":{"type":"string"},"end":{"type":"string"},"date":{"type":"string"}},"required":["do"]}}},
  "required":["reply","actions"]}
 """
 
