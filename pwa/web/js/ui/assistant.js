@@ -166,11 +166,14 @@ export function AssistantSettings({ s }) {
     shown = html`<${ConfirmDialog} title=${str('assistant_unlink_title')} text=${str('assistant_unlink_text')}
       confirm=${str('assistant_unlink')} onConfirm=${store.disconnectAssistant} onDismiss=${close} />`;
   }
+  else if (dialog === 'web') shown = html`<${WebSearchDialog} onDismiss=${close} />`;
+  const web = html`<${Setting} title=${str('web_search')} text=${str(s.webSearch ? 'web_search_on' : 'web_search_off')} onClick=${() => setDialog('web')} />`;
   if (!assistant.configured) {
-    return html`<${Setting} title=${str('assistant_setup')} text=${str('assistant_setup_text')} onClick=${() => setDialog('setup')} />${shown}`;
+    return html`${web}<${Setting} title=${str('assistant_setup')} text=${str('assistant_setup_text')} onClick=${() => setDialog('setup')} />${shown}`;
   }
   const fresh = teachable(s).some((key) => !assistant.taught.includes(key));
   return html`
+    ${web}
     <${Setting} title=${str('assistant_linked')} text=${str('assistant_linked_text', assistant.accountId.slice(0, 6))} />
     <${Chips} title=${str('assistant_model')} choices=${MODELS.map(([model, label]) => [model, str(label)])}
       selected=${assistant.model} onSelect=${store.setAssistantModel} />
@@ -181,3 +184,38 @@ export function AssistantSettings({ s }) {
     ${shown}`;
 }
 
+/** The key of Tavily for the web search (ui/Assistant.kt WebSearchKeyDialog), kept on the server for every device. */
+function WebSearchDialog({ onDismiss }) {
+  const [key, setKey] = useState('');
+  const save = async () => {
+    await store.setWebSearchKey(key);
+    onDismiss();
+  };
+  return html`
+    <${Dialog} title=${str('web_search')} onDismiss=${onDismiss} actions=${html`
+      <button class="text-btn" onClick=${onDismiss}>${str('cancel')}</button>
+      <button class="text-btn" onClick=${save}>${str('save')}</button>`}>
+      <div class="body-medium faint" style="margin-bottom:8px">${str('web_search_key_text')}</div>
+      <a class="text-btn" href="https://app.tavily.com" target="_blank" rel="noopener" style="display:inline-block;margin-bottom:12px">app.tavily.com</a>
+      <${Field} label=${str('web_search_key')} value=${key} onInput=${setKey} autofocus onEnter=${save} />
+    <//>`;
+}
+
+/** The pages a web search found: a touch opens one in a new tab. */
+export function WebLinks({ links }) {
+  const host = (url) => {
+    try {
+      return new URL(url).host.replace(/^www\./, '');
+    } catch {
+      return url;
+    }
+  };
+  return html`
+    <div class="web-links">
+      <div class="label-large faint">${str('web_search_sources')}</div>
+      ${links.map((l) => html`
+        <a key=${l.url} class="web-link" href=${l.url} target="_blank" rel="noopener noreferrer">
+          <span class="body-medium">${l.title}</span><span class="body-small faint">${host(l.url)}</span>
+        </a>`)}
+    </div>`;
+}

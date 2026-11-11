@@ -18,6 +18,7 @@ import * as lgtv from './lgtv.ts'
 import { send as push, subscribe, unsubscribe, vapidPublicKey } from './push.ts'
 import * as switchBot from './switchbot.ts'
 import * as music from './music.ts'
+import * as websearch from './websearch.ts'
 
 const PORT = Number(process.env.PORT ?? 8080)
 const HTTPS_PORT = Number(process.env.HTTPS_PORT ?? 8443)
@@ -208,6 +209,7 @@ function status() {
     assistant: { configured: assistant.configured(), accountId: assistant.keys()?.accountId ?? '', model: assistant.model() },
     calendar: { client: calendar.client() != null, linked: calendar.linked(), account: calendar.account() },
     notion: { linked: notion.linked(), workspace: notion.workspace() },
+    webSearch: websearch.key() != null,
   }
 }
 
@@ -821,10 +823,19 @@ route('POST', '/api/assistant/questions', async (req, res) => {
  * The Android app writes its own instructions, from what it knows of the home: the server only
  * adds the keys. [kind] is "correct", with the guesses heard, or "questions".
  */
-route('POST', '/api/assistant/image', async (req, res) => {
-  const { system, request, image } = await readJson<{ system?: string; request?: string; image?: string }>(req)
-  if (!image || !/^[A-Za-z0-9+/=]+$/.test(image)) throw new HttpError(400, 'Immagine non valida')
-  json(res, 200, { answer: await assistant.image(text(system, 60_000), text(request, 4000), image) })
+// The web search of the account, the same on the web app and on the phones linked to the server.
+route('POST', '/api/websearch/key', async (req, res) => {
+  const { key } = await readJson<{ key?: string }>(req)
+  websearch.setKey(text(key, 300))
+  data.touch()
+  ok(res)
+})
+
+route('POST', '/api/websearch', async (req, res) => {
+  const { query } = await readJson<{ query?: string }>(req)
+  const asked = text(query, 400).trim()
+  if (!asked) throw new HttpError(400, 'Richiesta non valida')
+  json(res, 200, await websearch.search(asked))
 })
 
 route('POST', '/api/assistant/ask', async (req, res) => {

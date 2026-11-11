@@ -8,7 +8,6 @@ import app.hommaterial.voice.parseWebSearch
 import app.hommaterial.data.Tavily
 import app.hommaterial.data.WebSearchException
 import app.hommaterial.data.webAnswerPrompt
-import app.hommaterial.data.imagePrompt
 import app.hommaterial.voice.parseNavigate
 import app.hommaterial.voice.parseClock
 import app.hommaterial.voice.ClockCommand
@@ -345,8 +344,6 @@ data class VoiceReply(
     val actions: List<AgentAction> = emptyList(),
     /** The pages a web search found, as title to address, shown under the answer. */
     val links: List<Pair<String, String>> = emptyList(),
-    /** Words to look up on the web, offered with a button: what a picture is about. */
-    val search: String = "",
 )
 
 /** Where the assistant stands: its account and what it was taught. */
@@ -396,8 +393,6 @@ private typealias DATA = android.provider.ContactsContract.Data
 private typealias PHONE = android.provider.ContactsContract.CommonDataKinds.Phone
 private typealias POSTAL = android.provider.ContactsContract.CommonDataKinds.StructuredPostal
 private const val TAVILY_KEY = "tavilyKey"
-// The longest side of a picture sent to the model: enough to read a flyer, small enough to send quickly.
-private const val IMAGE_SIDE = 1280
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 /** What the phone had before it used the home server, to go back to it. */
 private const val BEFORE_SERVER = "dati-prima-del-server.json"
@@ -488,7 +483,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             haptics = settings.getBoolean("haptics", true),
             readAloud = settings.getBoolean("readAloud", false),
             askAlexa = settings.getBoolean("askAlexa", true),
-            webSearch = settings.getString(TAVILY_KEY, "").orEmpty().isNotBlank(),
+            webSearch = webSearchOn(),
             hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
             theme = settings.getInt("theme", 0),
             look = settings.getInt("look", 0),
@@ -1871,7 +1866,24 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissReply() = _state.update { it.copy(reply = null) }
 
+    /** Whether the web search has a key: the one of the account on the home server, else the one of the phone. */
+    private fun webSearchOn(): Boolean =
+        if (ServerSync.active) ServerSync.webSearchLinked else settings.getString(TAVILY_KEY, "").orEmpty().isNotBlank()
+
+    /** Sets the key of Tavily; on the home server it is the one of the account, the same on the web app and every phone. */
     fun setWebSearchKey(key: String) {
+        if (ServerSync.active) {
+            viewModelScope.launch {
+                try {
+                    ServerSync.call("POST", "/api/websearch/key", JSONObject().put("key", key.trim()))
+                    _state.update { it.copy(webSearch = key.isNotBlank()) }
+                    ServerSync.pull(force = true)
+                } catch (e: Exception) {
+                    reject(e.message ?: str(R.string.something_wrong))
+                }
+            }
+            return
+        }
         settings.edit().putString(TAVILY_KEY, key.trim()).apply()
         _state.update { it.copy(webSearch = key.isNotBlank()) }
     }
@@ -1879,13 +1891,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     /** Looks up on the web what [heard] asks for ("cerca su internet …"); false when it asks for nothing of the kind. */
     private fun searchWeb(heard: List<String>): Boolean {
         val query = parseWebSearch(heard) ?: return false
-        val key = settings.getString(TAVILY_KEY, "").orEmpty()
-        if (key.isBlank()) {
-            reject(str(R.string.web_search_no_key))
-            return true
-        }
-        voiceJob?.cancel()
-        voiceJob = viewModelScope.launch { webSearch(query, key) }
+        searchFor(query)
         return true
     }
 
@@ -1929,65 +1935,34 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         show { it.copy(reply = text, links = found.results.map { r -> r.title to r.url }) }
     }
 
-    /** Looks up [query] on the web, as offered under the answer about a picture. */
+    /** Looks up [query] on the web: through the home server when linked, else with the key of the phone. */
     fun searchFor(query: String) {
         val key = settings.getString(TAVILY_KEY, "").orEmpty()
-        if (key.isBlank()) return reject(str(R.string.web_search_no_key))
+        if (!webSearchOn()) return reject(str(R.string.web_search_no_key))
         voiceJob?.cancel()
-        voiceJob = viewModelScope.launch { webSearch(query, key) }
+        voiceJob = viewModelScope.launch { if (ServerSync.active) serverSearch(query) else webSearch(query, key) }
     }
 
-    /**
-     * Shows what the picture at [uri], sent in the chat with the words [said], is about; when it announces
-     * something, offers to put it in the calendar (confirmed as the other actions) and to look it up on the web.
-     */
-    fun askImage(uri: Uri, said: String) {
-        if (!assistantStore.configured) return reject(str(R.string.ai_image_no_assistant))
-        voiceJob?.cancel()
-        voiceJob = viewModelScope.launch {
-            val asked = VoiceReply(System.nanoTime(), fromAlexa = false, said = said.ifBlank { str(R.string.ai_image_sent) })
-            _state.update { it.copy(reply = asked) }
-            fun show(change: (VoiceReply) -> VoiceReply) =
-                _state.update { if (it.reply?.id == asked.id) it.copy(reply = change(asked.copy(waiting = false))) else it }
-            try {
-                val jpeg = withContext(Dispatchers.IO) { jpegOf(uri) } ?: return@launch show { it.copy(reply = str(R.string.ai_image_unreadable)) }
-                val answer = workersAi.image(
-                    assistantStore.accountId(), assistantStore.token(), imagePrompt(assistantLanguage, nowText()), said, jpeg,
-                )
-                val plan = parseAgent(answer, assistantCatalog())
-                val search = answer.optString("search").trim().takeUnless { it == "null" }.orEmpty()
-                show {
-                    it.copy(reply = plan.reply.ifEmpty { str(R.string.ai_image_nothing) }, actions = plan.actions.filter { a -> a.kind == "event" }, search = search)
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: java.io.IOException) {
-                show { it.copy(reply = str(R.string.no_connection)) }
-            } catch (e: Exception) {
-                android.util.Log.w("Assistant", "Picture failed", e)
-                show { it.copy(reply = e.message ?: str(R.string.something_wrong)) }
+    /** The web search of the home server, with the key of the account: the same answer as the web app gets. */
+    private suspend fun serverSearch(query: String) {
+        val asked = VoiceReply(System.nanoTime(), fromAlexa = false, said = query)
+        _state.update { it.copy(reply = asked) }
+        fun show(change: (VoiceReply) -> VoiceReply) =
+            _state.update { if (it.reply?.id == asked.id) it.copy(reply = change(asked.copy(waiting = false))) else it }
+        try {
+            val found = ServerSync.call("POST", "/api/websearch", JSONObject().put("query", query))
+            val list = found.optJSONArray("links")
+            val links = (0 until (list?.length() ?: 0)).mapNotNull { i ->
+                list!!.optJSONObject(i)?.let { it.optString("title") to it.optString("url") }?.takeIf { it.second.startsWith("http") }
             }
+            show { it.copy(reply = found.optString("reply").ifBlank { str(R.string.web_search_nothing) }, links = links) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: java.io.IOException) {
+            show { it.copy(reply = str(R.string.no_connection)) }
+        } catch (e: Exception) {
+            show { it.copy(reply = e.message ?: str(R.string.something_wrong)) }
         }
-    }
-
-    /** The picture at [uri] as a JPEG in base64, no larger than the model needs; null when it cannot be read. */
-    private fun jpegOf(uri: Uri): String? {
-        val resolver = getApplication<Application>().contentResolver
-        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) } ?: return null
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= IMAGE_SIDE) sample *= 2
-        val decoded = resolver.openInputStream(uri)?.use {
-            android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
-        } ?: return null
-        val scale = IMAGE_SIDE.toFloat() / maxOf(decoded.width, decoded.height)
-        val bitmap = if (scale < 1f) {
-            android.graphics.Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true)
-        } else decoded
-        val out = java.io.ByteArrayOutputStream()
-        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 82, out)
-        return android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
     }
 
     fun setAskAlexa(on: Boolean) {

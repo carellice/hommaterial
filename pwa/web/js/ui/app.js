@@ -8,6 +8,7 @@ import { HomeScreen } from './home.js';
 import { SettingsScreen } from './settings.js';
 import { OnboardingScreen, LoginScreen, RestScreen } from './screens.js';
 import { AccountScreen } from './account.js';
+import { WebLinks } from './assistant.js';
 
 
 /** Whether [at] falls in the hours from [from] to [to] o'clock, which usually cross midnight. */
@@ -208,6 +209,7 @@ function ReplyScreen({ reply, readAloud }) {
         ${reply.waiting
           ? html`<${Thinking} icon=${alexa ? 'speaker' : 'auto_awesome'} label=${waiting} />`
           : html`<div class=${`reply-answer ${text ? 'headline-small' : 'title-large faint'}`} key=${reply.id}>${text ?? str('alexa_no_reply')}</div>`}
+        ${!reply.waiting && reply.links?.length > 0 && html`<${WebLinks} links=${reply.links} />`}
         ${!reply.waiting && reply.actions?.length > 0 && html`
           <div class="reply-actions">${reply.actions.map((a, i) => html`
             <div key=${i} class="reply-action body-large" style=${`--i:${i}`}><${Icon} name="task_alt" />${store.agentLabel(a)}</div>`)}

@@ -14,23 +14,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** The models of Workers AI the assistant can use, best first; all of them answer in JSON when asked. */
-/** The model that reads pictures, whatever model is chosen for the words (as VISION_MODEL in server/src/assistant.ts). */
-const val VISION_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct"
-
-/**
- * The instructions for a picture the user sent: what it shows, and what can be done with it, an event
- * for the calendar and words to look it up on the web. Kept in the same shape as parseAgent reads.
- */
-fun imagePrompt(language: String, now: String): String = """The user sent a picture: a flyer, a poster, a ticket, a screenshot, a photo. Answer in $language. Now it is $now.
-Return JSON {"reply": text, "actions": [...], "search": text}.
-"reply": in two or three short plain sentences, what the picture shows and what it is about, answering the words of the user when there are some;
-then, when there is something to do, ask which the user wants, one or both: put the event in the calendar, look for more about it on the internet.
-"actions": when the picture announces something with a date (an event, a concert, a meeting, an appointment), one item
-{"do":"event","title":short title with the place,"start":"YYYY-MM-DDTHH:MM","minutes":duration} or {"do":"event","title":text,"date":"YYYY-MM-DD"}
-when no time is given; a date without a year is the next one to come. Otherwise [].
-"search": a few words to look it up on the web (name, place, year), or "" when there is nothing worth looking up.
-The reply is read aloud: no lists, no markdown."""
-
 val ASSISTANT_MODELS = listOf(
     "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "@cf/meta/llama-3.1-8b-instruct",
@@ -615,46 +598,6 @@ class WorkersAi(private val http: OkHttpClient, private val base: String = "http
             val body = JSONObject().put("kind", "agent").put("system", system).put("heard", JSONArray().put(request))
             ServerSync.call("POST", "/api/assistant/ask", body).optJSONObject("answer") ?: JSONObject()
         } else json(accountId, token, model, listOf("system" to system, "user" to request), SCHEMA_AGENT, 1200, 0.2)
-
-    /**
-     * What the vision model makes of [jpeg], a picture in base64, with the words of [request], as the JSON
-     * [system] asks for; on the home server, the server asks. Through the endpoint like OpenAI's, which takes pictures.
-     */
-    suspend fun image(accountId: String, token: String, system: String, request: String, jpeg: String): JSONObject {
-        if (ServerSync.active) {
-            val body = JSONObject().put("system", system).put("request", request).put("image", jpeg)
-            return ServerSync.call("POST", "/api/assistant/image", body).optJSONObject("answer") ?: throw AssistantException(R.string.assistant_unreadable)
-        }
-        if (!accountId.matches(Regex("[0-9a-fA-F]{32}"))) throw AssistantException(R.string.assistant_bad_account)
-        val user = JSONArray()
-            .put(JSONObject().put("type", "text").put("text", request.ifBlank { "." }))
-            .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:image/jpeg;base64,$jpeg")))
-        val body = JSONObject()
-            .put("model", VISION_MODEL)
-            .put("max_tokens", 700)
-            .put("temperature", 0.2)
-            .put("messages", JSONArray().put(JSONObject().put("role", "system").put("content", system)).put(JSONObject().put("role", "user").put("content", user)))
-        return withContext(Dispatchers.IO) {
-            val call = Request.Builder()
-                .url("$base/accounts/$accountId/ai/v1/chat/completions")
-                .header("Authorization", "Bearer ${token.trim()}")
-                .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-                .build()
-            http.newCall(call).execute().use { response ->
-                val text = response.body?.string().orEmpty()
-                val json = runCatching { JSONObject(text) }.getOrNull()
-                val message = json?.optJSONArray("errors")?.optJSONObject(0)?.optString("message")
-                    ?: json?.optJSONObject("error")?.optString("message").orEmpty()
-                when {
-                    response.code == 401 || response.code == 403 -> throw AssistantException(R.string.assistant_unauthorized)
-                    response.code == 429 || message.contains("neurons", ignoreCase = true) -> throw AssistantException(R.string.assistant_limit)
-                    !response.isSuccessful -> throw AssistantException(R.string.assistant_error, message.ifEmpty { response.code.toString() })
-                }
-                val content = json?.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content").orEmpty()
-                extractJson(content) ?: throw AssistantException(R.string.assistant_unreadable)
-            }
-        }
-    }
 
     private suspend fun json(
         accountId: String,

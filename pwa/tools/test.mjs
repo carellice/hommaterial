@@ -11,7 +11,8 @@ process.env.DATA_DIR = (await import('node:fs')).mkdtempSync((await import('node
 const { setLanguage } = await import('../shared/i18n.js');
 setLanguage('it');
 const { switchBotSign } = await import('../server/src/switchbot.ts');
-const { parseVoice, parseExtras, parsePhrase, completeCommand } = await import('../web/js/voice.js');
+const { parseVoice, parseExtras, parsePhrase, completeCommand, parseWebSearch } = await import('../web/js/voice.js');
+const { parseTavily } = await import('../server/src/websearch.ts');
 const model = await import('../shared/model.js');
 const { remoteKind } = model;
 
@@ -434,6 +435,22 @@ await test('the chat completes names as AutocompleteTest.kt', () => {
   assert.ok(!labels('accendi lampada').includes('Lampada'));
   assert.deepEqual(labels(''), []);
   assert.deepEqual(labels('accendi xyz'), []);
+});
+
+await test('web searches are read as WebSearchVoiceTest.kt', () => {
+  assert.equal(parseWebSearch(['Cerca su internet chi ha vinto Sanremo']), 'chi ha vinto Sanremo');
+  assert.equal(parseWebSearch(['cercami orari del museo online per favore']), 'orari del museo');
+  assert.equal(parseWebSearch(['search the web for the best pizza in Rome']), 'the best pizza in Rome');
+  assert.equal(parseWebSearch(['cerca la lampada']), null);
+  assert.equal(parseWebSearch(['accendi la luce']), null);
+});
+
+await test('Tavily replies are read as WebSearchTest.kt', () => {
+  const found = parseTavily({ answer: 'Roma', results: [
+    { title: 'Capitale', url: 'https://it.wikipedia.org/wiki/Roma', content: 'Roma è la capitale' }, { title: 'x', url: '', content: 'x' }] });
+  assert.equal(found.answer, 'Roma');
+  assert.equal(found.results.length, 1);
+  assert.equal(parseTavily({ answer: null, results: [] }).answer, '');
 });
 
 if (failures) {

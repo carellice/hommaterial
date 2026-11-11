@@ -4,7 +4,7 @@
 import { Prefs } from './prefs.js';
 import { api, get, post, del, onSessionLost, NotLoggedInError, OfflineError, SessionError } from './net.js';
 import { str, plural, lang, clock, setLanguage as applyLanguage } from '/shared/i18n.js';
-import { parseVoice, parseExtras, parsePhrase } from './voice.js';
+import { parseVoice, parseExtras, parsePhrase, parseWebSearch } from './voice.js';
 import {
   LAYOUT_GRID, REST_ITEMS, FIRST_REST_ITEMS, emptyState, macroKey, remoteKey, placed, placeOf, shownRemotes, remoteKind, isLg,
   standardCommands, commandLabel, describe, conditionText, ACTION_POWER, ACTION_REMOTE, ACTION_MACRO,
@@ -96,6 +96,7 @@ const EMPTY_STATUS = {
   assistant: { configured: false, accountId: '', model: '' },
   calendar: { client: false, linked: false, account: '' },
   notion: { linked: false, workspace: '' },
+  webSearch: false,
 };
 
 const marketOf = (domain) => MARKETPLACES.find((m) => m.domain === domain) ?? MARKETPLACES[0];
@@ -118,6 +119,7 @@ function fromServer(data, status) {
     switchBot: status.switchBot,
     calendar: { ...EMPTY_STATUS.calendar, ...status.calendar },
     notion: { ...EMPTY_STATUS.notion, ...status.notion },
+    webSearch: status.webSearch === true,
     assistant: {
       ...status.assistant,
       notes: data.assistantNotes,
@@ -1185,6 +1187,8 @@ export async function onSpeech(heard) {
   }
   const said = heard.find((it) => it.trim());
   if (!said) return answer({ type: 'unknown', heard: '' });
+  const query = parseWebSearch(heard);
+  if (query) return webSearch(query);
   // What the app knows without doubt is done here: Alexa does not know the groups of the app, for one.
   if (act(heard)) return;
   if (state.assistant.configured) {
@@ -1393,6 +1397,33 @@ export async function askAssistant(request, { said = request, extra = '' } = {})
     show({ reply: done ? plan.reply || str('ai_done') : str('ai_partly') });
   }
   return plan;
+}
+
+/** Looks [query] up on the web through the server: a short answer and the pages, shown as the other answers. */
+export async function webSearch(query) {
+  if (!state.webSearch) {
+    say(str('web_search_no_key'));
+    return;
+  }
+  const asked = { id: Date.now(), from: 'ai', said: query, reply: null, waiting: true, actions: [], links: [] };
+  update({ reply: asked });
+  const show = (change) => update((s) => (s.reply?.id === asked.id ? { reply: { ...asked, waiting: false, ...change } } : {}));
+  try {
+    const found = await post('/api/websearch', { query });
+    show({ reply: found.reply, links: found.links ?? [] });
+  } catch (e) {
+    show({ reply: e instanceof OfflineError ? str('no_connection') : e.message || str('something_wrong') });
+  }
+}
+
+/** The key of Tavily of the account, kept on the server for every device; empty switches the search off. */
+export async function setWebSearchKey(key) {
+  try {
+    await post('/api/websearch/key', { key });
+    update({ webSearch: key.trim() !== '' });
+  } catch (e) {
+    say(e.message || str('something_wrong'));
+  }
 }
 
 /** Does what the assistant offered, once the user confirms it. */

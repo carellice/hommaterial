@@ -209,3 +209,22 @@ export function completeCommand(typed, words, max = 6) {
     .filter((c) => c.text.trim() !== typed.trim() && !labels.has(c.label.toLowerCase()) && labels.add(c.label.toLowerCase()))
     .slice(0, max);
 }
+
+// ——— Web search (voice/VoiceParser.kt parseWebSearch) ———
+const POLITE = /\s+(?:per favore|per piacere|grazie|please|thanks)$/i;
+const ON_WEB = String.raw`(?:su\s+internet|in\s+internet|online|on\s*line|sul\s+web|nel\s+web|in\s+rete|su\s+google|con\s+google|on\s+the\s+web|on\s+google)`;
+const SEARCH_VERB = String.raw`(?:cerca(?:mi|re)?|ricerca|trova(?:mi)?|search(?:\s+for)?|look\s+up)`;
+const SEARCH_FIRST = new RegExp(String.raw`^\s*${SEARCH_VERB}\s+${ON_WEB}\s+(?:per\s+|for\s+)?(.+?)[\s.!?]*$`, 'i');
+const SEARCH_LAST = new RegExp(String.raw`^\s*${SEARCH_VERB}\s+(.+?)\s+${ON_WEB}[\s.!?]*$`, 'i');
+const SEARCH_EN = /^\s*(?:search\s+the\s+web\s+for|google)\s+(.+?)[\s.!?]*$/i;
+
+/** What to look up on the web, when asked in so many words ("cerca su internet chi ha vinto Sanremo"); null otherwise. */
+export function parseWebSearch(heard) {
+  for (const sentence of heard) {
+    const text = sentence.trim().replace(/[.!?]+$/, '').replace(POLITE, '');
+    const found = SEARCH_FIRST.exec(text) ?? SEARCH_LAST.exec(text) ?? SEARCH_EN.exec(text);
+    const query = found?.[1]?.trim();
+    if (query) return query;
+  }
+  return null;
+}

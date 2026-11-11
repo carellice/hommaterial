@@ -23,6 +23,7 @@ import { WeatherHomeCard } from './weather.js';
 import { CalendarPage, HomeAgenda, reloadCalendar } from './calendar.js';
 import { NotesPage, reloadNotes } from './notes.js';
 import { MusicPage, PlayerBar, UploadButton, reloadMusic } from './music.js';
+import { WebLinks } from './assistant.js';
 
 // By size of the tiles: compact, normal, large.
 const LIST_MIN_WIDTH = 320;
@@ -853,7 +854,7 @@ function AssistantChat() {
   useEffect(() => {
     const r = s.reply;
     if (!r) return;
-    const line = { id: r.id, mine: false, text: r.reply, waiting: r.waiting, alexa: r.from === 'alexa', actions: r.actions ?? [] };
+    const line = { id: r.id, mine: false, text: r.reply, waiting: r.waiting, alexa: r.from === 'alexa', actions: r.actions ?? [], links: r.links ?? [] };
     setLines((l) => (l.some((it) => it.id === r.id) ? l.map((it) => (it.id === r.id ? line : it)) : [...l, line]));
   }, [s.reply]);
   // What the app says by itself: "Luce accesa", "Non ho capito…".
@@ -875,6 +876,7 @@ function AssistantChat() {
         ${lines.map((line) => html`
           <div key=${line.id} class=${`chat-bubble body-large ${line.mine ? 'mine' : ''} ${line.waiting ? 'waiting' : ''}`}>
             ${line.waiting ? str(line.alexa ? 'alexa_waiting' : 'ai_thinking') : line.text ?? str('alexa_no_reply')}
+            ${!line.waiting && line.links?.length > 0 && html`<${WebLinks} links=${line.links} />`}
             ${!line.waiting && line.actions?.length > 0 && html`
               ${line.actions.map((a, i) => html`<div key=${i} class="body-medium">• ${store.agentLabel(a)}</div>`)}
               ${s.reply?.id === line.id && html`

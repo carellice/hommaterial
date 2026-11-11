@@ -1420,3 +1420,8 @@ fieldset.plain { border: none; margin: 0; padding: 0; min-width: 0; display: fle
 .music-play { width: 72px; height: 72px; border-radius: 50%; border: none; background: var(--primary); color: var(--on-primary); display: inline-flex; align-items: center; justify-content: center; }
 .music-play .icon { font-size: 40px; }
 .music-on { color: var(--primary); }
+
+/* The pages of a web search, under the answer */
+.web-links { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; text-align: left; }
+.web-link { display: flex; flex-direction: column; padding: 6px 0; color: var(--primary); text-decoration: none; }
+.web-link .body-medium { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
