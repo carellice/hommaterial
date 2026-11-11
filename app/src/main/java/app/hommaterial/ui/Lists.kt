@@ -7,6 +7,7 @@ import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -103,7 +104,6 @@ import app.hommaterial.data.ListItem as AlexaItem
 import app.hommaterial.data.NotionSource
 import app.hommaterial.data.ListViews
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.outlined.CallSplit
 import androidx.compose.material.icons.automirrored.outlined.MergeType
@@ -362,8 +362,16 @@ private fun ListPicker(lists: List<Pair<String, Int?>>, selected: Int, onSelect:
         }
     }
     if (open) {
-        ModalBottomSheet(onDismissRequest = { open = false }) {
-            Text(str(R.string.lists_choose), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 24.dp, bottom = 12.dp))
+        // Modern UI has no handle: the sheet is a bare square panel under a big light title.
+        ModalBottomSheet(
+            onDismissRequest = { open = false },
+            dragHandle = if (metro) null else ({ BottomSheetDefaults.DragHandle() }),
+        ) {
+            Text(
+                str(R.string.lists_choose),
+                style = if (metro) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(start = 24.dp, bottom = 12.dp, top = if (metro) 24.dp else 0.dp),
+            )
             LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp)) {
                 itemsIndexed(lists) { index, (listName, listCount) ->
                     val chosen = index == selected
@@ -371,7 +379,7 @@ private fun ListPicker(lists: List<Pair<String, Int?>>, selected: Int, onSelect:
                         Modifier
                             .fillMaxWidth()
                             .padding(vertical = 2.dp)
-                            .clip(CircleShape)
+                            .clip(pill())
                             .background(if (chosen) colors.secondaryContainer else Color.Transparent)
                             .clickable {
                                 onSelect(index)
@@ -410,7 +418,7 @@ private fun CountBadge(count: Int, selected: Boolean) {
             .padding(start = 8.dp)
             .heightIn(min = 20.dp)
             .widthIn(min = 20.dp)
-            .clip(CircleShape)
+            .clip(pill())
             .background(if (selected) colors.onPrimary.copy(alpha = 0.2f) else colors.secondaryContainer)
             .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center,
@@ -443,7 +451,7 @@ private fun Segments(
     val fits = segments.size <= 3
     val skeuo = LocalSkeuo.current
     Surface(
-        shape = if (skeuo) corners(12.dp) else CircleShape,
+        shape = if (skeuo) corners(12.dp) else pill(),
         color = if (skeuo) Color.Transparent else colors.surfaceContainerHigh,
         contentColor = colors.onSurface,
         modifier = modifier.fillMaxWidth().skeuoRaised(corners(12.dp), elevation = 1.dp),
@@ -470,7 +478,7 @@ private fun Segments(
                             },
                         )
                         .height(44.dp)
-                        .then(if (skeuo) Modifier.skeuoBadge(corners(9.dp)) else Modifier.clip(CircleShape).background(colors.primary)),
+                        .then(if (skeuo) Modifier.skeuoBadge(corners(9.dp)) else Modifier.clip(pill()).background(colors.primary)),
                 )
             }
             Row(if (fits) Modifier.fillMaxWidth() else Modifier) {
@@ -485,7 +493,7 @@ private fun Segments(
                         // Sharing the width, a longer name takes more of it.
                         (if (fits) Modifier.weight(name.length + (if (count != null && count > 0) 4f else 0f) + 6f) else Modifier)
                             .height(44.dp)
-                            .clip(CircleShape)
+                            .clip(pill())
                             .clickable { onSelect(index) }
                             .onGloballyPositioned {
                                 lefts[index] = it.positionInParent().x.roundToInt()
@@ -509,7 +517,7 @@ private fun Segments(
                                     .padding(start = 8.dp)
                                     .heightIn(min = 20.dp)
                                     .widthIn(min = 20.dp)
-                                    .clip(CircleShape)
+                                    .clip(pill())
                                     .background(if (selected) colors.onPrimary.copy(alpha = 0.2f) else colors.secondaryContainer)
                                     .padding(horizontal = 6.dp),
                                 contentAlignment = Alignment.Center,
@@ -589,8 +597,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsGrouped(
         )
         // In the skeuomorphic look the items are the lines of one sheet of a legal pad.
         val skeuo = LocalSkeuo.current
+        val metro = LocalMetro.current
         Box(Modifier.animateItem().padding(bottom = if (skeuo) 0.dp else 2.dp)) {
-            ItemRow(item, model, list, if (skeuo) RoundedCornerShape(if (index == 0) 4.dp else 0.dp) else shape)
+            ItemRow(item, model, list, if (skeuo) RoundedCornerShape(if (index == 0) 4.dp else 0.dp) else if (metro) RoundedCornerShape(0.dp) else shape)
         }
     }
 }
@@ -615,7 +624,7 @@ private fun Header(name: String, todo: Int, done: Int, loaded: Boolean) {
             if (total > 0) {
                 LinearProgressIndicator(
                     progress = { progress },
-                    strokeCap = StrokeCap.Round,
+                    strokeCap = if (LocalMetro.current) StrokeCap.Butt else StrokeCap.Round,
                     gapSize = 4.dp,
                     drawStopIndicator = {},
                     trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -644,13 +653,13 @@ private fun AddField(onAdd: (String) -> Unit) {
         leadingIcon = { Icon(Icons.Outlined.Add, contentDescription = null) },
         trailingIcon = {
             AnimatedVisibility(visible = ready, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut()) {
-                FilledIconButton(onClick = ::add, modifier = Modifier.padding(end = 6.dp)) {
+                FilledIconButton(onClick = ::add, shape = pill(), modifier = Modifier.padding(end = 6.dp)) {
                     Icon(Icons.Outlined.Check, contentDescription = str(R.string.list_add))
                 }
             }
         },
         singleLine = true,
-        shape = CircleShape,
+        shape = pill(),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { add() }),
         colors = TextFieldDefaults.colors(
@@ -659,7 +668,9 @@ private fun AddField(onAdd: (String) -> Unit) {
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
         ),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).skeuoInset(CircleShape),
+        // Modern UI: a framed square field, as the text boxes of the phone.
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).skeuoInset(CircleShape)
+            .then(if (LocalMetro.current) Modifier.border(2.dp, MaterialTheme.colorScheme.outline) else Modifier),
     )
 }
 
@@ -687,7 +698,7 @@ private fun ItemRow(item: AlexaItem, model: ListsModel, list: AlexaList, shape: 
             Box(
                 Modifier
                     .size(48.dp)
-                    .clip(CircleShape)
+                    .clip(pill())
                     .clickable(onClickLabel = str(R.string.list_toggle)) { model.toggle(list.id, item) },
                 contentAlignment = Alignment.Center,
             ) {
@@ -746,8 +757,8 @@ private fun ItemEditDialog(name: String, onSave: (String) -> Unit, onDismiss: ()
                 modifier = Modifier.fillMaxWidth(),
             )
         },
-        confirmButton = { TextButton(enabled = ready, onClick = ::save) { Text(str(R.string.save)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
+        confirmButton = { AppTextButton(enabled = ready, onClick = ::save) { Text(str(R.string.save)) } },
+        dismissButton = { AppTextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
     )
 }
 
@@ -764,9 +775,9 @@ private fun CheckCircle(checked: Boolean) {
     Box(
         Modifier
             .size(26.dp)
-            .clip(CircleShape)
+            .clip(pill())
             .background(fill)
-            .border(2.dp, if (checked) colors.primary else colors.outline, CircleShape),
+            .border(2.dp, if (checked) colors.primary else colors.outline, pill()),
         contentAlignment = Alignment.Center,
     ) {
         if (checked || scale > 0.45f) {
@@ -790,16 +801,16 @@ private fun DoneHeader(count: Int, open: Boolean, modifier: Modifier, onClear: (
             title = { Text(str(R.string.list_clear_done_title)) },
             text = { Text(str(R.string.list_clear_done_text, count)) },
             confirmButton = {
-                TextButton(onClick = { confirming = false; onClear() }) { Text(str(R.string.list_clear_done)) }
+                AppTextButton(onClick = { confirming = false; onClear() }) { Text(str(R.string.list_clear_done)) }
             },
-            dismissButton = { TextButton(onClick = { confirming = false }) { Text(str(R.string.cancel)) } },
+            dismissButton = { AppTextButton(onClick = { confirming = false }) { Text(str(R.string.cancel)) } },
         )
     }
     Row(
         modifier
             .fillMaxWidth()
             .padding(top = 16.dp, bottom = 8.dp)
-            .clip(CircleShape)
+            .clip(pill())
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -837,7 +848,7 @@ internal fun EmptyState(title: String, text: String?, modifier: Modifier = Modif
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
-            Modifier.size(72.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+            Modifier.size(72.dp).clip(pill()).background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -915,14 +926,14 @@ internal fun ListsEditDialog(model: ListsModel, views: ListViews, onChange: (Lis
                 )
             },
             confirmButton = {
-                TextButton(onClick = { onChange(views.rename(list.id, name)); renaming = null }) { Text(str(R.string.save)) }
+                AppTextButton(onClick = { onChange(views.rename(list.id, name)); renaming = null }) { Text(str(R.string.save)) }
             },
             dismissButton = {
                 Row {
                     if (list.id in views.names) {
-                        TextButton(onClick = { onChange(views.rename(list.id, "")); renaming = null }) { Text(str(R.string.list_name_reset)) }
+                        AppTextButton(onClick = { onChange(views.rename(list.id, "")); renaming = null }) { Text(str(R.string.list_name_reset)) }
                     }
-                    TextButton(onClick = { renaming = null }) { Text(str(R.string.cancel)) }
+                    AppTextButton(onClick = { renaming = null }) { Text(str(R.string.cancel)) }
                 }
             },
         )
@@ -952,9 +963,9 @@ internal fun ListsEditDialog(model: ListsModel, views: ListViews, onChange: (Lis
                 }
             },
             confirmButton = {
-                TextButton(enabled = chosen.size >= 2, onClick = { onChange(views.merge(chosen)); merging = false }) { Text(str(R.string.list_merge)) }
+                AppTextButton(enabled = chosen.size >= 2, onClick = { onChange(views.merge(chosen)); merging = false }) { Text(str(R.string.list_merge)) }
             },
-            dismissButton = { TextButton(onClick = { merging = false }) { Text(str(R.string.cancel)) } },
+            dismissButton = { AppTextButton(onClick = { merging = false }) { Text(str(R.string.cancel)) } },
         )
     }
     AlertDialog(
@@ -1002,6 +1013,6 @@ internal fun ListsEditDialog(model: ListsModel, views: ListViews, onChange: (Lis
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str(R.string.close)) } },
+        confirmButton = { AppTextButton(onClick = onDismiss) { Text(str(R.string.close)) } },
     )
 }

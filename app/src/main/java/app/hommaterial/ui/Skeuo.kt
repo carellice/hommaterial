@@ -20,6 +20,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.LocalContentColor
@@ -460,6 +461,18 @@ internal fun AppTonalButton(
         modifier = modifier.skeuoRaised(shape, elevation = if (enabled) 2.dp else 0.dp),
         content = content,
     )
+}
+
+/** The button of a dialog: a text button in Material and the skeuomorphic look, a square frame in Modern UI. */
+@Composable
+internal fun AppTextButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable RowScope.() -> Unit,
+) {
+    if (LocalMetro.current) return MetroTonalButton(onClick, modifier, enabled, ButtonDefaults.ContentPadding, content)
+    TextButton(onClick = onClick, modifier = modifier, enabled = enabled, content = content)
 }
 
 /** The button of the main action: a gel key in the accent in the skeuomorphic look. */

@@ -246,3 +246,8 @@ internal fun MetroButton(onClick: () -> Unit, modifier: Modifier, enabled: Boole
 @Composable
 internal fun corners(radius: androidx.compose.ui.unit.Dp): androidx.compose.ui.graphics.Shape =
     if (LocalMetro.current) RectangleShape else androidx.compose.foundation.shape.RoundedCornerShape(radius)
+
+/** A round shape — a pill, a badge, a tick — in Material and the skeuomorphic look, square in Modern UI. */
+@Composable
+internal fun pill(): androidx.compose.ui.graphics.Shape =
+    if (LocalMetro.current) RectangleShape else androidx.compose.foundation.shape.CircleShape
