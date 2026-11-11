@@ -275,7 +275,7 @@ export function PlayerBar() {
       <${Cover} track=${track} />
       <span class="texts grow"><span class="body-medium">${track.title}</span><span class="body-small faint">${track.artist}</span></span>
       <span onClick=${(e) => e.stopPropagation()} style="display:flex">
-        <${IconButton} icon=${m.playing ? 'pause' : 'play_arrow'} label=${str(m.playing ? 'music_pause' : 'music_play')} onClick=${toggle} filled />
+        <${IconButton} icon=${m.playing ? 'pause' : 'play_arrow'} label=${str(m.playing ? 'music_pause' : 'music_play')} onClick=${toggle} />
         <${IconButton} icon="skip_next" label=${str('music_next')} onClick=${next} />
       </span>
     </div>

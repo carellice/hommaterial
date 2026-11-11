@@ -1410,6 +1410,8 @@ fieldset.plain { border: none; margin: 0; padding: 0; min-width: 0; display: fle
 .music-bar .texts { display: flex; flex-direction: column; min-width: 0; }
 .music-bar .texts span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .music-bar .music-cover { width: 40px; height: 40px; }
+/* Artist and buttons in the colour of the title, readable on the bar in every look. */
+.music-bar .texts .faint, .music-bar .icon-btn, .music-bar .icon-btn .icon { color: inherit !important; }
 .music-progress { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--primary); }
 .music-full { position: fixed; inset: 0; z-index: 40; background: var(--background); display: flex; flex-direction: column; padding: 8px 24px calc(24px + env(safe-area-inset-bottom)); animation: fade 0.2s; overflow-y: auto; }
 .music-full-top { display: flex; align-items: center; }
