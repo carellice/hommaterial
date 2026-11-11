@@ -817,8 +817,19 @@ function AssistantChat() {
   const field = useRef(null);
   // The names of the lists are read once, as the chat opens; the rest comes from the state.
   useEffect(() => { store.alexaLists().then((l) => setLists((l ?? []).map((it) => it.name)), () => {}); }, []);
-  const suggestions = completeCommand(typed, store.completionWords(lists));
+  // Tab walks the suggestions as they were when it was first pressed: the third is three Tabs away.
+  const [cycle, setCycle] = useState(null);
+  const suggestions = cycle?.list ?? completeCommand(typed, store.completionWords(lists));
+  const tab = (e) => {
+    if (!suggestions.length) return;
+    e.preventDefault();
+    const n = suggestions.length;
+    const i = cycle ? (cycle.i + (e.shiftKey ? n - 1 : 1)) % n : e.shiftKey ? n - 1 : 0;
+    setCycle({ list: suggestions, i });
+    setTyped(suggestions[i].text);
+  };
   const pick = (text) => {
+    setCycle(null);
     setTyped(text);
     setTimeout(() => { const f = field.current; if (f) { f.focus(); f.setSelectionRange(text.length, text.length); } });
   };
@@ -872,13 +883,14 @@ function AssistantChat() {
       ${/* As on Android: a rounded field with the hint inside and a filled send button. */ ''}
       ${suggestions.length > 0 && html`
         <div class="chat-suggestions" role="group" aria-label=${str('assistant_suggestions')}>
-          ${suggestions.map((c) => html`
-            <button key=${c.label} class="chip" onMouseDown=${(e) => e.preventDefault()} onClick=${() => pick(c.text)}>${c.label}</button>`)}
+          ${suggestions.map((c, i) => html`
+            <button key=${c.label} class=${`chip ${cycle?.i === i ? 'selected' : ''}`} onMouseDown=${(e) => e.preventDefault()} onClick=${() => pick(c.text)}>${c.label}</button>`)}
         </div>`}
       <div class="chat-input">
         <input class="chat-field" placeholder=${str('assistant_type_hint')} aria-label=${str('assistant_type_hint')} value=${typed}
           ref=${field}
-          onInput=${(e) => setTyped(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && (e.preventDefault(), send())} />
+          onInput=${(e) => { setCycle(null); setTyped(e.target.value); }}
+          onKeyDown=${(e) => (e.key === 'Enter' ? (e.preventDefault(), setCycle(null), send()) : e.key === 'Tab' && tab(e))} />
         <${IconButton} icon="send" label=${str('assistant_send')} onClick=${send} disabled=${!typed.trim()} cls="filled" />
       </div>
     </div>`;

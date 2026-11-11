@@ -30,8 +30,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.window.Dialog
 import app.hommaterial.data.AgentAction
 import app.hommaterial.voice.completeCommand
+import app.hommaterial.voice.Completion
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -516,6 +523,9 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
     val suggestions = remember(typed, words) {
         if (typed.selection.collapsed && typed.selection.end == typed.text.length) completeCommand(typed.text, words) else emptyList()
     }
+    // Tab on a keyboard walks the suggestions as they were when it was first pressed: the third is three Tabs away.
+    var cycle by remember { mutableStateOf<Pair<List<Completion>, Int>?>(null) }
+    val shown = cycle?.first ?: suggestions
     fun close() {
         vm.dismissReply()
         onDismiss()
@@ -524,6 +534,7 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
         val text = typed.text.trim()
         if (text.isEmpty()) return
         typed = TextFieldValue()
+        cycle = null
         chatLines += ChatLine(System.nanoTime(), mine = true, text = text)
         vm.onSpeech(listOf(text))
     }
@@ -571,17 +582,29 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
                     }
                     itemsIndexed(chatLines, key = { _, line -> line.id }) { _, line -> ChatBubble(line, state.reply?.id == line.id, vm) }
                 }
-                if (suggestions.isNotEmpty()) {
+                if (shown.isNotEmpty()) {
                     val label = str(R.string.assistant_suggestions)
                     LazyRow(
                         Modifier.fillMaxWidth().semantics { contentDescription = label },
                         contentPadding = PaddingValues(horizontal = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(suggestions, key = { it.label }) { suggestion ->
+                        itemsIndexed(shown, key = { _, it -> it.label }) { i, suggestion ->
+                            val chosen = cycle?.second == i
                             AssistChip(
-                                onClick = { typed = TextFieldValue(suggestion.text, TextRange(suggestion.text.length)) },
+                                onClick = {
+                                    cycle = null
+                                    typed = TextFieldValue(suggestion.text, TextRange(suggestion.text.length))
+                                },
                                 label = { Text(suggestion.label, maxLines = 1) },
+                                colors = if (chosen) {
+                                    AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    )
+                                } else {
+                                    AssistChipDefaults.assistChipColors()
+                                },
                                 modifier = Modifier.animateItem(),
                             )
                         }
@@ -590,13 +613,26 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
                 Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = typed,
-                        onValueChange = { typed = it },
+                        onValueChange = {
+                            if (it.text != typed.text) cycle = null
+                            typed = it
+                        },
                         placeholder = { Text(str(R.string.assistant_type_hint)) },
                         shape = corners(28.dp),
                         maxLines = 4,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(onSend = { send() }),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).onPreviewKeyEvent { e ->
+                            if (e.key != Key.Tab || shown.isEmpty()) return@onPreviewKeyEvent false
+                            if (e.type == KeyEventType.KeyDown) {
+                                // Shift+Tab goes back one.
+                                val step = if (e.isShiftPressed) shown.size - 1 else 1
+                                val i = cycle?.second?.let { (it + step) % shown.size } ?: if (e.isShiftPressed) shown.size - 1 else 0
+                                cycle = shown to i
+                                typed = TextFieldValue(shown[i].text, TextRange(shown[i].text.length))
+                            }
+                            true
+                        },
                     )
                     Spacer(Modifier.size(8.dp))
                     FilledIconButton(onClick = ::send, enabled = typed.text.isNotBlank()) {
