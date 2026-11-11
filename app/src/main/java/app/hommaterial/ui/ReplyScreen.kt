@@ -182,6 +182,7 @@ fun ReplyScreen(reply: VoiceReply, readAloud: Boolean, vm: HomeViewModel) {
                                         color = if (text != null) colors.onSurface else colors.onSurfaceVariant,
                                     )
                                     reply.actions.forEachIndexed { i, action -> ActionRow(action, i) }
+                                    if (reply.links.isNotEmpty()) WebLinks(reply.links, Modifier.padding(top = 8.dp))
                                 }
                             }
                         }

@@ -450,3 +450,15 @@ fun contactScore(name: String, said: String): Int {
     if (have == want) return 2
     return if (want.all { w -> have.any { alike(it, w) } }) 1 else 0
 }
+
+private const val ON_WEB = """(?:su\s+internet|in\s+internet|online|on\s*line|sul\s+web|nel\s+web|in\s+rete|su\s+google|con\s+google|on\s+the\s+web|on\s+google)"""
+private val SEARCH_FIRST = Regex("""^\s*(?:cerca(?:mi|re)?|ricerca|trova(?:mi)?|search(?:\s+for)?|look\s+up)\s+$ON_WEB\s+(?:per\s+|for\s+)?(.+?)[\s.!?]*$""", RegexOption.IGNORE_CASE)
+private val SEARCH_LAST = Regex("""^\s*(?:cerca(?:mi|re)?|ricerca|trova(?:mi)?|search(?:\s+for)?|look\s+up)\s+(.+?)\s+$ON_WEB[\s.!?]*$""", RegexOption.IGNORE_CASE)
+private val SEARCH_EN = Regex("""^\s*(?:search\s+the\s+web\s+for|google)\s+(.+?)[\s.!?]*$""", RegexOption.IGNORE_CASE)
+
+/** What to look up on the web, when asked in so many words ("cerca su internet chi ha vinto Sanremo"); null otherwise. */
+fun parseWebSearch(heard: List<String>): String? = heard.firstNotNullOfOrNull { sentence ->
+    val text = sentence.trim().trimEnd('.', '!', '?').replace(POLITE, "")
+    (SEARCH_FIRST.matchEntire(text) ?: SEARCH_LAST.matchEntire(text) ?: SEARCH_EN.matchEntire(text))
+        ?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
+}

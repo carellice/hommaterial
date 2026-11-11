@@ -124,6 +124,11 @@ collegati al proprio account Alexa.
   WhatsApp». Il nome va detto per intero; se è solo una parte, vale quando
   corrisponde a una sola app («apri maps» apre Google Maps). Senza un'app
   riconosciuta la frase prosegue come sempre (assistente AI o Alexa).
+- Su Android, a voce o nella chat, «cerca su internet chi ha vinto Sanremo»
+  cerca sul web con [Tavily](https://tavily.com) e mostra una risposta breve,
+  letta come le altre, con le pagine trovate da aprire. Serve una chiave
+  gratuita di Tavily, in **Impostazioni → Assistente AI → Ricerca su internet**;
+  con l'assistente AI configurato è lui a riassumere le pagine.
 - Su Android, a voce o nella chat, «chiama Flavio Ceccarelli» telefona al
   contatto, e «portami a Via del Corso 21 Roma con Google Maps» avvia la
   navigazione. «Portami a casa di Flavio» prende l'indirizzo dai contatti; se
@@ -321,6 +326,7 @@ nell'app e nel browser. Le istruzioni sono in [`pwa/README.md`](pwa/README.md).
   sono server intermedi, statistiche né pubblicità.
 - Solo se colleghi SwitchBot, l'app parla anche con i server di SwitchBot, per
   elencare i telecomandi e inviare i loro comandi.
+- Solo se aggiungi la chiave di Tavily, quello che chiedi di cercare su internet va a Tavily.
 - Solo se configuri l'assistente AI, l'app invia a Cloudflare Workers AI, con
   il tuo account, le frasi dettate al microfono che l'app non capisce da sola,
   i nomi di dispositivi, stanze e tasti e le note che gli hai insegnato. L'Account ID e

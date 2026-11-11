@@ -85,6 +85,17 @@
     <string name="voice_which_address">Which address?</string>
     <string name="voice_no_app_for_it">No app of the phone can do it</string>
     <string name="voice_contacts_denied">Without the permission for contacts and calls I cannot do it</string>
+    <string name="web_search">Web search</string>
+    <string name="web_search_on">On: “search the web for…” shows the answer and the pages</string>
+    <string name="web_search_off">Off. Tap to add the free key of Tavily</string>
+    <string name="web_search_key">Tavily API key</string>
+    <string name="web_search_key_text">With “search the web for…”, said or in the chat, the assistant searches the web with Tavily and shows a short answer with the pages found. Make a free account on app.tavily.com and paste the key here (it starts with tvly-). Empty switches the search off. It stays on this device only.</string>
+    <string name="web_search_no_key">To search the web add the key of Tavily in Settings → AI assistant</string>
+    <string name="web_search_bad_key">Tavily does not accept the key: check it in Settings</string>
+    <string name="web_search_limit">The free searches of Tavily are over for this month</string>
+    <string name="web_search_nothing">Nothing found on the web</string>
+    <string name="web_search_pages">Here are the pages found</string>
+    <string name="web_search_sources">Sources</string>
     <string name="voice_no_clock">No clock app on the phone for timers and alarms</string>
     <string name="voice_not_understood">I did not understand “%1$s”</string>
     <string name="voice_unavailable">Speech recognition is not available on this phone</string>

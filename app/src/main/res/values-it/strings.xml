@@ -83,6 +83,17 @@
     <string name="voice_which_address">Quale indirizzo?</string>
     <string name="voice_no_app_for_it">Nessuna app del telefono può farlo</string>
     <string name="voice_contacts_denied">Senza il permesso per contatti e telefonate non posso farlo</string>
+    <string name="web_search">Ricerca su internet</string>
+    <string name="web_search_on">Attiva: «cerca su internet…» mostra la risposta e le pagine</string>
+    <string name="web_search_off">Spenta. Tocca per aggiungere la chiave gratuita di Tavily</string>
+    <string name="web_search_key">Chiave API di Tavily</string>
+    <string name="web_search_key_text">Con «cerca su internet…», a voce o nella chat, l’assistente cerca sul web con Tavily e ti mostra una risposta breve con le pagine trovate. Crea un account gratuito su app.tavily.com e incolla qui la chiave (inizia con tvly-). Vuota, la ricerca si spegne. Resta solo su questo dispositivo.</string>
+    <string name="web_search_no_key">Per cercare su internet aggiungi la chiave di Tavily in Impostazioni → Assistente AI</string>
+    <string name="web_search_bad_key">Tavily non accetta la chiave: controllala nelle Impostazioni</string>
+    <string name="web_search_limit">Ricerche gratuite di Tavily finite per questo mese</string>
+    <string name="web_search_nothing">Non ho trovato niente sul web</string>
+    <string name="web_search_pages">Ecco le pagine che ho trovato</string>
+    <string name="web_search_sources">Fonti</string>
     <string name="voice_no_clock">Nessuna app orologio sul telefono per timer e sveglie</string>
     <string name="voice_not_understood">Non ho capito «%1$s»</string>
     <string name="voice_unavailable">Riconoscimento vocale non disponibile su questo telefono</string>

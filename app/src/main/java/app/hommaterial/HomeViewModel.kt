@@ -4,6 +4,10 @@ import app.hommaterial.voice.parseOpenApp
 import app.hommaterial.voice.Destination
 import app.hommaterial.voice.contactScore
 import app.hommaterial.voice.parseCall
+import app.hommaterial.voice.parseWebSearch
+import app.hommaterial.data.Tavily
+import app.hommaterial.data.WebSearchException
+import app.hommaterial.data.webAnswerPrompt
 import app.hommaterial.voice.parseNavigate
 import app.hommaterial.voice.parseClock
 import app.hommaterial.voice.ClockCommand
@@ -232,6 +236,8 @@ data class UiState(
     val readAloud: Boolean = false,
     /** Whether what the assistant leaves to others goes to Alexa; off, the assistant answers everything itself. */
     val askAlexa: Boolean = true,
+    /** Whether a key for searching the web is set. */
+    val webSearch: Boolean = false,
     /** Whom to call or where to drive to, when more than one would do: the user picks. */
     val choice: Choice? = null,
     /** The permissions a spoken request waits for, with what was heard to do it once given. */
@@ -336,6 +342,8 @@ data class VoiceReply(
     val reply: String? = null,
     val waiting: Boolean = true,
     val actions: List<AgentAction> = emptyList(),
+    /** The pages a web search found, as title to address, shown under the answer. */
+    val links: List<Pair<String, String>> = emptyList(),
 )
 
 /** Where the assistant stands: its account and what it was taught. */
@@ -384,6 +392,7 @@ private typealias CONTACTS = android.provider.ContactsContract.Contacts
 private typealias DATA = android.provider.ContactsContract.Data
 private typealias PHONE = android.provider.ContactsContract.CommonDataKinds.Phone
 private typealias POSTAL = android.provider.ContactsContract.CommonDataKinds.StructuredPostal
+private const val TAVILY_KEY = "tavilyKey"
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 /** What the phone had before it used the home server, to go back to it. */
 private const val BEFORE_SERVER = "dati-prima-del-server.json"
@@ -399,6 +408,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val notionStore = NotionStore(app)
     private val notion = Notion(alexa.http, notionStore)
     private val workersAi = WorkersAi(alexa.http)
+    private val tavily = Tavily(alexa.http)
     private val tvRemote = alexa.lgTv
     private val local = Cache(app)
     private val cache = local.prefs
@@ -473,6 +483,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             haptics = settings.getBoolean("haptics", true),
             readAloud = settings.getBoolean("readAloud", false),
             askAlexa = settings.getBoolean("askAlexa", true),
+            webSearch = settings.getString(TAVILY_KEY, "").orEmpty().isNotBlank(),
             hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
             theme = settings.getInt("theme", 0),
             look = settings.getInt("look", 0),
@@ -821,6 +832,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val said = heard.firstOrNull { it.isNotBlank() } ?: return answer(VoiceResult.Unknown(""))
         if (openApp(heard)) return
         if (callOrNavigate(heard)) return
+        if (searchWeb(heard)) return
         if (setClock(heard)) return
         // What the app knows without doubt is done here: Alexa does not know the groups of the app, for one.
         if (act(heard)) return
@@ -1853,6 +1865,64 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun dismissReply() = _state.update { it.copy(reply = null) }
+
+    fun setWebSearchKey(key: String) {
+        settings.edit().putString(TAVILY_KEY, key.trim()).apply()
+        _state.update { it.copy(webSearch = key.isNotBlank()) }
+    }
+
+    /** Looks up on the web what [heard] asks for ("cerca su internet …"); false when it asks for nothing of the kind. */
+    private fun searchWeb(heard: List<String>): Boolean {
+        val query = parseWebSearch(heard) ?: return false
+        val key = settings.getString(TAVILY_KEY, "").orEmpty()
+        if (key.isBlank()) {
+            reject(str(R.string.web_search_no_key))
+            return true
+        }
+        voiceJob?.cancel()
+        voiceJob = viewModelScope.launch { webSearch(query, key) }
+        return true
+    }
+
+    /** Shows full screen, or in the chat, the answer the web gives to [query], with the pages it comes from. */
+    private suspend fun webSearch(query: String, key: String) {
+        val asked = VoiceReply(System.nanoTime(), fromAlexa = false, said = query)
+        _state.update { it.copy(reply = asked) }
+        fun show(change: (VoiceReply) -> VoiceReply) =
+            _state.update { if (it.reply?.id == asked.id) it.copy(reply = change(asked.copy(waiting = false))) else it }
+        val found = try {
+            tavily.search(key, query)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: java.io.IOException) {
+            return show { it.copy(reply = str(R.string.no_connection)) }
+        } catch (e: WebSearchException) {
+            val why = when (e.message) {
+                "unauthorized" -> R.string.web_search_bad_key
+                "limit" -> R.string.web_search_limit
+                else -> R.string.something_wrong
+            }
+            return show { it.copy(reply = str(why)) }
+        } catch (e: Exception) {
+            android.util.Log.w("WebSearch", "Search failed", e)
+            return show { it.copy(reply = str(R.string.something_wrong)) }
+        }
+        // The assistant, when there is one, sums the pages up in the language of the app; else Tavily's own answer.
+        val summed = if (assistantStore.configured && found.results.isNotEmpty()) {
+            try {
+                workersAi.correct(assistantStore.accountId(), assistantStore.token(), assistantStore.model(),
+                    webAnswerPrompt(query, found, assistantLanguage), listOf(query))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ""
+            }
+        } else ""
+        val text = summed.ifBlank { found.answer }.ifBlank {
+            if (found.results.isEmpty()) str(R.string.web_search_nothing) else str(R.string.web_search_pages)
+        }
+        show { it.copy(reply = text, links = found.results.map { r -> r.title to r.url }) }
+    }
 
     fun setAskAlexa(on: Boolean) {
         settings.edit().putBoolean("askAlexa", on).apply()

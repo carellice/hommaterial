@@ -435,6 +435,13 @@ internal fun AssistantSettings(state: UiState, vm: HomeViewModel) {
             onDismiss = { unlinking = false },
         )
     }
+    var webKey by rememberSaveable { mutableStateOf(false) }
+    if (webKey) WebSearchKeyDialog(vm, onDismiss = { webKey = false })
+    Setting(
+        title = str(R.string.web_search),
+        text = str(if (state.webSearch) R.string.web_search_on else R.string.web_search_off),
+        onClick = { webKey = true },
+    )
     if (!assistant.configured) {
         Setting(title = str(R.string.assistant_setup), text = str(R.string.assistant_setup_text), onClick = { setup = true })
         return
@@ -465,6 +472,50 @@ internal fun AssistantSettings(state: UiState, vm: HomeViewModel) {
         onClick = { notes = true },
     )
     Setting(title = str(R.string.assistant_unlink), onClick = { unlinking = true })
+}
+
+/** The key of Tavily for the web search, made for free on app.tavily.com; empty switches the search off. */
+@Composable
+private fun WebSearchKeyDialog(vm: HomeViewModel, onDismiss: () -> Unit) {
+    var key by remember { mutableStateOf("") }
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.web_search)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(str(R.string.web_search_key_text))
+                TextButton(onClick = { uri.openUri("https://app.tavily.com") }) { Text("app.tavily.com") }
+                OutlinedTextField(
+                    value = key,
+                    onValueChange = { key = it },
+                    label = { Text(str(R.string.web_search_key)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { vm.setWebSearchKey(key); onDismiss() }) { Text(str(R.string.save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.cancel)) } },
+    )
+}
+
+/** The pages a web search found: a tap opens one in the browser. */
+@Composable
+internal fun WebLinks(links: List<Pair<String, String>>, modifier: Modifier = Modifier) {
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    Column(modifier) {
+        Text(str(R.string.web_search_sources), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        for ((title, url) in links) {
+            TextButton(onClick = { runCatching { uri.openUri(url) } }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)) {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(title, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                    Text(android.net.Uri.parse(url).host.orEmpty().removePrefix("www."), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
 }
 
 /** A command typed instead of said: it goes to [onSend] as if it had been heard. */
@@ -504,6 +555,7 @@ internal data class ChatLine(
     val waiting: Boolean = false,
     val fromAlexa: Boolean = false,
     val actions: List<AgentAction> = emptyList(),
+    val links: List<Pair<String, String>> = emptyList(),
 )
 
 /** Whether the chat with the assistant is open: then answers are written there, not shown full screen. */
@@ -546,7 +598,7 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
     // The answer of the assistant or of Alexa, written in place as it changes.
     LaunchedEffect(state.reply) {
         val reply = state.reply ?: return@LaunchedEffect
-        val line = ChatLine(reply.id, mine = false, text = reply.reply, waiting = reply.waiting, fromAlexa = reply.fromAlexa, actions = reply.actions)
+        val line = ChatLine(reply.id, mine = false, text = reply.reply, waiting = reply.waiting, fromAlexa = reply.fromAlexa, actions = reply.actions, links = reply.links)
         val at = chatLines.indexOfFirst { it.id == reply.id }
         if (at >= 0) chatLines[at] = line else chatLines += line
     }
@@ -717,6 +769,7 @@ private fun ChatBubble(line: ChatLine, current: Boolean, vm: HomeViewModel) {
                     )
                 } else {
                     Text(line.text ?: str(R.string.alexa_no_reply), style = MaterialTheme.typography.bodyLarge)
+                    if (line.links.isNotEmpty()) WebLinks(line.links, Modifier.padding(top = 8.dp))
                 }
                 // What the assistant would do waits for a yes, as on the full screen answer.
                 if (!line.waiting && line.actions.isNotEmpty()) {
