@@ -4,12 +4,14 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.nfc.NdefMessage
+import android.nfc.NfcAdapter
 import android.nfc.NdefRecord
 import android.nfc.Tag
 import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
 import android.os.Bundle
 import androidx.annotation.StringRes
+import androidx.core.content.IntentCompat
 import app.hommaterial.R
 import app.hommaterial.data.Cache
 import java.security.MessageDigest
@@ -74,12 +76,24 @@ internal fun writeTag(tag: Tag, uri: Uri, packageName: String): NfcResult {
 internal class NfcResult(val written: Boolean, @StringRes val message: Int)
 
 /**
+ * Set while the app waits to write a tag. Android may still hand a tag the app already wrote to
+ * [NfcActivity] instead of the reader: then it is overwritten, not run.
+ */
+@Volatile
+internal var pendingWrite: ((Tag) -> Unit)? = null
+
+/**
  * Opened by Android when the phone touches a tag the app wrote, even with the app closed: passes
  * what the tag asks for to the same receiver as the shortcuts, and never shows itself.
  */
 class NfcActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingWrite?.let { write ->
+            IntentCompat.getParcelableExtra(intent, NfcAdapter.EXTRA_TAG, Tag::class.java)?.let { tag -> Thread { write(tag) }.start() }
+            finish()
+            return
+        }
         val segments = intent.data?.takeIf { it.scheme == SCHEME && it.host == HOST }?.pathSegments.orEmpty()
         val kind = segments.getOrNull(0)
         val id = segments.getOrNull(1)?.let { written ->

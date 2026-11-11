@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.nfc.NfcAdapter
+import android.nfc.Tag
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -30,6 +31,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.hommaterial.R
 import app.hommaterial.quick.NfcResult
 import app.hommaterial.quick.nfcUri
+import app.hommaterial.quick.pendingWrite
 import app.hommaterial.quick.writeTag
 import app.hommaterial.str
 
@@ -82,16 +84,17 @@ private fun TagWaitDialog(uri: Uri, name: String, onDismiss: () -> Unit) {
     DisposableEffect(activity, adapter, enabled, written) {
         if (activity == null || adapter == null || !enabled || written) return@DisposableEffect onDispose { }
         val main = Handler(Looper.getMainLooper())
-        adapter.enableReaderMode(
-            activity,
-            { tag ->
-                val outcome = writeTag(tag, uri, context.packageName)
-                main.post { result = outcome }
-            },
-            READER_FLAGS,
-            null,
-        )
-        onDispose { adapter.disableReaderMode(activity) }
+        val write: (Tag) -> Unit = { tag ->
+            val outcome = writeTag(tag, uri, context.packageName)
+            main.post { result = outcome }
+        }
+        // A tag the app already wrote may still reach NfcActivity: while this waits, it is written there too.
+        pendingWrite = write
+        adapter.enableReaderMode(activity, write, READER_FLAGS, null)
+        onDispose {
+            if (pendingWrite === write) pendingWrite = null
+            adapter.disableReaderMode(activity)
+        }
     }
 
     AlertDialog(
