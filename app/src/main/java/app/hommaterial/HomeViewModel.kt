@@ -226,6 +226,8 @@ data class UiState(
     val reply: VoiceReply? = null,
     /** Whether those answers are read aloud at once. */
     val readAloud: Boolean = false,
+    /** Whether what the assistant leaves to others goes to Alexa; off, the assistant answers everything itself. */
+    val askAlexa: Boolean = true,
     /** The Echo that what is said to the microphone goes to, as if said to it; null when the app understands it by itself. */
     val voiceEcho: Echo? = null,
     /** The calendars chosen on this device, by id; null until the user chooses, showing those the calendar itself shows. */
@@ -358,6 +360,10 @@ private const val TEAM_FRESH_MS = 5 * 60_000L
 private const val WEATHER_FRESH_MS = 15 * 60_000L
 // The volume the Echo goes back to after answering in silence.
 private const val ECHO_VOLUME = 40
+// Added to the instructions of the assistant when Alexa is not to be asked.
+private const val NO_ALEXA = "Alexa is not used here: never set \"alexa\" true. What is about nothing of this app " +
+    "(general knowledge, advice, conversation, a question of any kind) is answered by you in the reply, in a few sentences. " +
+    "For what you cannot know (the weather now, today's news), say so briefly."
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 /** What the phone had before it used the home server, to go back to it. */
 private const val BEFORE_SERVER = "dati-prima-del-server.json"
@@ -446,6 +452,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             autoUpdate = settings.getBoolean("autoUpdate", true),
             haptics = settings.getBoolean("haptics", true),
             readAloud = settings.getBoolean("readAloud", false),
+            askAlexa = settings.getBoolean("askAlexa", true),
             hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
             theme = settings.getInt("theme", 0),
             look = settings.getInt("look", 0),
@@ -798,7 +805,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         if (act(heard)) return
         if (playMusic(heard)) return
         if (!assistantStore.configured) {
-            s.voiceEcho?.let { return sayToAlexa(it, said) }
+            if (s.askAlexa) s.voiceEcho?.let { return sayToAlexa(it, said) }
             return answer(parseVoice(heard, voiceDevices()))
         }
         voiceJob?.cancel()
@@ -808,7 +815,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             val plan = askAssistant(request, said)
             // What is about nothing of the app, or what the assistant could not answer, goes on to Alexa.
             if (plan != null && !plan.alexa) return@launch
-            _state.value.voiceEcho?.let { return@launch sayToAlexa(it, said) }
+            if (_state.value.askAlexa) _state.value.voiceEcho?.let { return@launch sayToAlexa(it, said) }
             if (plan == null) return@launch
             dismissReply()
             answer(parseVoice(heard, voiceDevices()))
@@ -1641,7 +1648,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { if (it.reply?.id == asked.id) it.copy(reply = change(asked.copy(waiting = false))) else it }
         val plan = try {
             val catalog = assistantCatalog()
-            val context = listOf(agentContext(), extra).filter { it.isNotBlank() }.joinToString("\n")
+            val context = listOf(agentContext(), extra, if (_state.value.askAlexa) "" else NO_ALEXA).filter { it.isNotBlank() }.joinToString("\n")
             val prompt = agentPrompt(catalog, assistantStore.house(), assistantLanguage, nowText(), context)
             parseAgent(workersAi.agent(assistantStore.accountId(), assistantStore.token(), assistantStore.model(), prompt, request), catalog)
         } catch (e: CancellationException) {
@@ -1698,6 +1705,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun dismissReply() = _state.update { it.copy(reply = null) }
+
+    fun setAskAlexa(on: Boolean) {
+        settings.edit().putBoolean("askAlexa", on).apply()
+        _state.update { it.copy(askAlexa = on) }
+    }
 
     fun setReadAloud(on: Boolean) {
         settings.edit().putBoolean("readAloud", on).apply()

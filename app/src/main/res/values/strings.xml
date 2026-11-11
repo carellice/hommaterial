@@ -827,6 +827,8 @@
     <string name="alexa_no_reply">Done. Alexa had nothing else to say.</string>
     <string name="alexa_read">Read aloud</string>
     <string name="alexa_stop_reading">Stop reading</string>
+    <string name="ask_alexa">Pass to Alexa what the assistant does not know</string>
+    <string name="ask_alexa_text">Off, the voice assistant no longer talks to Alexa: the AI assistant set up answers everything. For this device only.</string>
     <string name="read_aloud">Always read answers aloud</string>
     <string name="read_aloud_text">The answers of Alexa and of the AI assistant are read as soon as they come, with the most natural voice of the device. For this device only.</string>
     <string name="ai_title">AI assistant</string>

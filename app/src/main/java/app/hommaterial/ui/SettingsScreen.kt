@@ -597,6 +597,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
+                Toggle(R.string.ask_alexa, R.string.ask_alexa_text, state.askAlexa, vm::setAskAlexa)
                 Toggle(R.string.read_aloud, R.string.read_aloud_text, state.readAloud, vm::setReadAloud)
             }
 

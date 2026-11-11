@@ -227,6 +227,9 @@ collegati al proprio account Alexa.
   collegamento chiede a parole cosa sono le cose dai nomi poco chiari; le
   risposte, che aiutano a riconoscere i soprannomi, si correggono in «Cosa sa
   l'assistente».
+- In **Impostazioni → Comandi vocali**, spegnendo «Passa ad Alexa quello che
+  l'assistente non sa», l'assistente vocale non parla più con Alexa: a tutto
+  risponde l'assistente AI configurato.
 - All'assistente, a voce o scrivendo, si chiede anche cosa c'è in una lista:
   «cosa c'è nella to do list?», «cosa devo comprare?». Il nome non deve essere
   esatto: trattini, spazi o accenti mancanti vanno bene, e vale anche per
