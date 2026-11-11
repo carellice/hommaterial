@@ -201,4 +201,15 @@ class AssistantTest {
         val text = listsContext(listOf("Spesa" to listOf("latte", "pane"), "To-do" to emptyList(), "Notion" to null))
         assertEquals("Lists, with what is still to do in each:\n- \"Spesa\": latte; pane\n- \"To-do\": (empty)\n- \"Notion\": (could not be read)", text)
     }
+
+    @Test
+    fun aPictureOffersItsEventAndItsSearch() {
+        val answer = JSONObject("""{"reply":"Un concerto. Lo metto in calendario o cerco altro?","search":"concerto Vasco Roma 2026",
+            "actions":[{"do":"event","title":"Concerto di Vasco, Roma","start":"2026-06-20T21:00","minutes":180}]}""")
+        val plan = parseAgent(answer, catalog())
+        assertEquals(1, plan.actions.size)
+        assertEquals("2026-06-20T21:00", plan.actions.single().start)
+        assertTrue(plan.needsConfirm)
+        assertTrue(imagePrompt("Italian", "now").contains("\"search\""))
+    }
 }

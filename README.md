@@ -124,6 +124,11 @@ collegati al proprio account Alexa.
   WhatsApp». Il nome va detto per intero; se è solo una parte, vale quando
   corrisponde a una sola app («apri maps» apre Google Maps). Senza un'app
   riconosciuta la frase prosegue come sempre (assistente AI o Alexa).
+- Su Android, nella chat dell'assistente, l'icona della foto manda un'immagine:
+  un volantino, una locandina, un biglietto. L'assistente AI dice cosa mostra e,
+  se annuncia qualcosa con una data, propone di metterlo in calendario (con
+  conferma) e di cercare altro su internet, anche entrambe. Le foto le legge il
+  modello Llama 4 Scout di Cloudflare Workers AI, con lo stesso account.
 - Su Android, a voce o nella chat, «cerca su internet chi ha vinto Sanremo»
   cerca sul web con [Tavily](https://tavily.com) e mostra una risposta breve,
   letta come le altre, con le pagine trovate da aprire. Serve una chiave

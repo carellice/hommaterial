@@ -7,6 +7,10 @@ import android.speech.RecognizerIntent
 import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,6 +65,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.TravelExplore
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material3.AlertDialog
@@ -500,6 +506,32 @@ private fun WebSearchKeyDialog(vm: HomeViewModel, onDismiss: () -> Unit) {
     )
 }
 
+/** The picture sent in the chat, small, read from the address the photo picker gave. */
+@Composable
+private fun ChatPicture(uri: String) {
+    val context = LocalContext.current
+    val picture by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, uri) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val parsed = android.net.Uri.parse(uri)
+                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                context.contentResolver.openInputStream(parsed)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 640) sample *= 2
+                context.contentResolver.openInputStream(parsed)?.use {
+                    android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+                }?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    picture?.let {
+        androidx.compose.foundation.Image(
+            it, contentDescription = null,
+            modifier = Modifier.padding(bottom = 6.dp).widthIn(max = 260.dp).clip(corners(12.dp)),
+        )
+    }
+}
+
 /** The pages a web search found: a tap opens one in the browser. */
 @Composable
 internal fun WebLinks(links: List<Pair<String, String>>, modifier: Modifier = Modifier) {
@@ -556,6 +588,9 @@ internal data class ChatLine(
     val fromAlexa: Boolean = false,
     val actions: List<AgentAction> = emptyList(),
     val links: List<Pair<String, String>> = emptyList(),
+    val search: String = "",
+    /** The picture sent with the line, as the address the photo picker gave. */
+    val image: String? = null,
 )
 
 /** Whether the chat with the assistant is open: then answers are written there, not shown full screen. */
@@ -595,10 +630,19 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
         chatLines += ChatLine(System.nanoTime(), mine = true, text = text)
         vm.onSpeech(listOf(text))
     }
+    // A picture from the photo picker, with what is written so far: the assistant says what it is about.
+    val photo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = typed.text.trim()
+        typed = TextFieldValue()
+        cycle = null
+        chatLines += ChatLine(System.nanoTime(), mine = true, text = text.ifEmpty { null }, image = uri.toString())
+        vm.askImage(uri, text)
+    }
     // The answer of the assistant or of Alexa, written in place as it changes.
     LaunchedEffect(state.reply) {
         val reply = state.reply ?: return@LaunchedEffect
-        val line = ChatLine(reply.id, mine = false, text = reply.reply, waiting = reply.waiting, fromAlexa = reply.fromAlexa, actions = reply.actions, links = reply.links)
+        val line = ChatLine(reply.id, mine = false, text = reply.reply, waiting = reply.waiting, fromAlexa = reply.fromAlexa, actions = reply.actions, links = reply.links, search = reply.search)
         val at = chatLines.indexOfFirst { it.id == reply.id }
         if (at >= 0) chatLines[at] = line else chatLines += line
     }
@@ -685,6 +729,9 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
+                        Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = str(R.string.ai_image_send))
+                    }
                     OutlinedTextField(
                         value = typed,
                         onValueChange = {
@@ -761,6 +808,8 @@ private fun ChatBubble(line: ChatLine, current: Boolean, vm: HomeViewModel) {
             modifier = Modifier.widthIn(max = 320.dp).then(if (skeuo) Modifier.skeuoRaised(shape, lit = line.mine) else Modifier),
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                line.image?.let { ChatPicture(it) }
+                if (line.mine && line.text == null) return@Column
                 if (line.waiting) {
                     Text(
                         str(if (line.fromAlexa) R.string.alexa_waiting else R.string.ai_thinking),
@@ -770,6 +819,12 @@ private fun ChatBubble(line: ChatLine, current: Boolean, vm: HomeViewModel) {
                 } else {
                     Text(line.text ?: str(R.string.alexa_no_reply), style = MaterialTheme.typography.bodyLarge)
                     if (line.links.isNotEmpty()) WebLinks(line.links, Modifier.padding(top = 8.dp))
+                    if (current && line.search.isNotEmpty()) {
+                        OutlinedButton(onClick = { vm.searchFor(line.search) }, modifier = Modifier.padding(top = 8.dp)) {
+                            Icon(Icons.Outlined.TravelExplore, contentDescription = null)
+                            Text(str(R.string.ai_image_search), Modifier.padding(start = 8.dp))
+                        }
+                    }
                 }
                 // What the assistant would do waits for a yes, as on the full screen answer.
                 if (!line.waiting && line.actions.isNotEmpty()) {

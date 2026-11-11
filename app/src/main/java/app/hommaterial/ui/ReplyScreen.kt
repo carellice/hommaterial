@@ -187,6 +187,11 @@ fun ReplyScreen(reply: VoiceReply, readAloud: Boolean, vm: HomeViewModel) {
                             }
                         }
                     }
+                    if (reply.search.isNotEmpty() && !reply.waiting) {
+                        AppTonalButton(onClick = { vm.searchFor(reply.search) }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+                            Text(str(R.string.ai_image_search))
+                        }
+                    }
                     if (reply.actions.isNotEmpty() && !reply.waiting) {
                         Row(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
                             AppTonalButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(str(R.string.cancel)) }

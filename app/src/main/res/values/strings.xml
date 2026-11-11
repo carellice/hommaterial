@@ -96,6 +96,12 @@
     <string name="web_search_nothing">Nothing found on the web</string>
     <string name="web_search_pages">Here are the pages found</string>
     <string name="web_search_sources">Sources</string>
+    <string name="ai_image_send">Send a photo</string>
+    <string name="ai_image_sent">Photo</string>
+    <string name="ai_image_search">Search the internet</string>
+    <string name="ai_image_no_assistant">To read photos set up the AI assistant in Settings</string>
+    <string name="ai_image_unreadable">I cannot open this photo</string>
+    <string name="ai_image_nothing">I could not tell what the photo shows</string>
     <string name="voice_no_clock">No clock app on the phone for timers and alarms</string>
     <string name="voice_not_understood">I did not understand “%1$s”</string>
     <string name="voice_unavailable">Speech recognition is not available on this phone</string>

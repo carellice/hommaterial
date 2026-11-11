@@ -94,6 +94,12 @@
     <string name="web_search_nothing">Non ho trovato niente sul web</string>
     <string name="web_search_pages">Ecco le pagine che ho trovato</string>
     <string name="web_search_sources">Fonti</string>
+    <string name="ai_image_send">Invia una foto</string>
+    <string name="ai_image_sent">Foto</string>
+    <string name="ai_image_search">Cerca su internet</string>
+    <string name="ai_image_no_assistant">Per leggere le foto configura l’assistente AI nelle Impostazioni</string>
+    <string name="ai_image_unreadable">Non riesco ad aprire questa foto</string>
+    <string name="ai_image_nothing">Non ho capito cosa mostra la foto</string>
     <string name="voice_no_clock">Nessuna app orologio sul telefono per timer e sveglie</string>
     <string name="voice_not_understood">Non ho capito «%1$s»</string>
     <string name="voice_unavailable">Riconoscimento vocale non disponibile su questo telefono</string>

@@ -321,6 +321,50 @@ async function askJson(account: Keys, messages: [string, string][], schema: unkn
   return found
 }
 
+// The model that reads pictures, whatever model is chosen for the words (as VISION_MODEL in Assistant.kt).
+const VISION_MODEL = '@cf/meta/llama-4-scout-17b-16e-instruct'
+
+/**
+ * What the model makes of a picture ([image], a JPEG in base64) with the words of [request], as the
+ * JSON [system] asks for. Through the endpoint like OpenAI's, the one that takes pictures.
+ */
+export async function image(system: string, request_: string, image: string): Promise<any> {
+  const account_ = account()
+  let response
+  try {
+    response = await request(`${BASE}/accounts/${account_.accountId}/ai/v1/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${account_.token.trim()}`, 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({
+        model: VISION_MODEL,
+        max_tokens: 700,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: [{ type: 'text', text: request_ || '.' }, { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${image}` } }] },
+        ],
+      }),
+    }, 90_000)
+  } catch (e) {
+    if (e instanceof OfflineError) throw e
+    throw new OfflineError()
+  }
+  const text = await response.text()
+  let json: any = null
+  try {
+    json = JSON.parse(text)
+  } catch {
+    json = null
+  }
+  const message = String(json?.errors?.[0]?.message ?? json?.error?.message ?? '')
+  if (response.status === 401 || response.status === 403) throw new AssistantError('assistant_unauthorized')
+  if (response.status === 429 || /neurons/i.test(message)) throw new AssistantError('assistant_limit')
+  if (!response.ok) throw new AssistantError('assistant_error', message || String(response.status))
+  const found = extractJson(String(json?.choices?.[0]?.message?.content ?? ''))
+  if (!found) throw new AssistantError('assistant_unreadable')
+  return found
+}
+
 /** Checks the account and the token with the smallest request there is. */
 export const test = (accountId: string, token: string) => run({ accountId, token }, model(), [['user', 'Reply with OK.']], null, 4)
 

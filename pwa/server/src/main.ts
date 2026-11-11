@@ -821,6 +821,12 @@ route('POST', '/api/assistant/questions', async (req, res) => {
  * The Android app writes its own instructions, from what it knows of the home: the server only
  * adds the keys. [kind] is "correct", with the guesses heard, or "questions".
  */
+route('POST', '/api/assistant/image', async (req, res) => {
+  const { system, request, image } = await readJson<{ system?: string; request?: string; image?: string }>(req)
+  if (!image || !/^[A-Za-z0-9+/=]+$/.test(image)) throw new HttpError(400, 'Immagine non valida')
+  json(res, 200, { answer: await assistant.image(text(system, 60_000), text(request, 4000), image) })
+})
+
 route('POST', '/api/assistant/ask', async (req, res) => {
   const { kind, system, heard } = await readJson<{ kind?: string; system?: string; heard?: string[] }>(req)
   const prompt = text(system, 60_000)
