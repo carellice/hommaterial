@@ -209,6 +209,8 @@ fun HomeScreen(state: UiState, vm: HomeViewModel, onSettings: () -> Unit) {
     LaunchedEffect(Unit) { vm.messages.collect { if (!chatOpen.value) snackbar.showSnackbar(it) } }
 
     state.voice?.let { VoiceDialog(it, vm) }
+    state.choice?.let { ChoiceDialog(it, vm) }
+    state.permissionAsk?.let { PermissionRequest(it, vm) }
 
     // A wide screen has room for a side bar that splits the home in pages.
     val width = LocalConfiguration.current.screenWidthDp
@@ -1379,6 +1381,29 @@ private fun rememberVoiceCommand(vm: HomeViewModel): () -> Unit {
             vm.speechUnavailable()
         }
     }
+}
+
+/** Whom to call or where to drive to, when the contacts give more than one. */
+@Composable
+internal fun ChoiceDialog(choice: app.hommaterial.Choice, vm: HomeViewModel) {
+    AlertDialog(
+        onDismissRequest = vm::dismissChoice,
+        title = { Text(choice.title) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                for (option in choice.options) TextButton(onClick = { vm.pick(option) }) { Text(option.first) }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = vm::dismissChoice) { Text(str(R.string.cancel)) } },
+    )
+}
+
+/** Asks Android for the permissions a spoken request needs, then lets it go on. */
+@Composable
+internal fun PermissionRequest(ask: app.hommaterial.PermissionAsk, vm: HomeViewModel) {
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.permissionsAnswered() }
+    LaunchedEffect(ask) { launcher.launch(ask.permissions.toTypedArray()) }
 }
 
 @Composable

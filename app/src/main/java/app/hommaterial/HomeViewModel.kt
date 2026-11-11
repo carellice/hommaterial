@@ -1,6 +1,10 @@
 package app.hommaterial
 
 import app.hommaterial.voice.parseOpenApp
+import app.hommaterial.voice.Destination
+import app.hommaterial.voice.contactScore
+import app.hommaterial.voice.parseCall
+import app.hommaterial.voice.parseNavigate
 import app.hommaterial.voice.parseClock
 import app.hommaterial.voice.ClockCommand
 import app.hommaterial.voice.MusicCommand
@@ -228,6 +232,10 @@ data class UiState(
     val readAloud: Boolean = false,
     /** Whether what the assistant leaves to others goes to Alexa; off, the assistant answers everything itself. */
     val askAlexa: Boolean = true,
+    /** Whom to call or where to drive to, when more than one would do: the user picks. */
+    val choice: Choice? = null,
+    /** The permissions a spoken request waits for, with what was heard to do it once given. */
+    val permissionAsk: PermissionAsk? = null,
     /** The Echo that what is said to the microphone goes to, as if said to it; null when the app understands it by itself. */
     val voiceEcho: Echo? = null,
     /** The calendars chosen on this device, by id; null until the user chooses, showing those the calendar itself shows. */
@@ -316,6 +324,11 @@ data class TvSearch(
  * What was [said] to Alexa, or asked of the assistant, and the [reply]: null while [waiting] for it,
  * or when Alexa gave none in writing. [actions] are what the assistant would do, waiting for a yes.
  */
+/** A pick among [options], each a label and what it starts. */
+data class Choice(val title: String, val options: List<Pair<String, Intent>>)
+
+data class PermissionAsk(val permissions: List<String>, val heard: List<String>)
+
 data class VoiceReply(
     val id: Long,
     val fromAlexa: Boolean,
@@ -364,6 +377,13 @@ private const val ECHO_VOLUME = 40
 private const val NO_ALEXA = "Alexa is not used here: never set \"alexa\" true. What is about nothing of this app " +
     "(general knowledge, advice, conversation, a question of any kind) is answered by you in the reply, in a few sentences. " +
     "For what you cannot know (the weather now, today's news), say so briefly."
+// The contacts offered at most when a name said fits more than one.
+private const val MAX_CONTACTS = 6
+private const val GOOGLE_MAPS = "com.google.android.apps.maps"
+private typealias CONTACTS = android.provider.ContactsContract.Contacts
+private typealias DATA = android.provider.ContactsContract.Data
+private typealias PHONE = android.provider.ContactsContract.CommonDataKinds.Phone
+private typealias POSTAL = android.provider.ContactsContract.CommonDataKinds.StructuredPostal
 private const val UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 /** What the phone had before it used the home server, to go back to it. */
 private const val BEFORE_SERVER = "dati-prima-del-server.json"
@@ -800,6 +820,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
         val said = heard.firstOrNull { it.isNotBlank() } ?: return answer(VoiceResult.Unknown(""))
         if (openApp(heard)) return
+        if (callOrNavigate(heard)) return
         if (setClock(heard)) return
         // What the app knows without doubt is done here: Alexa does not know the groups of the app, for one.
         if (act(heard)) return
@@ -962,6 +983,133 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             true
         } catch (e: ActivityNotFoundException) {
             false
+        }
+    }
+
+    /**
+     * Calls a contact ("chiama Flavio Ceccarelli") or drives with Google Maps to an address or to the
+     * address of a contact ("portami a casa di Flavio"); false when [heard] is about neither.
+     */
+    private fun callOrNavigate(heard: List<String>): Boolean {
+        val call = parseCall(heard)
+        val place = if (call == null) parseNavigate(heard) else null
+        if (call == null && place == null) return false
+        val context = getApplication<Application>()
+        val needed = buildList {
+            if (call != null || place is Destination.Contact) add(android.Manifest.permission.READ_CONTACTS)
+            if (call != null) add(android.Manifest.permission.CALL_PHONE)
+        }.filter { context.checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
+        if (needed.isNotEmpty()) {
+            _state.update { it.copy(permissionAsk = PermissionAsk(needed, heard)) }
+            return true
+        }
+        when {
+            call != null -> callContact(call)
+            place is Destination.Address -> start(mapsIntent(place.address), str(R.string.voice_navigating, place.address))
+            place is Destination.Contact -> navigateToContact(place.name)
+        }
+        return true
+    }
+
+    /** Goes on with the request that waited for permissions, once Android has asked for them. */
+    fun permissionsAnswered() {
+        val ask = _state.value.permissionAsk ?: return
+        _state.update { it.copy(permissionAsk = null) }
+        val context = getApplication<Application>()
+        if (ask.permissions.all { context.checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED }) {
+            callOrNavigate(ask.heard)
+        } else {
+            reject(str(R.string.voice_contacts_denied))
+        }
+    }
+
+    fun pick(option: Pair<String, Intent>) {
+        _state.update { it.copy(choice = null) }
+        start(option.second, option.first)
+    }
+
+    fun dismissChoice() = _state.update { it.copy(choice = null) }
+
+    private fun start(intent: Intent, said: String) {
+        try {
+            getApplication<Application>().startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            _haptics.tryEmit(Haptic.Confirm)
+            _messages.tryEmit(said)
+        } catch (e: ActivityNotFoundException) {
+            reject(str(R.string.voice_no_app_for_it))
+        }
+    }
+
+    private fun reject(said: String) {
+        _haptics.tryEmit(Haptic.Reject)
+        _messages.tryEmit(said)
+    }
+
+    /** Navigation in Google Maps, or a map of any app when there is no Google Maps. */
+    private fun mapsIntent(address: String): Intent {
+        val maps = Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + Uri.encode(address))).setPackage(GOOGLE_MAPS)
+        val installed = getApplication<Application>().packageManager.resolveActivity(maps, 0) != null
+        return if (installed) maps else Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(address)))
+    }
+
+    /** The contacts of the phone that answer best to [said], as id to name: all with that same name, or all holding it. */
+    private fun contacts(said: String): List<Pair<Long, String>> {
+        val resolver = getApplication<Application>().contentResolver
+        val found = mutableListOf<Triple<Long, String, Int>>()
+        val columns = arrayOf(CONTACTS._ID, CONTACTS.DISPLAY_NAME_PRIMARY)
+        resolver.query(CONTACTS.CONTENT_URI, columns, null, null, null)?.use { c ->
+            while (c.moveToNext()) {
+                val name = c.getString(1) ?: continue
+                val score = contactScore(name, said)
+                if (score > 0) found += Triple(c.getLong(0), name, score)
+            }
+        }
+        val best = found.maxOfOrNull { it.third } ?: return emptyList()
+        return found.filter { it.third == best }.map { it.first to it.second }.take(MAX_CONTACTS)
+    }
+
+    /** The values in [column] of the rows of [uri] of the contact [id], the default one first, each once. */
+    private fun details(uri: Uri, column: String, id: Long): List<String> {
+        val resolver = getApplication<Application>().contentResolver
+        val values = mutableListOf<Pair<String, Boolean>>()
+        val columns = arrayOf(column, DATA.IS_SUPER_PRIMARY)
+        resolver.query(uri, columns, "${DATA.CONTACT_ID} = ?", arrayOf(id.toString()), null)?.use { c ->
+            while (c.moveToNext()) c.getString(0)?.trim()?.takeIf { it.isNotEmpty() }?.let { values += it to (c.getInt(1) != 0) }
+        }
+        return values.sortedByDescending { it.second }.map { it.first }
+            .distinctBy { v -> v.filter { it.isLetterOrDigit() || it == '+' }.lowercase() }
+    }
+
+    /** Calls [said] at once when one number is meant; with more people or numbers, asks which. */
+    private fun callContact(said: String) {
+        val found = contacts(said)
+        if (found.isEmpty()) return reject(str(R.string.voice_no_contact, said))
+        val numbers = found.flatMap { (id, name) -> details(PHONE.CONTENT_URI, PHONE.NUMBER, id).map { name to it } }
+        if (numbers.isEmpty()) return reject(str(R.string.voice_no_number, found.first().second))
+        val call = { number: String -> Intent(Intent.ACTION_CALL, Uri.parse("tel:" + Uri.encode(number))) }
+        if (numbers.size == 1) {
+            val (name, number) = numbers.single()
+            return start(call(number), str(R.string.voice_calling, name))
+        }
+        _state.update { s ->
+            s.copy(choice = Choice(str(R.string.voice_which_number), numbers.map { (name, number) -> "$name · $number" to call(number) }))
+        }
+    }
+
+    /** Drives to the address of [said]; with more than one address, asks which first. */
+    private fun navigateToContact(said: String) {
+        val found = contacts(said)
+        if (found.isEmpty()) return reject(str(R.string.voice_no_contact, said))
+        val places = found.flatMap { (id, name) ->
+            details(POSTAL.CONTENT_URI, POSTAL.FORMATTED_ADDRESS, id).map { name to it.replace('\n', ' ') }
+        }
+        if (places.isEmpty()) return reject(str(R.string.voice_no_address, found.first().second))
+        if (places.size == 1) {
+            val (name, address) = places.single()
+            return start(mapsIntent(address), str(R.string.voice_navigating, "$name, $address"))
+        }
+        _state.update { s ->
+            s.copy(choice = Choice(str(R.string.voice_which_address), places.map { (name, address) -> "$name · $address" to mapsIntent(address) }))
         }
     }
 

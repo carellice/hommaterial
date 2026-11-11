@@ -124,6 +124,11 @@ collegati al proprio account Alexa.
   WhatsApp». Il nome va detto per intero; se è solo una parte, vale quando
   corrisponde a una sola app («apri maps» apre Google Maps). Senza un'app
   riconosciuta la frase prosegue come sempre (assistente AI o Alexa).
+- Su Android, a voce o nella chat, «chiama Flavio Ceccarelli» telefona al
+  contatto, e «portami a Via del Corso 21 Roma con Google Maps» avvia la
+  navigazione. «Portami a casa di Flavio» prende l'indirizzo dai contatti; se
+  ne ha più di uno chiede quale. La prima volta chiede il permesso per contatti
+  e telefonate; con più numeri o più contatti dallo stesso nome chiede chi.
 - Su Android, a voce o nella chat, timer e sveglie si impostano nell'app Orologio
   del telefono: «imposta un timer di 10 minuti», «timer di un'ora e mezza»,
   «sveglia alle 7», «svegliami alle 6 e mezza», «svegliami tra 20 minuti».

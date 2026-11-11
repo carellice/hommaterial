@@ -400,3 +400,53 @@ fun parseClock(heard: List<String>): ClockCommand? {
     }
     return null
 }
+
+private val CALL = Regex("""^\s*(?:chiama(?:mi)?|telefona(?:re)?|fai una telefonata|call|phone|ring)\s+(?:a\s+|ad\s+|al\s+|alla\s+|allo\s+)?(.+?)[\s.!?]*$""", RegexOption.IGNORE_CASE)
+private val POLITE = Regex("""\s+(?:per favore|per piacere|grazie|please|thanks)$""", RegexOption.IGNORE_CASE)
+
+/** The name of the contact to call in what was [heard] ("chiama Flavio Ceccarelli", "telefona a mamma"); null when none. */
+fun parseCall(heard: List<String>): String? = heard.firstNotNullOfOrNull { sentence ->
+    CALL.matchEntire(sentence.trim())?.groupValues?.get(1)?.replace(POLITE, "")?.trim()?.takeIf { it.isNotEmpty() }
+}
+
+/** Where to drive to: an [address] as said, or the address of a [contact]. */
+sealed interface Destination {
+    data class Address(val address: String) : Destination
+
+    data class Contact(val name: String) : Destination
+}
+
+private val NAVIGATE = Regex(
+    """^\s*(?:portami|accompagnami|guidami|naviga(?:\s+verso)?|avvia\s+(?:la\s+)?navigazione\s+(?:verso|per|a)|take\s+me|drive\s+me|navigate(?:\s+to)?)\s+(.+?)[\s.!?]*$""",
+    RegexOption.IGNORE_CASE,
+)
+private val WITH_MAPS = Regex("""\s+(?:con|su|usando|tramite|with|using|on|in)\s+(?:google\s+)?maps$""", RegexOption.IGNORE_CASE)
+private val HOUSE_OF = Regex("""^(?:a\s+|to\s+)?(?:casa\s+(?:di|del|della|dello|dei|delle)|da|the\s+house\s+of|the\s+home\s+of)\s+(.+)$""", RegexOption.IGNORE_CASE)
+private val HOUSE_OF_EN = Regex("""^(?:to\s+)?(.+?)'s\s+(?:house|home|place)$""", RegexOption.IGNORE_CASE)
+private val TOWARDS = Regex("""^(?:a|ad|al|alla|allo|all'|in|verso|fino\s+a|to)\s+""", RegexOption.IGNORE_CASE)
+
+/**
+ * Where to be taken in what was [heard]: "portami a Via del Corso 21 Roma con Google Maps" is an
+ * address, "portami a casa di Flavio Ceccarelli" or "portami da Flavio" the address of a contact.
+ */
+fun parseNavigate(heard: List<String>): Destination? = heard.firstNotNullOfOrNull { sentence ->
+    val rest = NAVIGATE.matchEntire(sentence.trim())?.groupValues?.get(1)?.replace(POLITE, "")?.replace(WITH_MAPS, "")?.trim()
+        ?: return@firstNotNullOfOrNull null
+    val contact = (HOUSE_OF.matchEntire(rest) ?: HOUSE_OF_EN.matchEntire(rest))?.groupValues?.get(1)?.trim()
+    when {
+        !contact.isNullOrEmpty() -> Destination.Contact(contact)
+        else -> rest.replace(TOWARDS, "").trim().takeIf { it.isNotEmpty() }?.let { Destination.Address(it) }
+    }
+}
+
+/**
+ * How well a contact called [name] answers to [said]: 2 for the same name, 1 when every word said is
+ * in the name ("Flavio" for "Flavio Ceccarelli"), 0 otherwise.
+ */
+fun contactScore(name: String, said: String): Int {
+    val have = words(name)
+    val want = words(said)
+    if (want.isEmpty()) return 0
+    if (have == want) return 2
+    return if (want.all { w -> have.any { alike(it, w) } }) 1 else 0
+}

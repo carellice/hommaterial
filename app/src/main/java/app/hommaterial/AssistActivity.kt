@@ -247,7 +247,7 @@ private fun AssistPanel(state: UiState, vm: HomeViewModel, onOpenApp: () -> Unit
             }
         }
     }
-    val asking = state.voice != null || state.reply != null
+    val asking = state.voice != null || state.reply != null || state.choice != null || state.permissionAsk != null
     LaunchedEffect(phase, outcome, asking) {
         when {
             asking -> {}
@@ -267,6 +267,8 @@ private fun AssistPanel(state: UiState, vm: HomeViewModel, onOpenApp: () -> Unit
         if (asking) asked = true else if (asked && phase != Phase.DONE) close()
     }
     state.voice?.let { VoiceDialog(it, vm) }
+    state.choice?.let { app.hommaterial.ui.ChoiceDialog(it, vm) }
+    state.permissionAsk?.let { app.hommaterial.ui.PermissionRequest(it, vm) }
     state.reply?.let { ReplyScreen(it, state.readAloud, vm) }
     // Typed instead of said: the microphone stops and the text goes on as if heard.
     var typing by remember { mutableStateOf(false) }

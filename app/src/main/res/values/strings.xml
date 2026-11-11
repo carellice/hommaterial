@@ -76,6 +76,15 @@
     <string name="voice_alarms_set">%1$d alarms set from %2$s to %3$s</string>
     <string name="voice_alarms_dismissed">Switched off the %1$s alarm. Android lets another app switch off one alarm at a time: the others are in the clock app, open now</string>
     <string name="voice_no_alarms">No alarm to switch off</string>
+    <string name="voice_calling">Calling %1$s</string>
+    <string name="voice_navigating">Taking you to %1$s</string>
+    <string name="voice_no_contact">No contact is called “%1$s”</string>
+    <string name="voice_no_number">%1$s has no phone number</string>
+    <string name="voice_no_address">%1$s has no address in the contacts</string>
+    <string name="voice_which_number">Whom do I call?</string>
+    <string name="voice_which_address">Which address?</string>
+    <string name="voice_no_app_for_it">No app of the phone can do it</string>
+    <string name="voice_contacts_denied">Without the permission for contacts and calls I cannot do it</string>
     <string name="voice_no_clock">No clock app on the phone for timers and alarms</string>
     <string name="voice_not_understood">I did not understand “%1$s”</string>
     <string name="voice_unavailable">Speech recognition is not available on this phone</string>
