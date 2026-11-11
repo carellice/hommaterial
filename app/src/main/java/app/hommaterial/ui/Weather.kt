@@ -106,12 +106,15 @@ internal fun WeatherHomeCard(state: UiState, vm: HomeViewModel) {
     val float by rememberInfiniteTransition(label = "weather").animateFloat(
         0f, 1f, infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "float",
     )
+    val metro = LocalMetro.current
     Box(
         Modifier
             .fillMaxWidth()
             .padding(top = 4.dp)
-            .clip(corners(24.dp))
-            .background(Brush.linearGradient(listOf(look.top, look.bottom))),
+            .then(if (metro) Modifier.metroTilt() else Modifier.lookGlass(corners(if (LocalSkeuo.current) 16.dp else 24.dp)))
+            .clip(corners(if (LocalSkeuo.current) 16.dp else 24.dp))
+            // A live tile is one flat color; elsewhere the sky fades from top to bottom.
+            .background(if (metro) Brush.linearGradient(listOf(look.bottom, look.bottom)) else Brush.linearGradient(listOf(look.top, look.bottom))),
     ) {
         // The icon of the sky, large and faint, behind everything.
         Icon(
@@ -167,7 +170,7 @@ internal fun WeatherHomeCard(state: UiState, vm: HomeViewModel) {
                                             translationY = (1 - appear) * 16.dp.toPx()
                                         }
                                         .clip(corners(16.dp))
-                                        .background(Color.White.copy(alpha = 0.14f))
+                                        .background(Color.White.copy(alpha = if (LocalMetro.current) 0.18f else 0.14f))
                                         .padding(vertical = 8.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {

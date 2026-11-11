@@ -430,10 +430,26 @@ internal fun HomeAgenda(model: CalendarModel, state: UiState, onOpen: () -> Unit
     val today = LocalDate.now(zone)
     val until = midnight(today.plusDays(2))
     val soon = model.events?.filter { it.start < until && it.end > System.currentTimeMillis() } ?: return
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+    val skeuo = LocalSkeuo.current
+    val metro = LocalMetro.current
+    val base = MaterialTheme.colorScheme
+    // Modern UI: the live tile of the calendar, the accent with white words; what was tinted turns white too.
+    val scheme = if (metro) base.copy(onSurfaceVariant = Color.White.copy(alpha = 0.8f), primary = Color.White, onSurface = Color.White) else base
+    MaterialTheme(colorScheme = scheme) { Surface(
+        color = when {
+            metro -> base.primary
+            skeuo -> Color.Transparent
+            else -> base.secondaryContainer.copy(alpha = 0.55f)
+        },
+        contentColor = if (metro) Color.White else base.onSurface,
         shape = corners(24.dp),
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp).clip(corners(24.dp)).clickable(onClick = onOpen),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp)
+            .then(if (skeuo) Modifier.skeuoPanel(corners(16.dp)) else Modifier)
+            .then(if (metro) Modifier.metroTilt() else Modifier)
+            .clip(corners(if (skeuo) 16.dp else 24.dp))
+            .clickable(onClick = onOpen),
     ) {
         Column(Modifier.animateContentSize().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -491,7 +507,7 @@ internal fun HomeAgenda(model: CalendarModel, state: UiState, onOpen: () -> Unit
                 )
             }
         }
-    }
+    } }
 }
 
 /**

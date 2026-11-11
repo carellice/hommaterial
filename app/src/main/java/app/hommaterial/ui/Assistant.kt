@@ -31,6 +31,11 @@ import androidx.compose.ui.window.Dialog
 import app.hommaterial.data.AgentAction
 import app.hommaterial.voice.completeCommand
 import app.hommaterial.voice.Completion
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -552,17 +557,22 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
         onDismissRequest = ::close,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+        val skeuo = LocalSkeuoMaterials.current
+        val metro = LocalMetro.current
+        // The table of the skeuomorphic look under the chat, its bar of brushed metal; the header of a hub in Modern UI.
+        Surface(Modifier.fillMaxSize().screenTexture(), color = screenColor()) {
             Column(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
-                Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = ::close) { Icon(Icons.Outlined.Close, contentDescription = str(R.string.close)) }
-                    Text(str(R.string.assistant_chat), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    if (chatLines.isNotEmpty()) {
-                        IconButton(onClick = { chatLines.clear() }) {
-                            Icon(Icons.Outlined.RestartAlt, contentDescription = str(R.string.assistant_chat_clear))
+                AppTopBar(
+                    title = { Text(str(R.string.assistant_chat).let { if (metro) it.lowercase() else it }) },
+                    navigationIcon = { IconButton(onClick = ::close) { Icon(Icons.Outlined.Close, contentDescription = str(R.string.close)) } },
+                    actions = {
+                        if (chatLines.isNotEmpty()) {
+                            IconButton(onClick = { chatLines.clear() }) {
+                                Icon(Icons.Outlined.RestartAlt, contentDescription = str(R.string.assistant_chat_clear))
+                            }
                         }
-                    }
-                }
+                    },
+                )
                 LazyColumn(
                     Modifier.weight(1f).fillMaxWidth(),
                     state = list,
@@ -591,6 +601,18 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
                     ) {
                         itemsIndexed(shown, key = { _, it -> it.label }) { i, suggestion ->
                             val chosen = cycle?.second == i
+                            if (skeuo != null || metro) {
+                                AppFilterChip(
+                                    selected = chosen,
+                                    onClick = {
+                                        cycle = null
+                                        typed = TextFieldValue(suggestion.text, TextRange(suggestion.text.length))
+                                    },
+                                    label = { Text(suggestion.label, maxLines = 1) },
+                                    modifier = Modifier.animateItem(),
+                                )
+                                return@itemsIndexed
+                            }
                             AssistChip(
                                 onClick = {
                                     cycle = null
@@ -619,6 +641,12 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
                         },
                         placeholder = { Text(str(R.string.assistant_type_hint)) },
                         shape = corners(28.dp),
+                        // A white field cut into the table in the skeuomorphic look.
+                        colors = if (skeuo != null) {
+                            OutlinedTextFieldDefaults.colors(focusedContainerColor = skeuo.field, unfocusedContainerColor = skeuo.field)
+                        } else {
+                            OutlinedTextFieldDefaults.colors()
+                        },
                         maxLines = 4,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(onSend = { send() }),
@@ -635,7 +663,16 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
                         },
                     )
                     Spacer(Modifier.size(8.dp))
-                    FilledIconButton(onClick = ::send, enabled = typed.text.isNotBlank()) {
+                    FilledIconButton(
+                        onClick = ::send,
+                        enabled = typed.text.isNotBlank(),
+                        colors = if (skeuo != null) {
+                            IconButtonDefaults.filledIconButtonColors(containerColor = Color.Transparent, contentColor = Color.White)
+                        } else {
+                            IconButtonDefaults.filledIconButtonColors()
+                        },
+                        modifier = if (skeuo != null) Modifier.skeuoRaised(CircleShape, lit = typed.text.isNotBlank()) else Modifier,
+                    ) {
                         Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = str(R.string.assistant_send))
                     }
                 }
@@ -647,12 +684,29 @@ internal fun AssistantChat(vm: HomeViewModel, onDismiss: () -> Unit) {
 @Composable
 private fun ChatBubble(line: ChatLine, current: Boolean, vm: HomeViewModel) {
     val colors = MaterialTheme.colorScheme
+    val skeuo = LocalSkeuo.current
+    val metro = LocalMetro.current
+    // Lit glass for what I wrote and ivory for the answers in the skeuomorphic look; flat squares in Modern UI.
+    val shape = when {
+        metro -> RectangleShape
+        skeuo -> RoundedCornerShape(16.dp)
+        else -> RoundedCornerShape(20.dp, 20.dp, if (line.mine) 4.dp else 20.dp, if (line.mine) 20.dp else 4.dp)
+    }
     Box(Modifier.fillMaxWidth(), contentAlignment = if (line.mine) Alignment.CenterEnd else Alignment.CenterStart) {
         Surface(
-            color = if (line.mine) colors.primaryContainer else colors.surfaceContainerHigh,
-            contentColor = if (line.mine) colors.onPrimaryContainer else colors.onSurface,
-            shape = RoundedCornerShape(20.dp, 20.dp, if (line.mine) 4.dp else 20.dp, if (line.mine) 20.dp else 4.dp),
-            modifier = Modifier.widthIn(max = 320.dp),
+            color = when {
+                skeuo -> Color.Transparent
+                metro && line.mine -> colors.primary
+                line.mine -> colors.primaryContainer
+                else -> colors.surfaceContainerHigh
+            },
+            contentColor = when {
+                (skeuo || metro) && line.mine -> Color.White
+                line.mine -> colors.onPrimaryContainer
+                else -> colors.onSurface
+            },
+            shape = shape,
+            modifier = Modifier.widthIn(max = 320.dp).then(if (skeuo) Modifier.skeuoRaised(shape, lit = line.mine) else Modifier),
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 if (line.waiting) {

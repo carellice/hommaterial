@@ -49,6 +49,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -232,11 +233,7 @@ fun MusicPage() {
                 }
                 Column {
                     val views = listOf(R.string.music_songs, R.string.music_albums, R.string.music_artists, R.string.music_folders)
-                    PrimaryTabRow(selectedTabIndex = view) {
-                        views.forEachIndexed { i, label ->
-                            Tab(selected = view == i, onClick = { view = i; opened = null }, text = { Text(str(label), maxLines = 1) })
-                        }
-                    }
+                    AppTabRow(views.map { str(it) }, view, onSelect = { view = it; opened = null })
                     AnimatedContent(
                         Triple(view, opened, path),
                         transitionSpec = {
@@ -659,7 +656,7 @@ private fun rememberArtwork(bytes: ByteArray?): ImageBitmap? =
 @Composable
 private fun Artwork(now: NowPlaying, corner: Dp, modifier: Modifier = Modifier) {
     val picture = rememberArtwork(now.artwork)
-    Crossfade(picture, modifier.clip(RoundedCornerShape(corner)), label = "artwork") { image ->
+    Crossfade(picture, modifier.clip(corners(corner)), label = "artwork") { image ->
         if (image != null) {
             Image(image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
@@ -755,11 +752,23 @@ private fun NowBar(now: NowPlaying) {
     val context = LocalContext.current
     val (position, length) = rememberProgress(now)
     val progress by animateFloatAsState(if (length > 0) position.toFloat() / length else 0f, label = "progress")
+    val skeuo = LocalSkeuo.current
+    val metro = LocalMetro.current
+    // A panel of the skeuomorphic look; in Modern UI a flat gray strip that tilts under the finger.
     Surface(
-        shape = corners(24.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shadowElevation = 6.dp,
-        modifier = Modifier.fillMaxWidth().swipeToSkip().clip(corners(24.dp)).clickable { musicExpanded.value = true },
+        shape = corners(if (skeuo) 14.dp else 24.dp),
+        color = when {
+            skeuo -> Color.Transparent
+            metro -> MaterialTheme.colorScheme.surfaceContainerHigh
+            else -> MaterialTheme.colorScheme.secondaryContainer
+        },
+        shadowElevation = if (skeuo || metro) 0.dp else 6.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .swipeToSkip()
+            .then(if (skeuo) Modifier.skeuoRaised(RoundedCornerShape(14.dp), elevation = 6.dp) else if (metro) Modifier.metroTilt() else Modifier)
+            .clip(corners(if (skeuo) 14.dp else 24.dp))
+            .clickable { musicExpanded.value = true },
     ) {
         Column {
             Row(Modifier.padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -831,7 +840,14 @@ internal fun MusicFullScreen() {
                         }
                     },
                 )
-                .background(Brush.verticalGradient(listOf(colors.secondaryContainer, colors.surface, colors.surface))),
+                .then(
+                    when {
+                        // The table of the skeuomorphic look, the bare black or white of Modern UI.
+                        LocalSkeuo.current -> Modifier.screenTexture()
+                        LocalMetro.current -> Modifier.background(colors.background)
+                        else -> Modifier.background(Brush.verticalGradient(listOf(colors.secondaryContainer, colors.surface, colors.surface)))
+                    },
+                ),
         ) {
             Column(
                 Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp, vertical = 8.dp),
@@ -842,7 +858,11 @@ internal fun MusicFullScreen() {
                         Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = str(R.string.music_close))
                     }
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(str(R.string.music_now_playing), style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
+                        Text(
+                            str(R.string.music_now_playing).let { if (LocalMetro.current) it.lowercase() else it },
+                            style = if (LocalMetro.current) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
+                            textAlign = TextAlign.Center,
+                        )
                         sleepAt?.let {
                             Text(str(R.string.music_sleep_until, clock(it)), style = MaterialTheme.typography.labelSmall, color = colors.primary)
                         }
@@ -879,7 +899,8 @@ internal fun MusicFullScreen() {
                         .aspectRatio(1f)
                         .swipeToSkip()
                         .graphicsLayer { scaleX = scale; scaleY = scale }
-                        .shadow(lift, corners(28.dp)),
+                        .shadow(if (LocalMetro.current) 0.dp else lift, corners(28.dp))
+                        .lookGlass(corners(28.dp)),
                 )
                 Spacer(Modifier.weight(1f))
                 AnimatedContent(
@@ -906,7 +927,7 @@ internal fun MusicFullScreen() {
                 // While the thumb is dragged it shows where it is, not where the music is.
                 var seeking by remember { mutableStateOf<Float?>(null) }
                 var dragged by remember { mutableFloatStateOf(0f) }
-                Slider(
+                AppSlider(
                     value = seeking ?: if (length > 0) position.toFloat() / length else 0f,
                     onValueChange = { seeking = it; dragged = it },
                     onValueChangeFinished = {
@@ -927,21 +948,32 @@ internal fun MusicFullScreen() {
                         val tint by animateColorAsState(if (now.shuffle) colors.primary else colors.onSurfaceVariant, label = "shuffle")
                         Icon(Icons.Outlined.Shuffle, contentDescription = str(R.string.music_shuffle), tint = tint)
                     }
-                    IconButton(onClick = { MusicPlayer.previous(context) }, modifier = Modifier.size(64.dp)) {
-                        Icon(Icons.Outlined.SkipPrevious, contentDescription = str(R.string.music_previous), modifier = Modifier.size(40.dp))
+                    val metro = LocalMetro.current
+                    val skeuo = LocalSkeuo.current
+                    // Modern UI: the round buttons of the music of Windows Phone, a ring around each icon.
+                    val ring = if (metro) Modifier.border(2.dp, colors.onSurface, CircleShape) else Modifier
+                    // The skeuomorphic look: ivory keys around the gel one in the middle.
+                    val key = if (skeuo) Modifier.skeuoRaised(CircleShape, elevation = 2.dp) else Modifier
+                    IconButton(onClick = { MusicPlayer.previous(context) }, modifier = Modifier.size(64.dp).then(ring).then(key)) {
+                        Icon(Icons.Outlined.SkipPrevious, contentDescription = str(R.string.music_previous), modifier = Modifier.size(if (metro || skeuo) 32.dp else 40.dp))
                     }
                     // A circle while paused, a softer square while playing.
                     val corner by animateDpAsState(if (now.playing) 28.dp else 44.dp, spring(dampingRatio = 0.6f), label = "play shape")
+                    val playShape = if (metro || skeuo) CircleShape else RoundedCornerShape(corner)
                     Surface(
-                        shape = RoundedCornerShape(corner),
-                        color = colors.primary,
-                        contentColor = colors.onPrimary,
-                        modifier = Modifier.size(88.dp).clip(RoundedCornerShape(corner)).clickable { MusicPlayer.toggle(context) },
+                        shape = playShape,
+                        color = if (skeuo) Color.Transparent else colors.primary,
+                        contentColor = if (skeuo || metro) Color.White else colors.onPrimary,
+                        modifier = Modifier
+                            .size(88.dp)
+                            .then(if (skeuo) Modifier.skeuoRaised(CircleShape, lit = true, elevation = 6.dp) else if (metro) Modifier.metroTilt() else Modifier)
+                            .clip(playShape)
+                            .clickable { MusicPlayer.toggle(context) },
                     ) {
                         Box(contentAlignment = Alignment.Center) { PlayPauseIcon(now.playing, Modifier.size(44.dp)) }
                     }
-                    IconButton(onClick = { MusicPlayer.next(context) }, modifier = Modifier.size(64.dp)) {
-                        Icon(Icons.Outlined.SkipNext, contentDescription = str(R.string.music_next), modifier = Modifier.size(40.dp))
+                    IconButton(onClick = { MusicPlayer.next(context) }, modifier = Modifier.size(64.dp).then(ring).then(key)) {
+                        Icon(Icons.Outlined.SkipNext, contentDescription = str(R.string.music_next), modifier = Modifier.size(if (metro || skeuo) 32.dp else 40.dp))
                     }
                     IconButton(onClick = { MusicPlayer.cycleRepeat(context) }) {
                         val tint by animateColorAsState(if (now.repeat != Player.REPEAT_MODE_OFF) colors.primary else colors.onSurfaceVariant, label = "repeat")

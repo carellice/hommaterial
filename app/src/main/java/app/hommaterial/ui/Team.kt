@@ -78,6 +78,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -290,12 +291,16 @@ internal fun TeamHomeCard(state: UiState, vm: HomeViewModel, onOpen: () -> Unit)
     LaunchedEffect(team) { vm.loadTeam() }
     val info = state.teamInfo
     val (brush, on) = teamBrush(team)
+    val metro = LocalMetro.current
+    val shape = corners(if (LocalSkeuo.current) 16.dp else 24.dp)
     Box(
         Modifier
             .fillMaxWidth()
             .padding(top = 4.dp)
-            .clip(corners(24.dp))
-            .background(brush)
+            .then(if (metro) Modifier.metroTilt() else Modifier.lookGlass(shape))
+            .clip(shape)
+            // A live tile is the flat color of the team; elsewhere it shades to dark.
+            .background(if (metro) SolidColor(teamColor(team)) else brush)
             .clickable(onClick = onOpen),
     ) {
         // The logo of the team, large and faint, behind everything.

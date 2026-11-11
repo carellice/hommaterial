@@ -1156,7 +1156,7 @@ private fun HapticLevel(level: Int, onChange: (Int) -> Unit) {
     var value by remember(level) { mutableFloatStateOf(level.toFloat()) }
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(str(R.string.haptic_level, value.roundToInt()), style = MaterialTheme.typography.bodyLarge)
-        Slider(
+        AppSlider(
             value = value,
             onValueChange = {
                 if (it.roundToInt() != value.roundToInt()) vibrations.play(Haptic.Tick, it.roundToInt())

@@ -94,6 +94,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.hommaterial.ui.LocalHaptics
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.RectangleShape
+import app.hommaterial.ui.skeuoRaised
+import app.hommaterial.ui.skeuoPanel
+import app.hommaterial.ui.LocalMetro
+import app.hommaterial.ui.LocalSkeuo
 import app.hommaterial.ui.ProvideHaptics
 import app.hommaterial.ui.ReplyScreen
 import app.hommaterial.ui.TypeCommandDialog
@@ -134,7 +141,7 @@ class AssistActivity : ComponentActivity() {
                 2 -> true
                 else -> isSystemInDarkTheme()
             }
-            MaterialTheme(colorScheme = accentScheme(state.accent, dark, LocalContext.current)) {
+            LookTheme(dark, state.accent, state.look) {
                 ProvideHaptics(state.haptics, state.hapticLevel) {
                     val haptic = LocalHaptics.current
                     LaunchedEffect(vm, haptic) { vm.haptics.collect(haptic) }
@@ -333,22 +340,34 @@ private fun Panel(
     val turn by motion.animateFloat(0f, 360f, infiniteRepeatable(tween(if (phase == Phase.THINKING) 1200 else 4000, easing = LinearEasing)), label = "turn")
     // The ring of colors turns while something happens and rests once it is over.
     val ring by animateFloatAsState(if (phase == Phase.LISTENING || phase == Phase.THINKING) 1f else 0.25f, tween(500), label = "ring")
-    val shape = RoundedCornerShape(32.dp)
-    val ringColors = listOf(colors.primary, colors.tertiary, colors.secondary, colors.primary.copy(alpha = 0.3f), colors.primary)
+    val skeuo = LocalSkeuo.current
+    val metro = LocalMetro.current
+    // Square with a band of the accent in Modern UI; an ivory panel with a lit edge in the skeuomorphic look.
+    val shape = when {
+        metro -> RectangleShape
+        skeuo -> RoundedCornerShape(20.dp)
+        else -> RoundedCornerShape(32.dp)
+    }
+    val ringColors = if (metro) listOf(colors.primary, colors.primary) else listOf(colors.primary, colors.tertiary, colors.secondary, colors.primary.copy(alpha = 0.3f), colors.primary)
     Box(
         Modifier
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .padding(horizontal = if (metro) 0.dp else 12.dp, vertical = if (metro) 0.dp else 12.dp)
             .fillMaxWidth()
+            .then(if (skeuo) Modifier.shadow(10.dp, shape, clip = false) else Modifier)
             .clip(shape)
             .drawBehind {
                 rotate(turn) {
                     drawCircle(Brush.sweepGradient(ringColors), radius = size.maxDimension, alpha = ring)
                 }
             }
-            .padding(2.dp),
+            .padding(top = if (metro) 4.dp else 2.dp, start = if (metro) 0.dp else 2.dp, end = if (metro) 0.dp else 2.dp, bottom = if (metro) 0.dp else 2.dp),
     ) {
-        Surface(shape = RoundedCornerShape(30.dp), color = colors.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            shape = if (metro) RectangleShape else if (skeuo) RoundedCornerShape(18.dp) else RoundedCornerShape(30.dp),
+            color = if (skeuo) Color.Transparent else if (metro) colors.surfaceContainer else colors.surfaceContainerHigh,
+            modifier = Modifier.fillMaxWidth().then(if (skeuo) Modifier.skeuoPanel(RoundedCornerShape(18.dp)) else Modifier),
+        ) {
             Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -493,18 +512,32 @@ private fun Mic(phase: Phase, level: Float, onClick: () -> Unit) {
                 .clip(CircleShape)
                 .background(colors.primary.copy(alpha = if (listening) 0.22f else 0f)),
         )
+        val skeuo = LocalSkeuo.current
+        val metro = LocalMetro.current
         Box(
             Modifier
                 .size(56.dp)
-                .clip(CircleShape)
-                .background(if (listening) colors.primary else colors.primaryContainer)
+                .then(
+                    when {
+                        // A gel key, lit while it listens.
+                        skeuo -> Modifier.skeuoRaised(CircleShape, lit = true, elevation = if (listening) 6.dp else 3.dp)
+                        // The round button of Windows Phone: a ring, filled with the accent while it listens.
+                        metro -> Modifier.clip(CircleShape).background(if (listening) colors.primary else Color.Transparent).border(2.dp, if (listening) colors.primary else colors.onSurface, CircleShape)
+                        else -> Modifier.clip(CircleShape).background(if (listening) colors.primary else colors.primaryContainer)
+                    },
+                )
                 .clickable(role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 Icons.Filled.Mic,
                 contentDescription = str(if (listening) R.string.voice_button else R.string.assist_again),
-                tint = if (listening) colors.onPrimary else colors.onPrimaryContainer,
+                tint = when {
+                    skeuo -> Color.White
+                    metro -> if (listening) Color.White else colors.onSurface
+                    listening -> colors.onPrimary
+                    else -> colors.onPrimaryContainer
+                },
             )
         }
     }

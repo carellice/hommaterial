@@ -261,6 +261,17 @@ private fun isNight(at: Long, from: Int, to: Int): Boolean {
 
 @Composable
 private fun HommaterialTheme(dark: Boolean, accent: String, look: Int, haptics: Boolean, hapticLevel: Int, content: @Composable () -> Unit) {
+    LookTheme(dark, accent, look) {
+        // Painted behind every screen: what a sliding screen uncovers is the theme, not the window.
+        ScreenSurface {
+            ProvideHaptics(haptics, hapticLevel, content)
+        }
+    }
+}
+
+/** The colors, shapes and type of the chosen [look], with the locals its pieces read: also for the panel of the assistant. */
+@Composable
+internal fun LookTheme(dark: Boolean, accent: String, look: Int, content: @Composable () -> Unit) {
     val accentColors = accentScheme(accent, dark, LocalContext.current)
     val skeuo = look == LOOK_SKEUO
     val metro = look == LOOK_METRO
@@ -278,11 +289,7 @@ private fun HommaterialTheme(dark: Boolean, accent: String, look: Int, haptics: 
             LocalSkeuo provides skeuo,
             LocalMetro provides metro,
             LocalSkeuoMaterials provides if (skeuo) remember(dark, colors) { SkeuoMaterials(dark, colors) } else null,
-        ) {
-            // Painted behind every screen: what a sliding screen uncovers is the theme, not the window.
-            ScreenSurface {
-                ProvideHaptics(haptics, hapticLevel, content)
-            }
-        }
+            content = content,
+        )
     }
 }

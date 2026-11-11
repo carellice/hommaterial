@@ -617,12 +617,7 @@ private fun SideBar(
                 }
             }
             for (page in pages) {
-                NavigationDrawerItem(
-                    label = { Text(pageLabel(page), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    icon = { Icon(pageIcon(page), contentDescription = null) },
-                    selected = page == current,
-                    onClick = { onSelect(page) },
-                )
+                AppNavItem(pageLabel(page), pageIcon(page), page == current, onClick = { onSelect(page) })
             }
         }
     } else {
@@ -639,12 +634,7 @@ private fun SideBar(
                     )
                 }
                 for (page in pages) {
-                    NavigationRailItem(
-                        selected = page == current,
-                        onClick = { onSelect(page) },
-                        icon = { Icon(pageIcon(page), contentDescription = null) },
-                        label = { Text(pageLabel(page), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    )
+                    AppRailItem(pageLabel(page), pageIcon(page), page == current, onClick = { onSelect(page) })
                 }
             }
         }
@@ -1818,7 +1808,7 @@ private fun BrightnessSlider(brightness: Int, onChange: (Int) -> Unit) {
     // Local while dragging; the command goes out once, when the finger lifts.
     var value by remember(brightness) { mutableFloatStateOf(brightness.toFloat()) }
     val haptic = LocalHaptics.current
-    Slider(
+    AppSlider(
         value = value,
         onValueChange = {
             // A light tick every 5%, and a firmer one at either end, felt under the finger.

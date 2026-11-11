@@ -82,6 +82,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -321,9 +322,30 @@ private fun ListPicker(lists: List<Pair<String, Int?>>, selected: Int, onSelect:
     val colors = MaterialTheme.colorScheme
     var open by remember { mutableStateOf(false) }
     val (name, count) = lists[selected.coerceIn(0, lists.size - 1)]
-    Surface(onClick = { open = true }, shape = CircleShape, color = colors.surfaceContainerHigh, modifier = modifier.fillMaxWidth()) {
+    // An ivory key with a glass badge in the skeuomorphic look, a gray square with an accent one in Modern UI.
+    val skeuo = LocalSkeuo.current
+    val metro = LocalMetro.current
+    val shape = when {
+        metro -> RectangleShape
+        skeuo -> RoundedCornerShape(14.dp)
+        else -> CircleShape
+    }
+    val badge = when {
+        metro -> RectangleShape
+        skeuo -> RoundedCornerShape(10.dp)
+        else -> CircleShape
+    }
+    Surface(
+        onClick = { open = true },
+        shape = shape,
+        color = if (skeuo) Color.Transparent else colors.surfaceContainerHigh,
+        modifier = modifier.fillMaxWidth().then(if (skeuo) Modifier.skeuoRaised(shape) else if (metro) Modifier.metroTilt() else Modifier),
+    ) {
         Row(Modifier.padding(start = 6.dp, end = 12.dp).height(52.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).clip(CircleShape).background(colors.primary), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.size(40.dp).then(if (skeuo) Modifier.skeuoBadge(badge) else Modifier.clip(badge).background(colors.primary)),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(Icons.AutoMirrored.Outlined.List, contentDescription = null, tint = colors.onPrimary)
             }
             AnimatedContent(name, label = "list", modifier = Modifier.weight(1f).padding(start = 12.dp)) { shown ->
