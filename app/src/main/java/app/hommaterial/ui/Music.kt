@@ -80,6 +80,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Album
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.MusicNote
@@ -99,6 +100,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -137,6 +139,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import app.hommaterial.R
+import app.hommaterial.quick.clock
 import app.hommaterial.data.SettingsSearch
 import app.hommaterial.music.MusicLibrary
 import app.hommaterial.music.MusicPlayer
@@ -809,6 +812,9 @@ internal fun MusicFullScreen() {
         val colors = MaterialTheme.colorScheme
         var queueOpen by remember { mutableStateOf(false) }
         if (queueOpen) QueueSheet(now, onDismiss = { queueOpen = false })
+        val sleepAt by MusicPlayer.sleepAt.collectAsState()
+        var sleepOpen by remember { mutableStateOf(false) }
+        if (sleepOpen) SleepDialog(sleepAt != null, onDismiss = { sleepOpen = false })
         Box(
             Modifier
                 .fillMaxSize()
@@ -835,12 +841,19 @@ internal fun MusicFullScreen() {
                     IconButton(onClick = close) {
                         Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = str(R.string.music_close))
                     }
-                    Text(
-                        str(R.string.music_now_playing),
-                        style = MaterialTheme.typography.titleSmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f),
-                    )
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(str(R.string.music_now_playing), style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
+                        sleepAt?.let {
+                            Text(str(R.string.music_sleep_until, clock(it)), style = MaterialTheme.typography.labelSmall, color = colors.primary)
+                        }
+                    }
+                    IconButton(onClick = { sleepOpen = true }) {
+                        Icon(
+                            Icons.Outlined.Bedtime,
+                            contentDescription = str(R.string.music_sleep),
+                            tint = if (sleepAt != null) colors.primary else LocalContentColor.current,
+                        )
+                    }
                     IconButton(onClick = { queueOpen = true }) {
                         Icon(Icons.AutoMirrored.Outlined.QueueMusic, contentDescription = str(R.string.music_queue))
                     }
@@ -942,6 +955,20 @@ internal fun MusicFullScreen() {
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+}
+
+private val SLEEP_MINUTES = listOf(15, 30, 45, 60, 90, 120)
+
+/** The sleep timer: after how long the music pauses by itself, or no timer once one is set. */
+@Composable
+private fun SleepDialog(active: Boolean, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val choices = SLEEP_MINUTES.map { str(R.string.music_sleep_minutes, it) to null } +
+        if (active) listOf(str(R.string.music_sleep_off) to null) else emptyList()
+    ListDialog(str(R.string.music_sleep), choices, onDismiss = onDismiss) { i ->
+        MusicPlayer.setSleep(context, SLEEP_MINUTES.getOrNull(i))
+        onDismiss()
     }
 }
 

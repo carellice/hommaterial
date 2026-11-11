@@ -6,6 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.DocumentsContract
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -362,6 +365,7 @@ object MusicPlayer {
 
     /** Stops and empties the queue: nothing is left to show. */
     fun stop(context: Context) = withController(context) {
+        setSleep(context, null)
         it.stop()
         it.clearMediaItems()
     }
@@ -387,6 +391,26 @@ object MusicPlayer {
     }
 
     fun seekTo(context: Context, ms: Long) = withController(context) { it.seekTo(ms) }
+
+    private val sleepHandler = Handler(Looper.getMainLooper())
+    private val _sleepAt = MutableStateFlow<Long?>(null)
+
+    /** When the sleep timer pauses the music, as wall-clock milliseconds; null without one. */
+    val sleepAt: StateFlow<Long?> = _sleepAt.asStateFlow()
+
+    /** Pauses the music in [minutes]; null takes the timer away. The music keeps the app alive meanwhile. */
+    fun setSleep(context: Context, minutes: Int?) {
+        sleepHandler.removeCallbacksAndMessages(null)
+        _sleepAt.value = null
+        if (minutes == null) return
+        val app = context.applicationContext
+        val delay = minutes * 60_000L
+        sleepHandler.postAtTime({
+            _sleepAt.value = null
+            pause(app)
+        }, SystemClock.uptimeMillis() + delay)
+        _sleepAt.value = System.currentTimeMillis() + delay
+    }
 
     /** Where the track is and how long it lasts, in milliseconds: read often, while the player is in sight. */
     fun position(): Long = controller?.currentPosition ?: 0
