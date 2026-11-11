@@ -1,4 +1,4 @@
-// Portable v1 contract shared with Android and the native Windows client.
+// Portable v1 contract shared with Android.
 // Optional additions keep old backups readable. No Amazon login or monitor PIN is portable.
 export function createBackup(s, switchBot = null, assistantKeys = null) {
   const backup = {

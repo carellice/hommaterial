@@ -10,11 +10,7 @@ local.properties
 *.keystore
 signing.properties
 
-# Windows / .NET
-**/bin/
-**/obj/
-windows/artifacts/
-windows/.dotnet-home/
-windows/.nuget/
+# Build leftovers of the Windows version, which no longer exists.
+windows/
 *.pfx
 *.cer

@@ -6,20 +6,16 @@
 
 <p align="center"><b>Comanda la tua smart home Alexa, senza fronzoli.</b></p>
 
-<p align="center">Android · Server di casa (CasaOS) · Windows 11 (anteprima) · Gratuita · Open source</p>
+<p align="center">Android · Server di casa (CasaOS) · Gratuita · Open source</p>
 
 <p align="center">
   <a href="https://github.com/carellice/hommaterial/releases/latest" title="Scarica il file APK dall'ultima release"><img src="https://img.shields.io/badge/Android-Scarica_APK-3DDC84?style=for-the-badge&amp;logo=android&amp;logoColor=white" alt="Android — Scarica APK"></a>
   <a href="pwa/README.md"><img src="https://img.shields.io/badge/CasaOS-Installa_sul_server-6750A4?style=for-the-badge" alt="CasaOS — Installa sul server di casa"></a>
-  <a href="https://github.com/carellice/hommaterial/releases/latest" title="Scarica lo ZIP Windows dall'ultima release"><img src="https://img.shields.io/badge/Windows_11-Scarica_ZIP-0078D4?style=for-the-badge" alt="Windows 11 — Scarica ZIP"></a>
 </p>
 
-<p align="center"><a href="pwa/README.md">Guida del server di casa</a> · <a href="windows/README.md">Guida Windows</a></p>
+<p align="center"><a href="pwa/README.md">Guida del server di casa</a></p>
 
-**Windows 11:** scarica lo ZIP Windows dalle [release GitHub](https://github.com/carellice/hommaterial/releases),
-estrailo interamente in una cartella personale e avvia `Hommaterial.Windows.exe`.
-Gli aggiornamenti si scaricano dall'app, in **Impostazioni → Controlla aggiornamenti**.
-Per pubblicare Android e Windows da questo PC usa `release.bat`: [guida al rilascio](RELEASING.md).
+Per pubblicare una nuova versione da questo PC usa `release.bat`: [guida al rilascio](RELEASING.md).
 
 <p align="center">
   <a href="docs/video/hommaterial-promo.mp4"><img src="docs/video/anteprima.gif" alt="Presentazione animata di Hommaterial" width="720"></a>
@@ -281,15 +277,6 @@ quando il telefono legge lo stato, non nell'istante in cui cambia.
 
 Gli avvisi di temperatura li controlla il telefono, circa ogni 15 minuti e
 più di rado quando è fermo da un po': non sono un allarme in tempo reale.
-
-## Versione Windows 11
-
-Nella cartella [`windows`](windows/README.md) c'è la prima versione nativa in
-**C# e WinUI 3**, con stanze Alexa, preferiti, ricerca, luci, sensori e timer
-mentre l'app è aperta. Include una modalità demo per provarla senza account,
-build autonoma x64/ARM64 e preparazione del pacchetto MSIX per una futura
-distribuzione sul Microsoft Store. Le funzioni avanzate sono ancora in porting:
-consulta [funzioni, limiti e istruzioni di prova](windows/README.md).
 
 ## Versione web, sul server di casa
 
