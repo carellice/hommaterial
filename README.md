@@ -129,6 +129,8 @@ collegati al proprio account Alexa.
   letta come le altre, con le pagine trovate da aprire. Serve una chiave
   gratuita di Tavily, in **Impostazioni → Assistente AI → Ricerca su internet**;
   con l'assistente AI configurato è lui a riassumere le pagine.
+  Le notizie e le domande su oggi, ieri, la settimana o il mese cercano solo tra
+  le pagine di quel periodo.
   Anche nella versione web: con il server di casa la chiave è dell'account e vale
   per la web app e per i telefoni collegati, e le ricerche passano dal server.
 - Su Android, a voce o nella chat, «chiama Flavio Ceccarelli» telefona al

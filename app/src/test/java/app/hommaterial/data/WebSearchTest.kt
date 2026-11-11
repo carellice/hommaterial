@@ -15,4 +15,12 @@ class WebSearchTest {
         assertEquals("https://it.wikipedia.org/wiki/Roma", found.results.single().url)
         assertEquals("", parseTavily(JSONObject("""{"answer":null,"results":[]}""")).answer)
     }
+
+    @Test
+    fun newsOfTodayAreAskedForToday() {
+        assertEquals(WebScope("news", "day"), webSearchScope("le ultime notizie di oggi"))
+        assertEquals(WebScope("news", "week"), webSearchScope("notizie su Sinner"))
+        assertEquals(WebScope("general", "week"), webSearchScope("chi ha vinto ieri"))
+        assertEquals(WebScope("general", null), webSearchScope("chi ha vinto Sanremo"))
+    }
 }

@@ -12,7 +12,7 @@ const { setLanguage } = await import('../shared/i18n.js');
 setLanguage('it');
 const { switchBotSign } = await import('../server/src/switchbot.ts');
 const { parseVoice, parseExtras, parsePhrase, completeCommand, parseWebSearch } = await import('../web/js/voice.js');
-const { parseTavily } = await import('../server/src/websearch.ts');
+const { parseTavily, webSearchScope } = await import('../server/src/websearch.ts');
 const model = await import('../shared/model.js');
 const { remoteKind } = model;
 
@@ -454,6 +454,10 @@ await test('Tavily replies are read as WebSearchTest.kt', () => {
   assert.equal(found.answer, 'Roma');
   assert.equal(found.results.length, 1);
   assert.equal(parseTavily({ answer: null, results: [] }).answer, '');
+  assert.deepEqual(webSearchScope('le ultime notizie di oggi'), { topic: 'news', timeRange: 'day' });
+  assert.deepEqual(webSearchScope('notizie su Sinner'), { topic: 'news', timeRange: 'week' });
+  assert.deepEqual(webSearchScope('chi ha vinto ieri'), { topic: 'general', timeRange: 'week' });
+  assert.deepEqual(webSearchScope('chi ha vinto Sanremo'), { topic: 'general', timeRange: null });
 });
 
 if (failures) {

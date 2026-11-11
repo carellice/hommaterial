@@ -1927,7 +1927,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val summed = if (assistantStore.configured && found.results.isNotEmpty()) {
             try {
                 workersAi.correct(assistantStore.accountId(), assistantStore.token(), assistantStore.model(),
-                    webAnswerPrompt(query, found, assistantLanguage), listOf(query))
+                    webAnswerPrompt(query, found, assistantLanguage, java.time.LocalDate.now().toString()), listOf(query))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
