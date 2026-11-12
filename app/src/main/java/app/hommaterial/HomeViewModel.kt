@@ -110,6 +110,7 @@ import app.hommaterial.data.AgentAction
 import app.hommaterial.data.AgentPlan
 import app.hommaterial.data.agentPrompt
 import app.hommaterial.data.closestList
+import app.hommaterial.ui.listName
 import app.hommaterial.data.listsContext
 import app.hommaterial.data.parseAgent
 import app.hommaterial.data.historyLine
@@ -1768,12 +1769,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val s = _state.value
         val parts = mutableListOf<String>()
         // The lists with what is left to do in each, read at once; the copy kept here when slow or offline.
-        val lists = alexaLists().orEmpty().distinctBy { it.name.trim().lowercase() }
+        // The names shown in the app: the shopping and to-do lists of Alexa have none of their own.
+        val lists = alexaLists().orEmpty().distinctBy { listName(it).trim().lowercase() }
         if (lists.isNotEmpty()) {
             val items = coroutineScope {
                 lists.map { l -> async { withTimeoutOrNull(4_000) { alexaListItems(l.id) } ?: Offline.items(l.id) } }.map { it.await() }
             }
-            parts += listsContext(lists.zip(items) { l, all -> l.name to all?.filter { !it.completed }?.map { it.name } })
+            parts += listsContext(lists.zip(items) { l, all -> listName(l) to all?.filter { !it.completed }?.map { it.name } })
         }
         if (calendar.ready) {
             // Without the agenda the rest is still worth an answer.
@@ -2026,7 +2028,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 "list" -> {
-                    val list = closestList(alexaLists().orEmpty(), a.list) { it.name }
+                    val list = closestList(alexaLists().orEmpty(), a.list) { listName(it) }
                     if (list == null) {
                         ok = false
                     } else {

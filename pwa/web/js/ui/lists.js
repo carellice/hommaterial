@@ -4,14 +4,8 @@ import { html, useState, useEffect, useRef } from '../lib.js';
 import { Icon, IconButton, Spinner, Dialog, Details, Setting, Field, ConfirmDialog } from './common.js';
 import { applyViews, members, merge, split, rename, move, MERGED } from '/shared/lists.js';
 import * as store from '../store.js';
+import { listName } from '../store.js';
 import { str } from '/shared/i18n.js';
-
-/** What a list is called: the two of Alexa by their name in the app, the others by the one the user gave them. */
-export function listName(list) {
-  if (list.type === 'TO_DO' && !list.name) return str('list_todo');
-  if (list.type === 'SHOPPING_LIST' && !list.name) return str('list_shopping');
-  return list.name || list.type;
-}
 
 // Items added and not yet confirmed by Alexa carry an id of their own until the list is read again.
 const ADDING = 'adding:';

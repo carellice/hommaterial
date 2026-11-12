@@ -1259,6 +1259,13 @@ export function listsContext(lists) {
   return `Lists, with what is still to do in each:\n${lists.map(line).join('\n')}`;
 }
 
+/** What a list is called: the two of Alexa by their name in the app, the others by the one the user gave them. */
+export function listName(list) {
+  if (list.type === 'TO_DO' && !list.name) return str('list_todo');
+  if (list.type === 'SHOPPING_LIST' && !list.name) return str('list_shopping');
+  return list.name || list.type;
+}
+
 /**
  * The list meant by [said]: the same name, else the same once case, accents, spaces and dashes are
  * left out, else the only one whose name holds the other (as closestList in Assistant.kt).
@@ -1267,9 +1274,10 @@ export function closestList(lists, said) {
   const key = (text) => text.normalize('NFD').replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
   const wanted = key(said);
   if (!wanted) return null;
-  const holding = lists.filter((l) => { const n = key(l.name); return n && (n.includes(wanted) || wanted.includes(n)); });
-  return lists.find((l) => l.name.trim().toLowerCase() === said.trim().toLowerCase())
-    ?? lists.find((l) => key(l.name) === wanted)
+  const holding = lists.filter((l) => { const n = key(listName(l)); return n && (n.includes(wanted) || wanted.includes(n)); });
+  // The name shown in the app: the shopping list of Alexa has none of its own.
+  return lists.find((l) => listName(l).trim().toLowerCase() === said.trim().toLowerCase())
+    ?? lists.find((l) => key(listName(l)) === wanted)
     ?? (holding.length === 1 ? holding[0] : null);
 }
 
@@ -1280,7 +1288,7 @@ async function agentContext() {
   const [lists, events] = await Promise.all([
     // Each list with what is left to do in it, read at once; a list that is slow or fails says so.
     quiet(async () => Promise.all(((await alexaLists()) ?? []).map(async (l) => ({
-      name: l.name,
+      name: listName(l),
       items: await Promise.race([
         alexaListItems(l.id).then((items) => Array.isArray(items) ? items.filter((it) => !it.completed).map((it) => it.name) : null, () => null),
         new Promise((done) => setTimeout(() => done(null), 4000)),
