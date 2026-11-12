@@ -205,6 +205,8 @@ class ServerClient {
         val reason = json?.optString("code")?.takeIf { it.isNotBlank() && it != "null" }
         return when {
             code == 401 && message == "Accesso richiesto" -> ServerException(str(R.string.server_expired), code, "session")
+            // The answer of a server older than the app, which does not know this call yet.
+            code == 404 && message == "Non trovato" -> ServerException(str(R.string.server_outdated), code, answered = true)
             message != null -> ServerException(message, code, reason, answered = true)
             code in 300..399 -> ServerException(str(R.string.server_redirect), code)
             else -> ServerException(str(R.string.server_error, code), code)

@@ -735,6 +735,7 @@
     <string name="server_off_now">The home server is not in use</string>
     <string name="server_not_ours">The server did not open the session: is it really Hommaterial?</string>
     <string name="server_expired">Session expired: sign in again in Settings › Home server</string>
+    <string name="server_outdated">The home server does not have this feature yet: it updates by itself at night, or run sudo hommaterial-aggiorna</string>
     <string name="server_redirect">The server answers with a redirect: check the address (http or https, port)</string>
     <string name="server_error">Server error (%1$d)</string>
     <string name="server_tls">Invalid HTTPS certificate: with the local certificate, install it on the phone first</string>

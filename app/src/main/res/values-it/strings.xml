@@ -725,6 +725,7 @@
     <string name="server_off_now">Il server di casa non è in uso</string>
     <string name="server_not_ours">Il server non ha aperto la sessione: è davvero Hommaterial?</string>
     <string name="server_expired">Sessione scaduta: accedi di nuovo in Impostazioni › Server di casa</string>
+    <string name="server_outdated">Il server di casa non ha ancora questa funzione: si aggiorna da solo di notte, oppure esegui sudo hommaterial-aggiorna</string>
     <string name="server_redirect">Il server risponde con un reindirizzamento: controlla l\'indirizzo (http o https, porta)</string>
     <string name="server_error">Errore del server (%1$d)</string>
     <string name="server_tls">Certificato HTTPS non valido: con il certificato locale installalo prima sul telefono</string>
