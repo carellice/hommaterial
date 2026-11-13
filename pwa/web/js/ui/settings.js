@@ -16,6 +16,7 @@ import { RoomPicker, MembersDialog, PicksDialog } from './rooms.js';
 import { MacroEditor, EchoDialog } from './macros.js';
 import { CalendarSettings } from './calendar.js';
 import { NotionSettings } from './notes.js';
+import { ListsSettings } from './lists.js';
 import { SwitchBotDialog } from './remotes.js';
 import { LgTvDialog, LgRenameDialog } from './lgtv.js';
 import { AssistantSettings } from './assistant.js';
@@ -34,7 +35,7 @@ const AI_EXAMPLES = Array.from({ length: 10 }, (_, i) => `ai_example_${i + 1}`);
 // The words each section is looked for by, beyond its title: settings_keys_<name>.
 const SEARCH_KEYS = { aiExamples: 'ai_examples' };
 
-const SECTION_ICONS = { appearance: 'palette', notifications: 'notifications', team: 'sports_soccer', weather: 'partly_cloudy_day', switchbot: 'settings_remote', lgtv: 'tv', assistant: 'auto_awesome', aiExamples: 'lightbulb', voice: 'record_voice_over', calendar: 'calendar_month', notion: 'description', updates: 'system_update', rooms: 'meeting_room', devices: 'devices_other', groups: 'layers', macros: 'extension', monitor: 'tablet_android', timers: 'timer', alerts: 'warning', backup: 'backup', data: 'storage', account: 'account_circle', server: 'dns', hints: 'tips_and_updates', about: 'info' };
+const SECTION_ICONS = { appearance: 'palette', notifications: 'notifications', team: 'sports_soccer', weather: 'partly_cloudy_day', switchbot: 'settings_remote', lgtv: 'tv', assistant: 'auto_awesome', aiExamples: 'lightbulb', voice: 'record_voice_over', calendar: 'calendar_month', lists: 'checklist', notion: 'description', updates: 'system_update', rooms: 'meeting_room', devices: 'devices_other', groups: 'layers', macros: 'extension', monitor: 'tablet_android', timers: 'timer', alerts: 'warning', backup: 'backup', data: 'storage', account: 'account_circle', server: 'dns', hints: 'tips_and_updates', about: 'info' };
 
 function Section({ title, text, icon, open, onToggle, children }) {
   return html`
@@ -214,6 +215,7 @@ export function SettingsScreen({ onBack }) {
           <${Setting} title=${str('lgtv_add')} text=${str('lgtv_add_text')} onClick=${() => setDialog({ type: 'lgSearch' })} />`)}
 
         ${section('calendar', 's_calendar', 'calendar_settings_text', html`<${CalendarSettings} s=${s} />`)}
+        ${section('lists', 's_lists', 'lists_settings_text', html`<${ListsSettings} s=${s} />`)}
         ${section('notion', 's_notion', 'notion_settings_text', html`<${NotionSettings} s=${s} />`)}
         ${group('settings_group_voice')}
         ${section('voice', 's_voice', 'voice_settings_text', html`<${VoiceSettings} s=${s} />`)}

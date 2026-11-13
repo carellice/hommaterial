@@ -15,11 +15,25 @@ data class ListViews(
     val merged: List<List<String>> = emptyList(),
     /** The ids of the lists shown, in the order chosen; those not in it follow, as Alexa gives them. */
     val order: List<String> = emptyList(),
+    /** Whether the lists of Alexa show; off, only those of Notion. */
+    val alexa: Boolean = true,
+    /** The id of the list things to do go to, and of the one for the shopping; null for those of Alexa. */
+    val todo: String? = null,
+    val shopping: String? = null,
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("names", JSONObject(names))
         .put("merged", JSONArray(merged.map { JSONArray(it) }))
         .put("order", JSONArray(order))
+        .put("alexa", alexa)
+        .put("todo", todo ?: JSONObject.NULL)
+        .put("shopping", shopping ?: JSONObject.NULL)
+
+    /** The list of [type] (TO_DO or SHOPPING_LIST) among [lists]: the one chosen, else that of Alexa. */
+    fun defaultOf(lists: List<AlexaList>, type: String): AlexaList? {
+        val chosen = if (type == TO_DO) todo else shopping
+        return lists.find { it.id == chosen } ?: lists.find { it.type == type }
+    }
 
     /** The lists as shown: renamed, those joined as one in the place of the first of them. */
     fun apply(lists: List<AlexaList>, nameOf: (AlexaList) -> String): List<AlexaList> {
@@ -63,6 +77,8 @@ data class ListViews(
 
     companion object {
         const val MERGED = "MERGED"
+        const val TO_DO = "TO_DO"
+        const val SHOPPING = "SHOPPING_LIST"
         private const val PREFIX = "merged:"
 
         fun idOf(group: List<String>) = PREFIX + group.joinToString("|")
@@ -81,6 +97,9 @@ data class ListViews(
                     merged.optJSONArray(i)?.let { a -> (0 until a.length()).map { a.optString(it) } }?.takeIf { it.size >= 2 }
                 },
                 (0 until order.length()).map { order.optString(it) }.filter { it.isNotBlank() },
+                o.optBoolean("alexa", true),
+                o.optString("todo").takeIf { !o.isNull("todo") && it.isNotBlank() },
+                o.optString("shopping").takeIf { !o.isNull("shopping") && it.isNotBlank() },
             )
         }
     }

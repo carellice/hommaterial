@@ -1770,12 +1770,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val parts = mutableListOf<String>()
         // The lists with what is left to do in each, read at once; the copy kept here when slow or offline.
         // The names shown in the app: the shopping and to-do lists of Alexa have none of their own.
-        val lists = alexaLists().orEmpty().distinctBy { listName(it).trim().lowercase() }
+        val every = alexaLists().orEmpty()
+        val lists = every.distinctBy { listName(it).trim().lowercase() }
         if (lists.isNotEmpty()) {
             val items = coroutineScope {
                 lists.map { l -> async { withTimeoutOrNull(4_000) { alexaListItems(l.id) } ?: Offline.items(l.id) } }.map { it.await() }
             }
             parts += listsContext(lists.zip(items) { l, all -> listName(l) to all?.filter { !it.completed }?.map { it.name } })
+            // The lists chosen in the settings for what is to do and to buy, when the request names none.
+            val todo = s.listViews.defaultOf(every, ListViews.TO_DO)?.let { "things to do go to \"${listName(it)}\"" }
+            val shopping = s.listViews.defaultOf(every, ListViews.SHOPPING)?.let { "things to buy go to \"${listName(it)}\"" }
+            listOfNotNull(todo, shopping).takeIf { it.isNotEmpty() }?.let { parts += "When no list is named, ${it.joinToString(" and ")}." }
         }
         if (calendar.ready) {
             // Without the agenda the rest is still worth an answer.
@@ -2010,6 +2015,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * The list meant by [said]. The to-do and shopping lists of Alexa, or their names, mean the ones
+     * chosen in the settings: those of Notion, say, or Alexa's own when none was chosen.
+     */
+    private fun listFor(lists: List<AlexaList>, said: String): AlexaList? {
+        val found = closestList(lists, said) { listName(it) }
+        if (found != null && found.type != ListViews.TO_DO && found.type != ListViews.SHOPPING) return found
+        val type = found?.type ?: mapOf(ListViews.TO_DO to R.string.list_todo, ListViews.SHOPPING to R.string.list_shopping)
+            .entries.find { (_, name) -> closestList(listOf(str(name)), said) { it } != null }?.key
+        return type?.let { _state.value.listViews.defaultOf(lists, it) } ?: found
+    }
+
     /** Does the actions the assistant chose; false when one of them could not be done. */
     private suspend fun doAgent(actions: List<AgentAction>): Boolean {
         var ok = true
@@ -2028,7 +2045,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 "list" -> {
-                    val list = closestList(alexaLists().orEmpty(), a.list) { listName(it) }
+                    val list = listFor(alexaLists().orEmpty(), a.list)
                     if (list == null) {
                         ok = false
                     } else {
@@ -2493,9 +2510,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { runCatching { Offline.flush() } }
     }
 
-    /** The lists of Alexa, then those chosen of Notion; those of Notion alone when Alexa has none to give. */
+    /** The lists of Alexa, then those chosen of Notion; those of Notion alone when Alexa has none to give or is left out. */
     suspend fun alexaLists(): List<AlexaList>? {
         val fromNotion = if (notionStore.linked) notionStore.lists().map { AlexaList(it.listId, it.name, LIST_NOTION, null) } else emptyList()
+        // The lists of Alexa can be left out in the settings, for those of Notion alone.
+        if (!_state.value.listViews.alexa) return fromNotion
         if (!_state.value.loggedIn && fromNotion.isNotEmpty()) return fromNotion
         val fromAlexa = readKept(Offline::lists, Offline::putLists) { api.lists() }
         if (fromAlexa == null && fromNotion.isEmpty()) return null

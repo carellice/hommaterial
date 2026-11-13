@@ -7,6 +7,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.text.style.TextAlign
 import app.hommaterial.data.SettingsSearch
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Palette
@@ -569,6 +570,8 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
 
             Section(R.string.s_calendar, R.string.calendar_settings_text) { CalendarSettings(state, vm) }
 
+            Section(R.string.s_lists, R.string.lists_settings_text) { ListsSettings(state, vm) }
+
             Section(R.string.s_notion, R.string.notion_settings_text) { NotionSettings(state, vm) }
 
             Section(R.string.s_music, R.string.music_settings_text) { MusicSettings() }
@@ -883,6 +886,7 @@ private fun sectionKeys(@StringRes title: Int): Int? = when (title) {
     R.string.s_switchbot -> R.string.settings_keys_switchbot
     R.string.s_lgtv -> R.string.settings_keys_lgtv
     R.string.s_calendar -> R.string.settings_keys_calendar
+    R.string.s_lists -> R.string.settings_keys_lists
     R.string.s_notion -> R.string.settings_keys_notion
     R.string.s_music -> R.string.settings_keys_music
     R.string.s_voice -> R.string.settings_keys_voice
@@ -983,6 +987,7 @@ private fun sectionIcon(@StringRes title: Int): ImageVector? = when (title) {
     R.string.s_ai_examples -> Icons.Outlined.Lightbulb
     R.string.s_voice -> Icons.Outlined.RecordVoiceOver
     R.string.s_calendar -> Icons.Outlined.CalendarMonth
+    R.string.s_lists -> Icons.Outlined.Checklist
     R.string.s_notion -> Icons.Outlined.Description
     R.string.s_music -> Icons.Outlined.LibraryMusic
     R.string.s_updates -> Icons.Outlined.SystemUpdate

@@ -1,8 +1,8 @@
 // The page of the lists of Alexa, as in its app and on the Echo devices (ui/Lists.kt): a segmented
 // control to choose the list, the list under it, and a swipe sideways to move to the next one.
 import { html, useState, useEffect, useRef } from '../lib.js';
-import { Icon, IconButton, Spinner, Dialog, Details, Setting, Field, ConfirmDialog } from './common.js';
-import { applyViews, members, merge, split, rename, move, MERGED } from '/shared/lists.js';
+import { Icon, IconButton, Spinner, Dialog, Details, Setting, Field, ConfirmDialog, Toggle, ListDialog } from './common.js';
+import { applyViews, members, merge, split, rename, move, MERGED, defaultOf, TO_DO, SHOPPING } from '/shared/lists.js';
 import * as store from '../store.js';
 import { listName } from '../store.js';
 import { str } from '/shared/i18n.js';
@@ -115,8 +115,8 @@ const active = (list) => itemsOf(list.id)?.filter((it) => !it.completed).length 
 
 export function ListsPage({ s }) {
   const m = useModel();
-  // The lists chosen of Notion come and go with the settings: read again when they change.
-  const notion = JSON.stringify([s.notion.linked, s.notionLists]);
+  // The lists chosen of Notion, and those of Alexa, come and go with the settings: read again when they change.
+  const notion = JSON.stringify([s.notion.linked, s.notionLists, s.listViews?.alexa !== false]);
   const [seen, setSeen] = useState(notion);
   useEffect(() => {
     if (notion === seen) return;
@@ -141,7 +141,7 @@ export function ListsPage({ s }) {
   const lists = shownLists(s);
   const index = Math.max(0, lists.findIndex((l) => l.id === chosen) >= 0
     ? lists.findIndex((l) => l.id === chosen)
-    : lists.findIndex((l) => l.type === 'TO_DO' || members(l.id).some((id) => m.lists.find((x) => x.id === id)?.type === 'TO_DO')));
+    : lists.findIndex((l) => members(l.id).includes(defaultOf(m.lists, s.listViews, TO_DO)?.id)));
   const list = lists[index];
   const go = (to) => {
     if (to < 0 || to >= lists.length || to === index) return;
@@ -451,4 +451,30 @@ export function RestLists({ s }) {
     ${items.slice(0, 4).map((it) => html`<div class="body-large ellipsis" key=${it.id}>· ${it.name}</div>`)}
     ${items.length > 4 && html`<div class="body-medium" style="opacity:.6">+${items.length - 4}</div>`}
   </div>`)}</div>`;
+}
+
+/** The lists in the settings: those of Alexa shown or not, and the ones for what is to do and to buy. */
+export function ListsSettings({ s }) {
+  const views = s.listViews ?? {};
+  const [lists, setLists] = useState([]);
+  const [choosing, setChoosing] = useState(null);
+  const key = JSON.stringify([views.alexa !== false, s.notion.linked, s.notionLists]);
+  useEffect(() => {
+    let live = true;
+    store.alexaLists().then((found) => live && setLists(found ?? []), () => {});
+    return () => { live = false; };
+  }, [key]);
+  const title = (type) => str(type === TO_DO ? 'lists_default_todo' : 'lists_default_shopping');
+  return html`
+    <${Toggle} title=${str('lists_alexa')} text=${str('lists_alexa_text')} checked=${views.alexa !== false}
+      onChange=${(alexa) => store.setListViews({ ...views, alexa })} />
+    ${[TO_DO, SHOPPING].map((type) => html`
+      <${Setting} key=${type} title=${title(type)} text=${(() => { const l = defaultOf(lists, views, type); return l ? listName(l) : str('lists_default_none'); })()}
+        onClick=${() => setChoosing(type)} />`)}
+    ${choosing && html`<${ListDialog} title=${title(choosing)} empty=${str('lists_none')} note=${str('lists_default_note')}
+      items=${lists.map((l) => [listName(l), l.type === store.LIST_NOTION ? 'Notion' : 'Alexa'])}
+      onDismiss=${() => setChoosing(null)} onPick=${(i) => {
+        store.setListViews({ ...views, [choosing === TO_DO ? 'todo' : 'shopping']: lists[i].id });
+        setChoosing(null);
+      }} />`}`;
 }

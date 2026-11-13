@@ -746,6 +746,13 @@
     <string name="s_notes">Notes</string>
     <string name="s_notion">Notion</string>
     <string name="notion_settings_text">To-do lists and notes from Notion. Which lists and notes to show applies to this device only.</string>
+    <string name="lists_settings_text">Which lists show and where the assistant adds what is to do and to buy. With the home server it is the same on every device.</string>
+    <string name="lists_alexa">Lists of Alexa</string>
+    <string name="lists_alexa_text">Off, only the lists of Notion show.</string>
+    <string name="lists_default_todo">To-do list</string>
+    <string name="lists_default_shopping">Shopping list</string>
+    <string name="lists_default_note">Where the assistant adds what is asked without naming a list. The widget starts from the to-do list.</string>
+    <string name="lists_default_none">None</string>
     <string name="notion_intro">Notion lets the app in through an integration of your own: make it, copy its secret and share with it the pages and databases to show.</string>
     <string name="notion_step1_title">1. Make the integration</string>
     <string name="notion_step1_text">In Notion, Settings › Connections › Develop or manage integrations: New integration, type Internal, in your workspace. Give it the read, update and insert content capabilities.</string>
@@ -1023,6 +1030,7 @@
     <string name="settings_keys_lgtv">lg, tv, television, webos, pair, remote, screen</string>
     <string name="settings_keys_calendar">calendar, google, agenda, events, appointments, today, tomorrow, schedule</string>
     <string name="settings_keys_notion">notion, notes, lists, to do, workspace</string>
+    <string name="settings_keys_lists">lists, alexa, notion, to do, shopping, default, assistant</string>
     <string name="settings_keys_voice">voice, microphone, speak, echo, alexa, read aloud, talk, dictation</string>
     <string name="settings_keys_assistant">assistant, ai, artificial intelligence, cloudflare, workers, model, key, token, chat</string>
     <string name="settings_keys_ai_examples">examples, ideas, ask, ai, questions, assistant</string>

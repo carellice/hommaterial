@@ -1,6 +1,7 @@
 // How the lists show in the app only: names given here, lists joined into one, and their order. Alexa
 // and Notion never see it; on the server it is the same on every device. The Android app does the same
-// in data/ListViews.kt: keep them alike. views = { names: { [listId]: name }, merged: [[listId, ...]], order: [shownId, ...] }
+// in data/ListViews.kt: keep them alike. views = { names: { [listId]: name }, merged: [[listId, ...]], order: [shownId, ...],
+// alexa: whether the lists of Alexa show (true when missing), todo and shopping: the id of the list for each, null for Alexa's }
 
 export const MERGED = 'MERGED';
 const PREFIX = 'merged:';
@@ -8,6 +9,15 @@ const PREFIX = 'merged:';
 export const EMPTY_VIEWS = { names: {}, merged: [], order: [] };
 
 export const viewId = (group) => PREFIX + group.join('|');
+
+export const TO_DO = 'TO_DO';
+export const SHOPPING = 'SHOPPING_LIST';
+
+/** The list of [type] (TO_DO or SHOPPING_LIST) among [lists]: the one chosen, else that of Alexa. */
+export function defaultOf(lists, views, type) {
+  const chosen = type === TO_DO ? views?.todo : views?.shopping;
+  return lists.find((l) => l.id === chosen) ?? lists.find((l) => l.type === type) ?? null;
+}
 
 /** The lists behind a list shown: itself, or those joined in it. */
 export const members = (id) => (id.startsWith(PREFIX) ? id.slice(PREFIX.length).split('|') : [id]);

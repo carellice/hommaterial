@@ -736,6 +736,13 @@
     <string name="s_notes">Note</string>
     <string name="s_notion">Notion</string>
     <string name="notion_settings_text">Liste di cose da fare e note da Notion. Quali liste e note mostrare vale solo per questo dispositivo.</string>
+    <string name="lists_settings_text">Quali liste mostrare e dove l\'assistente aggiunge le cose da fare e la spesa. Con il server di casa vale su tutti i dispositivi.</string>
+    <string name="lists_alexa">Liste di Alexa</string>
+    <string name="lists_alexa_text">Spente, si vedono solo le liste di Notion.</string>
+    <string name="lists_default_todo">Lista delle cose da fare</string>
+    <string name="lists_default_shopping">Lista della spesa</string>
+    <string name="lists_default_note">Dove l\'assistente aggiunge ciò che chiedi senza dire la lista. Il widget parte dalla lista delle cose da fare.</string>
+    <string name="lists_default_none">Nessuna</string>
     <string name="notion_intro">Notion fa entrare l\'app con un\'integrazione tua: creala, copiane la chiave segreta e condividi con lei le pagine e i database da mostrare.</string>
     <string name="notion_step1_title">1. Crea l\'integrazione</string>
     <string name="notion_step1_text">In Notion, Impostazioni › Connessioni › Sviluppa o gestisci integrazioni: Nuova integrazione, tipo Interna, nel tuo spazio di lavoro. Dalle le funzioni di lettura, aggiornamento e inserimento dei contenuti.</string>
@@ -1013,6 +1020,7 @@
     <string name="settings_keys_lgtv">lg, tv, televisore, televisione, webos, abbina, telecomando, schermo</string>
     <string name="settings_keys_calendar">calendario, google, agenda, eventi, appuntamenti, impegni, oggi, domani</string>
     <string name="settings_keys_notion">notion, note, appunti, liste, cose da fare, workspace</string>
+    <string name="settings_keys_lists">liste, alexa, notion, cose da fare, spesa, predefinita, assistente</string>
     <string name="settings_keys_voice">voce, microfono, parla, parlare, echo, alexa, leggi ad alta voce, dettatura</string>
     <string name="settings_keys_assistant">assistente, ai, ia, intelligenza artificiale, cloudflare, workers, modello, chiave, token, chat</string>
     <string name="settings_keys_ai_examples">esempi, idee, chiedi, domande, ai, ia, assistente</string>

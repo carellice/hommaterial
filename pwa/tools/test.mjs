@@ -416,6 +416,15 @@ await test('lists renamed and joined in the app only', () => {
   assert.deepEqual(views.split(v, 'x').order, ['b', 'a', 'c']);
 });
 
+await test('the lists for what is to do and to buy as ListViewsTest.kt', () => {
+  const todo = { id: 'a1', name: '', type: views.TO_DO }, shopping = { id: 'a2', name: '', type: views.SHOPPING };
+  const notion = { id: 'notion:page:1', name: 'Spesa', type: 'NOTION' };
+  const lists = [todo, shopping, notion];
+  assert.equal(views.defaultOf(lists, views.EMPTY_VIEWS, views.TO_DO), todo);
+  assert.equal(views.defaultOf(lists, { shopping: notion.id }, views.SHOPPING), notion);
+  assert.equal(views.defaultOf([notion], { shopping: 'gone' }, views.SHOPPING), null);
+});
+
 await test('the chat completes names as AutocompleteTest.kt', () => {
   const words = {
     power: ['Luce cucina', 'Lampada', 'TV Flavio', 'Luci salotto'], run: ['Buonanotte', 'Modalità cinema'],

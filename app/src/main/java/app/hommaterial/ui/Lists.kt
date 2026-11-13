@@ -138,8 +138,15 @@ internal class ListsModel(private val vm: HomeViewModel, private val scope: Coro
     var source by mutableStateOf<List<AlexaList>?>(null)
         private set
     private val read = mutableStateMapOf<String, List<AlexaItem>>()
-    /** The names given and the lists joined in the app, followed from the settings. */
-    var views by mutableStateOf(ListViews())
+    private var viewsState by mutableStateOf(ListViews())
+    /** The names given and the lists joined in the app, followed from the settings; the lists of Alexa shown or not read them again. */
+    var views: ListViews
+        get() = viewsState
+        set(value) {
+            val reread = value.alexa != viewsState.alexa && source != null
+            viewsState = value
+            if (reread) reload()
+        }
 
     /** The lists as shown: renamed, those joined as one. */
     val lists: List<AlexaList>? get() = source?.let { views.apply(it, ::listName) }
@@ -278,7 +285,8 @@ internal fun ListsPage(model: ListsModel, bottomSpace: Int) {
     }
     var chosen by rememberSaveable { mutableStateOf<String?>(null) }
     val start = all.indexOfFirst { it.id == chosen }.takeIf { it >= 0 }
-        ?: all.indexOfFirst { it.type == "TO_DO" }.coerceAtLeast(0)
+        ?: model.source?.let { model.views.defaultOf(it, ListViews.TO_DO) }?.let { todo -> all.indexOfFirst { todo.id in ListViews.members(it.id) } }
+            ?.takeIf { it >= 0 } ?: 0
     val pager = rememberPagerState(initialPage = start) { all.size }
     val scope = rememberCoroutineScope()
     LaunchedEffect(pager, all) {
@@ -1015,4 +1023,34 @@ internal fun ListsEditDialog(model: ListsModel, views: ListViews, onChange: (Lis
         },
         confirmButton = { AppTextButton(onClick = onDismiss) { Text(str(R.string.close)) } },
     )
+}
+
+/** The lists in the settings: those of Alexa shown or not, and the ones for what is to do and to buy. */
+@Composable
+internal fun ListsSettings(state: app.hommaterial.UiState, vm: HomeViewModel) {
+    val views = state.listViews
+    var lists by remember { mutableStateOf<List<AlexaList>>(emptyList()) }
+    LaunchedEffect(views.alexa, state.notionLists) { lists = vm.alexaLists().orEmpty() }
+    var choosing by remember { mutableStateOf<String?>(null) }
+    Toggle(R.string.lists_alexa, R.string.lists_alexa_text, views.alexa) { vm.setListViews(views.copy(alexa = it)) }
+    for ((type, title) in listOf(ListViews.TO_DO to R.string.lists_default_todo, ListViews.SHOPPING to R.string.lists_default_shopping)) {
+        Setting(
+            title = str(title),
+            text = views.defaultOf(lists, type)?.let { listName(it) } ?: str(R.string.lists_default_none),
+            onClick = { choosing = type },
+        )
+    }
+    choosing?.let { type ->
+        ListDialog(
+            title = str(if (type == ListViews.TO_DO) R.string.lists_default_todo else R.string.lists_default_shopping),
+            items = lists.map { listName(it) to (if (it.type == LIST_NOTION) "Notion" else "Alexa") },
+            onDismiss = { choosing = null },
+            empty = str(R.string.lists_none),
+            note = str(R.string.lists_default_note),
+        ) { i ->
+            val id = lists[i].id
+            vm.setListViews(if (type == ListViews.TO_DO) views.copy(todo = id) else views.copy(shopping = id))
+            choosing = null
+        }
+    }
 }

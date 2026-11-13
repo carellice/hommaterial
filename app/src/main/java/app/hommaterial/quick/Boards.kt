@@ -52,6 +52,7 @@ import app.hommaterial.data.CalendarEvent
 import app.hommaterial.data.CalendarSource
 import app.hommaterial.data.LIST_NOTION
 import app.hommaterial.data.ListItem
+import app.hommaterial.data.ListViews
 import app.hommaterial.data.Notion
 import app.hommaterial.data.NotionSource
 import app.hommaterial.data.NotionStore
@@ -105,18 +106,22 @@ object Boards {
 
     // --- the lists ------------------------------------------------------------------------------
 
-    /** The lists of Alexa as kept, then those chosen of Notion. */
+    private fun views(context: Context) = runCatching {
+        ListViews.fromJson(org.json.JSONObject(context.getSharedPreferences("settings", Context.MODE_PRIVATE).getString("listViews", "{}")!!))
+    }.getOrDefault(ListViews())
+
+    /** The lists of Alexa as kept, unless left out in the settings, then those chosen of Notion. */
     fun lists(context: Context): List<AlexaList> {
         val notion = NotionStore(context)
         val fromNotion = if (notion.linked) notion.lists().map { AlexaList(it.listId, it.name, LIST_NOTION, null) } else emptyList()
-        return Offline.lists().orEmpty() + fromNotion
+        return (if (views(context).alexa) Offline.lists().orEmpty() else emptyList()) + fromNotion
     }
 
-    /** The list the widget shows: the one chosen with its title, else the to-do list of Alexa. */
+    /** The list the widget shows: the one chosen with its title, else the to-do list of the settings. */
     fun shownList(context: Context): AlexaList? {
         val all = lists(context)
         val chosen = prefs(context).getString("list", null)
-        return all.find { it.id == chosen } ?: all.find { it.type == "TO_DO" } ?: all.firstOrNull()
+        return all.find { it.id == chosen } ?: views(context).defaultOf(all, ListViews.TO_DO) ?: all.firstOrNull()
     }
 
     fun items(list: AlexaList): List<ListItem>? =

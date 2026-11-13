@@ -10,6 +10,7 @@ import {
   standardCommands, commandLabel, describe, conditionText, ACTION_POWER, ACTION_REMOTE, ACTION_MACRO,
 } from '/shared/model.js';
 import { APP_VERSION } from './version.js';
+import { defaultOf, TO_DO, SHOPPING } from '/shared/lists.js';
 import { createBackup, parseBackup, selectBackup } from '/shared/backup.js';
 import { enablePush, disablePush, pushState } from './push.js';
 
@@ -697,6 +698,8 @@ export async function alexaLists() {
   const fromNotion = state.notion.linked
     ? state.notionLists.map((it) => ({ id: `${NOTION_LIST}${it.kind}:${it.id}`, name: it.name, type: LIST_NOTION, active: null }))
     : [];
+  // The lists of Alexa can be left out in the settings, for those of Notion alone.
+  if (state.listViews?.alexa === false) return fromNotion;
   if (!state.loggedIn && fromNotion.length) return fromNotion;
   const fromAlexa = await onList(async () => (await get('/api/lists')).lists);
   if (!fromAlexa && !fromNotion.length) return null;
@@ -1281,6 +1284,18 @@ export function closestList(lists, said) {
     ?? (holding.length === 1 ? holding[0] : null);
 }
 
+/**
+ * The list meant by [said]. The to-do and shopping lists of Alexa, or their names, mean the ones chosen
+ * in the settings: those of Notion, say, or Alexa's own when none was chosen (as listFor in HomeViewModel.kt).
+ */
+export function listFor(lists, said, views = state.listViews) {
+  const found = closestList(lists, said);
+  if (found && found.type !== TO_DO && found.type !== SHOPPING) return found;
+  const type = found?.type ?? [[TO_DO, 'list_todo'], [SHOPPING, 'list_shopping']]
+    .find(([, name]) => closestList([{ name: str(name) }], said))?.[0];
+  return (type && defaultOf(lists, views, type)) ?? found;
+}
+
 /** What the assistant is told besides the home: the lists, the agenda of the next days, the timers. Each part may be missing. */
 async function agentContext() {
   const quiet = (work) => work().catch(() => null);
@@ -1288,6 +1303,7 @@ async function agentContext() {
   const [lists, events] = await Promise.all([
     // Each list with what is left to do in it, read at once; a list that is slow or fails says so.
     quiet(async () => Promise.all(((await alexaLists()) ?? []).map(async (l) => ({
+      list: l,
       name: listName(l),
       items: await Promise.race([
         alexaListItems(l.id).then((items) => Array.isArray(items) ? items.filter((it) => !it.completed).map((it) => it.name) : null, () => null),
@@ -1303,7 +1319,15 @@ async function agentContext() {
     }),
   ]);
   const parts = [];
-  if (lists?.length) parts.push(listsContext(lists));
+  if (lists?.length) {
+    parts.push(listsContext(lists));
+    // The lists chosen in the settings for what is to do and to buy, when the request names none.
+    const all = lists.map((l) => l.list);
+    const todo = defaultOf(all, state.listViews, TO_DO);
+    const shopping = defaultOf(all, state.listViews, SHOPPING);
+    const said = [todo && `things to do go to "${listName(todo)}"`, shopping && `things to buy go to "${listName(shopping)}"`].filter(Boolean);
+    if (said.length) parts.push(`When no list is named, ${said.join(' and ')}.`);
+  }
   if (events) parts.push(`Calendar, today and the next two days:\n${events.map((e) => `- ${e.start}${e.allDay ? ' (all day)' : ` to ${e.end}`}: ${e.title}`).join('\n') || '- nothing'}`);
   const timers = [
     ...Object.entries(state.timers).map(([id, at]) => `- ${state.devices.find((d) => d.applianceId === id)?.name ?? id} switches off at ${clock(at)}`),
@@ -1371,7 +1395,7 @@ async function doAgent(actions) {
       else ok = false;
     } else if (a.do === 'list') {
       const lists = await alexaLists();
-      const list = closestList(lists ?? [], a.list);
+      const list = listFor(lists ?? [], a.list);
       if (!list) ok = false;
       else for (const item of a.items) ok = (await addAlexaListItem(list.id, item)) && ok;
     } else if (a.do === 'event') {
