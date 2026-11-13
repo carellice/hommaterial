@@ -194,15 +194,38 @@ function groups(tracks, view) {
   })).sort((a, b) => collator.compare(a.title, b.title));
 }
 
+/** What a folder holds, as on the phone: its subfolders, then its own songs; [inside] is everything in it, subfolders too. */
+function folderContents(tracks, path) {
+  const prefix = path ? `${path}/` : '';
+  const inside = tracks.filter((t) => t.folder === path || t.folder.startsWith(prefix))
+    .sort((a, b) => collator.compare(a.folder, b.folder) || a.disc - b.disc || a.number - b.number || collator.compare(a.title, b.title));
+  const by = new Map();
+  for (const t of inside) {
+    if (t.folder === path) continue;
+    const key = prefix + t.folder.slice(prefix.length).split('/')[0];
+    if (!by.has(key)) by.set(key, []);
+    by.get(key).push(t);
+  }
+  const folders = [...by.entries()].map(([key, list]) => ({ key, title: key.slice(key.lastIndexOf('/') + 1), sub: plural('music_tracks', list.length) }))
+    .sort((a, b) => collator.compare(a.title, b.title));
+  return { inside, folders, tracks: inside.filter((t) => t.folder === path) };
+}
+
+const parentOf = (path) => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
+
 export function MusicPage() {
   const m = useModel();
   const [view, setView] = useState('songs');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(null);
+  // The folder shown on the page of the folders, '' for the folder of the account.
+  const [path, setPath] = useState('');
   useEffect(() => {
     if (!m.tracks) reloadMusic();
   }, []);
   useBack(() => setOpen(null), open != null);
+  // The path itself, not just true: each folder deeper puts its own step back on the back gesture.
+  useBack(() => setPath(parentOf(path)), view === 'folders' && !open && !query.trim() && path);
   if (!m.tracks) {
     return html`<div class="lists-center">${m.failed && !m.loading
       ? html`<button class="tonal-btn" onClick=${reloadMusic}>${str('lists_retry')}</button>`
@@ -219,7 +242,10 @@ export function MusicPage() {
   const q = fold(query.trim());
   const tracks = q ? m.tracks.filter((t) => fold(`${t.title} ${t.artist} ${t.album} ${t.folder}`).includes(q)) : m.tracks;
   const group = open && groups(m.tracks, open.view).find((g) => g.key === open.key);
-  const list = group ? group.tracks : tracks;
+  const browsing = !group && view === 'folders' && !q;
+  const here = browsing && folderContents(m.tracks, path);
+  const list = group ? group.tracks : browsing ? here.inside : tracks;
+  const openFolder = (key) => { setPath(key); setQuery(''); };
   return html`
     <div class="music-page">
       ${group ? html`
@@ -230,15 +256,27 @@ export function MusicPage() {
         <input class="music-search" type="search" placeholder=${str('music_search_hint')} value=${query} onInput=${(e) => setQuery(e.target.value)} />
         <div class="chips">${VIEWS.map(([key, label]) => html`
           <button key=${key} class=${`chip ${view === key ? 'selected' : ''}`} onClick=${() => setView(key)}>${str(label)}</button>`)}
-        </div>`}
+        </div>
+        ${browsing && path && html`
+          <div class="music-head">
+            <${IconButton} icon="arrow_back" label=${str('music_back')} onClick=${() => setPath(parentOf(path))} />
+            <div class="grow"><div class="title-medium">${path.slice(path.lastIndexOf('/') + 1)}</div><div class="body-small faint">${plural('music_tracks', list.length)}</div></div>
+          </div>`}`}
       <div class="music-actions">
         <button class="filled-btn" onClick=${() => play(list, 0)}><${Icon} name="play_arrow" />${str('music_play')}</button>
         <button class="tonal-btn" onClick=${() => play(list, 0, true)}><${Icon} name="shuffle" />${str('music_shuffle')}</button>
       </div>
       ${group || view === 'songs'
         ? list.map((t, i) => html`<${TrackRow} key=${t.path} track=${t} playing=${current()?.path === t.path} onPlay=${() => play(list, i)} />`)
+        : browsing ? html`
+          ${here.folders.map((g) => html`
+            <button key=${g.key} class="list-item" onClick=${() => setPath(g.key)}>
+              <span class="music-cover icon-cover"><${Icon} name="folder" /></span>
+              <span class="texts"><span class="body-large">${g.title}</span><span class="supporting">${g.sub}</span></span>
+            </button>`)}
+          ${here.tracks.map((t, i) => html`<${TrackRow} key=${t.path} track=${t} playing=${current()?.path === t.path} onPlay=${() => play(here.tracks, i)} />`)}`
         : groups(tracks, view).map((g) => html`
-          <button key=${g.key} class="list-item" onClick=${() => setOpen({ view, key: g.key })}>
+          <button key=${g.key} class="list-item" onClick=${() => (view === 'folders' ? openFolder(g.key === '/' ? '' : g.key) : setOpen({ view, key: g.key }))}>
             ${view === 'albums' ? html`<${Cover} track=${g.tracks[0]} />` : html`<span class="music-cover icon-cover"><${Icon} name=${view === 'artists' ? 'person' : 'folder'} /></span>`}
             <span class="texts"><span class="body-large">${g.title}</span><span class="supporting">${g.sub}</span></span>
           </button>`)}
