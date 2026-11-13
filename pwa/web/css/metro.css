@@ -262,6 +262,11 @@ html:root[data-look="metro"][data-theme="dark"] {
 [data-look="metro"] .chat-field:focus,
 [data-look="metro"] .settings-search:focus-within,
 [data-look="metro"] .add-field:focus-within { border: 2px solid var(--primary); background: #FFFFFF; color: #000000; }
+/* The box turns white in the dark theme too: its text must turn black with it. */
+[data-look="metro"] .settings-search:focus-within input,
+[data-look="metro"] .add-field:focus-within input { color: #000000; }
+[data-look="metro"] .settings-search:focus-within input::placeholder,
+[data-look="metro"] .add-field:focus-within input::placeholder { color: #5E5E5E; }
 [data-look="metro"] .field input:focus,
 [data-look="metro"] .field textarea:focus { padding: 14px 16px; }
 [data-look="metro"] input[type="range"] { accent-color: var(--primary); }
