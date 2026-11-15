@@ -136,7 +136,7 @@ class AssistActivity : ComponentActivity() {
                 LaunchedEffect(Unit) { openApp() }
                 return@setContent
             }
-            val dark = when (state.theme) {
+            val dark = state.look == app.hommaterial.ui.LOOK_DUEFFE || when (state.theme) {
                 1 -> false
                 2 -> true
                 else -> isSystemInDarkTheme()

@@ -328,12 +328,13 @@ private fun Agenda(events: List<CalendarEvent>, model: CalendarModel, state: UiS
 @Composable
 private fun EventRow(event: CalendarEvent, calendar: CalendarInfo?, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val skeuo = LocalSkeuo.current
-    val shape = if (LocalMetro.current) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(if (skeuo) 12.dp else 18.dp)
+    val dueffe = LocalDueffe.current
+    val shape = if (LocalMetro.current) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(if (skeuo) 12.dp else if (dueffe) 20.dp else 18.dp)
     Surface(
-        color = if (skeuo) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+        color = if (skeuo || dueffe) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = shape,
-        modifier = modifier.fillMaxWidth().skeuoPanel(shape).clip(shape).clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth().then(if (dueffe) Modifier.dueffePress(0.97f).dueffeCard(shape) else Modifier.skeuoPanel(shape)).clip(shape).clickable(onClick = onClick),
     ) {
         Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(5.dp).fillMaxHeight().clip(CircleShape).background(colorOf(calendar)))

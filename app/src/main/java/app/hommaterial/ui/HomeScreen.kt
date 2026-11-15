@@ -935,10 +935,12 @@ private fun SectionHeader(name: String, onPower: ((Boolean) -> Unit)? = null) {
         val metro = LocalMetro.current
         // In Nothing, the small spaced capitals of an instrument panel.
         val nothing = LocalNothing.current
+        // In Dueffe, a section headline in Bricolage, ivory.
+        val dueffe = LocalDueffe.current
         Text(
             if (metro) name.lowercase() else if (nothing) name.uppercase() else name,
-            style = if (metro) MaterialTheme.typography.headlineSmall else if (nothing) MaterialTheme.typography.labelMedium else MaterialTheme.typography.titleSmall,
-            color = if (metro) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = if (metro || dueffe) MaterialTheme.typography.headlineSmall else if (nothing) MaterialTheme.typography.labelMedium else MaterialTheme.typography.titleSmall,
+            color = if (metro || dueffe) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
         if (onPower != null) {

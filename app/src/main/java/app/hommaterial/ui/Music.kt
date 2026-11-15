@@ -920,7 +920,7 @@ internal fun MusicFullScreen() {
                 .then(
                     when {
                         // The table of the skeuomorphic look, the bare black or white of Modern UI.
-                        LocalSkeuo.current -> Modifier.screenTexture()
+                        LocalSkeuo.current || LocalDueffe.current -> Modifier.screenTexture()
                         LocalMetro.current -> Modifier.background(colors.background)
                         else -> Modifier.background(Brush.verticalGradient(listOf(colors.secondaryContainer, colors.surface, colors.surface)))
                     },

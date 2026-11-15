@@ -185,7 +185,7 @@ internal fun textureBrush(dark: Boolean): Brush = ShaderBrush(ImageShader(if (da
 @Composable
 internal fun ScreenSurface(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val skeuo = LocalSkeuoMaterials.current
-    if (LocalNothing.current) {
+    if (LocalNothing.current || LocalDueffe.current) {
         Surface(modifier.fillMaxSize().screenTexture(), color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground, content = content)
     } else if (skeuo == null) {
         Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background, content = content)
@@ -196,11 +196,12 @@ internal fun ScreenSurface(modifier: Modifier = Modifier, content: @Composable (
 
 /** The background a Scaffold paints: none in the skeuomorphic look, where [screenTexture] lies under it. */
 @Composable
-internal fun screenColor(): Color = if (LocalSkeuo.current || LocalNothing.current) Color.Transparent else MaterialTheme.colorScheme.background
+internal fun screenColor(): Color = if (LocalSkeuo.current || LocalNothing.current || LocalDueffe.current) Color.Transparent else MaterialTheme.colorScheme.background
 
 @Composable
 internal fun Modifier.screenTexture(): Modifier =
     if (LocalNothing.current) background(MaterialTheme.colorScheme.background).background(nothingDots())
+    else if (LocalDueffe.current) dueffeAurora()
     else LocalSkeuoMaterials.current?.let { background(textureBrush(it.dark)) } ?: this
 
 // ——— Raised pieces ———
@@ -278,6 +279,7 @@ internal fun Modifier.skeuoBadge(shape: Shape = RoundedCornerShape(10.dp)): Modi
 internal fun TileSurface(on: Boolean, modifier: Modifier, clicks: Modifier, content: @Composable () -> Unit) {
     if (LocalMetro.current) return MetroTile(on, modifier, clicks, content)
     if (LocalNothing.current) return NothingTile(on, modifier, clicks, content)
+    if (LocalDueffe.current) return DueffeTile(on, modifier, clicks, content)
     val colors = MaterialTheme.colorScheme
     val m = LocalSkeuoMaterials.current
     if (m == null) {
@@ -320,6 +322,7 @@ internal fun AppTopBar(
 ) {
     if (LocalMetro.current) return MetroTopBar(title, navigationIcon, actions)
     if (LocalNothing.current) return NothingTopBar(title, navigationIcon, actions)
+    if (LocalDueffe.current) return DueffeTopBar(title, navigationIcon, actions)
     val m = LocalSkeuoMaterials.current
     if (m == null) {
         TopAppBar(title = title, navigationIcon = navigationIcon, actions = actions)
@@ -354,6 +357,7 @@ internal fun AppTopBar(
 internal fun AppSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
     if (LocalMetro.current) return MetroSwitch(checked, onCheckedChange, modifier, enabled)
     if (LocalNothing.current) return NothingSwitch(checked, onCheckedChange, modifier, enabled)
+    if (LocalDueffe.current) return DueffeSwitch(checked, onCheckedChange, modifier, enabled)
     val m = LocalSkeuoMaterials.current
     if (m == null) {
         Switch(checked = checked, onCheckedChange = onCheckedChange, modifier = modifier, enabled = enabled)
@@ -403,6 +407,7 @@ internal fun AppFilterChip(
 ) {
     if (LocalMetro.current) return MetroFilterChip(selected, onClick, label, modifier, leadingIcon)
     if (LocalNothing.current) return NothingFilterChip(selected, onClick, label, modifier, leadingIcon)
+    if (LocalDueffe.current) return DueffeFilterChip(selected, onClick, label, modifier, leadingIcon)
     val m = LocalSkeuoMaterials.current
     if (m == null) {
         FilterChip(selected = selected, onClick = onClick, label = label, modifier = modifier, leadingIcon = leadingIcon)
@@ -451,6 +456,7 @@ internal fun AppTonalButton(
 ) {
     if (LocalMetro.current) return MetroTonalButton(onClick, modifier, enabled, contentPadding, content)
     if (LocalNothing.current) return NothingTonalButton(onClick, modifier, enabled, contentPadding, content)
+    if (LocalDueffe.current) return DueffeTonalButton(onClick, modifier, enabled, contentPadding, content)
     val m = LocalSkeuoMaterials.current
     if (m == null) {
         FilledTonalButton(onClick = onClick, modifier = modifier, enabled = enabled, contentPadding = contentPadding, content = content)
@@ -495,6 +501,7 @@ internal fun AppButton(
 ) {
     if (LocalMetro.current) return MetroButton(onClick, modifier, enabled, contentPadding, content)
     if (LocalNothing.current) return NothingButton(onClick, modifier, enabled, contentPadding, content)
+    if (LocalDueffe.current) return DueffeButton(onClick, modifier, enabled, contentPadding, content)
     val m = LocalSkeuoMaterials.current
     if (m == null) {
         Button(onClick = onClick, modifier = modifier, enabled = enabled, contentPadding = contentPadding, content = content)

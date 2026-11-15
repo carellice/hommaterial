@@ -441,6 +441,16 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 )
                 return
             }
+            // In Dueffe, a section headline in Bricolage, ivory.
+            if (LocalDueffe.current) {
+                Text(
+                    str(title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = 4.dp, top = 18.dp),
+                )
+                return
+            }
             // In Nothing, the small spaced capitals of an instrument panel.
             if (LocalNothing.current) {
                 Text(
@@ -475,10 +485,11 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
             Group(R.string.settings_group_general)
             Section(R.string.s_appearance) {
                 val themes = listOf(R.string.theme_auto, R.string.theme_light, R.string.theme_dark)
-                Chips(R.string.theme, themes.mapIndexed { i, label -> i to str(label) }, state.theme, vm::setTheme)
-                Chips(R.string.look, listOf(LOOK_MATERIAL to str(R.string.look_material), LOOK_SKEUO to str(R.string.look_skeuo), LOOK_METRO to str(R.string.look_metro), LOOK_NOTHING to str(R.string.look_nothing)), state.look, vm::setLook)
-                // Nothing is monochrome: the accent waits for another look.
-                if (state.look != LOOK_NOTHING) AccentPicker(state.accent, vm::setAccent)
+                // Dueffe is dark only: the theme waits for another look.
+                if (state.look != LOOK_DUEFFE) Chips(R.string.theme, themes.mapIndexed { i, label -> i to str(label) }, state.theme, vm::setTheme)
+                Chips(R.string.look, listOf(LOOK_MATERIAL to str(R.string.look_material), LOOK_SKEUO to str(R.string.look_skeuo), LOOK_METRO to str(R.string.look_metro), LOOK_NOTHING to str(R.string.look_nothing), LOOK_DUEFFE to str(R.string.look_dueffe)), state.look, vm::setLook)
+                // Nothing is monochrome and Dueffe is gold: the accent waits for another look.
+                if (state.look != LOOK_NOTHING && state.look != LOOK_DUEFFE) AccentPicker(state.accent, vm::setAccent)
                 val layouts = listOf(LAYOUT_GRID to str(R.string.layout_grid), LAYOUT_LIST to str(R.string.layout_list))
                 Chips(R.string.layout, layouts, state.layout, vm::setLayout)
                 Toggle(R.string.haptics, R.string.haptics_text, state.haptics, vm::setHaptics)
@@ -935,12 +946,13 @@ private fun Accordion(
     val skeuo = LocalSkeuo.current
     val metro = LocalMetro.current
     val nothing = LocalNothing.current
+    val dueffe = LocalDueffe.current
     Surface(
-        color = if (skeuo) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+        color = if (skeuo || dueffe) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = if (metro) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(if (skeuo) 12.dp else if (nothing) 16.dp else 20.dp),
+        shape = if (metro) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(if (skeuo) 12.dp else if (nothing) 16.dp else if (dueffe) 26.dp else 20.dp),
         border = if (nothing) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
-        modifier = Modifier.skeuoPanel(corners(12.dp)),
+        modifier = if (dueffe) Modifier.dueffeCard() else Modifier.skeuoPanel(corners(12.dp)),
     ) {
         Column {
             Row(
@@ -952,13 +964,14 @@ private fun Accordion(
                         if (skeuo) Modifier.size(40.dp).skeuoBadge()
                         else if (metro) Modifier.size(40.dp).background(MaterialTheme.colorScheme.primary)
                         else if (nothing) Modifier.size(40.dp).nothingRing()
+                        else if (dueffe) Modifier.size(40.dp).dueffeIcon()
                         else Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             icon,
                             contentDescription = null,
-                            tint = if (skeuo || metro) Color.White else if (nothing) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSecondaryContainer,
+                            tint = if (skeuo || metro) Color.White else if (nothing) MaterialTheme.colorScheme.onSurface else if (dueffe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.size(if (nothing) 20.dp else 22.dp),
                         )
                     }

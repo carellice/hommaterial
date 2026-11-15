@@ -51,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -136,6 +137,13 @@ internal fun FloatingBottomBar(
             ) {
                 Box(Modifier.padding(bottom = inset), contentAlignment = Alignment.Center) { tabs() }
             }
+        } else if (LocalDueffe.current) {
+            // Dueffe: a floating bar of near black with a golden line, no shadow.
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = DF.Nav,
+                border = androidx.compose.foundation.BorderStroke(1.dp, DF.Line),
+            ) { tabs() }
         } else if (LocalNothing.current) {
             // Nothing: a flat pill with a hairline, no shadow.
             Surface(
@@ -160,10 +168,13 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
     val skeuo = LocalSkeuo.current
     val metro = LocalMetro.current
     val nothing = LocalNothing.current
+    val dueffe = LocalDueffe.current
+    // The gold indicator of Dueffe under the chosen tab.
+    val gold by animateFloatAsState(if (dueffe && selected) 1f else 0f, androidx.compose.animation.core.tween(320, easing = DfMotion.Reveal), label = "tab gold")
     // In the black bar of the skeuomorphic look the chosen tab sits on glass, its icon lit.
     val background by animateColorAsState(
         when {
-            skeuo || metro || nothing -> Color.Transparent
+            skeuo || metro || nothing || dueffe -> Color.Transparent
             selected -> colors.secondaryContainer
             else -> colors.secondaryContainer.copy(alpha = 0f)
         },
@@ -174,29 +185,31 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
             skeuo -> if (selected) Color.White else Color(0xFF9C9C9C)
             metro -> if (selected) colors.onSurface else colors.onSurfaceVariant
             nothing -> if (selected) colors.primary else colors.onSurfaceVariant.copy(alpha = 0.7f)
+            dueffe -> if (selected) DF.OnPrimary else DF.Muted
             selected -> colors.onSecondaryContainer
             else -> colors.onSurfaceVariant
         },
         label = "tab content",
     )
-    val shape = if (skeuo) corners(15.dp) else CircleShape
-    // The icon of the tab just chosen gives a little bounce.
+    val shape = if (skeuo) corners(15.dp) else if (dueffe) RoundedCornerShape(22.dp) else CircleShape
+    // The icon of the tab just chosen gives a little bounce; in Dueffe a livelier spring.
     val scale by animateFloatAsState(
-        if (selected || metro || nothing) 1f else 0.92f,
-        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        if (selected || metro || nothing) 1f else if (dueffe) 0.86f else 0.92f,
+        if (dueffe) spring(dampingRatio = 0.42f, stiffness = 380f) else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "tab icon",
     )
     Row(
         Modifier
             // Modern UI: room for the ring and its word under it, no rounded ripple, the tilt of a tile instead.
-            .height(if (metro) 58.dp else 48.dp)
-            .then(if (metro) Modifier.metroTilt() else Modifier.clip(shape))
+            .height(if (metro) 58.dp else if (dueffe) 56.dp else 48.dp)
+            .then(if (metro) Modifier.metroTilt() else if (dueffe) Modifier.dueffePress(0.92f).clip(shape) else Modifier.clip(shape))
             .background(background)
+            .then(if (dueffe) Modifier.drawBehind { if (gold > 0f) drawRect(DF.Gold, alpha = gold) } else Modifier)
             .then(if (skeuo && selected) Modifier.background(SkeuoTabGlass).border(1.dp, Color(0x99000000), shape) else Modifier)
             .selectable(
                 selected = selected,
                 interactionSource = null,
-                indication = if (metro) null else androidx.compose.material3.ripple(),
+                indication = if (metro || dueffe) null else androidx.compose.material3.ripple(),
                 role = Role.Tab,
                 onClick = onClick,
             )

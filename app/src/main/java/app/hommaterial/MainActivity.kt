@@ -48,6 +48,11 @@ import app.hommaterial.quick.EXTRA_TAB
 import app.hommaterial.ui.accentScheme
 import app.hommaterial.ui.LOOK_METRO
 import app.hommaterial.ui.LOOK_NOTHING
+import app.hommaterial.ui.LOOK_DUEFFE
+import app.hommaterial.ui.LocalDueffe
+import app.hommaterial.ui.DueffeShapes
+import app.hommaterial.ui.DueffeTypography
+import app.hommaterial.ui.dueffeScheme
 import app.hommaterial.ui.LocalNothing
 import app.hommaterial.ui.NothingShapes
 import app.hommaterial.ui.NothingTypography
@@ -94,7 +99,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: HomeViewModel = viewModel()
             val state by vm.state.collectAsStateWithLifecycle()
-            val dark = when (state.theme) {
+            // Dueffe is dark only.
+            val dark = state.look == LOOK_DUEFFE || when (state.theme) {
                 1 -> false
                 2 -> true
                 else -> isSystemInDarkTheme()
@@ -275,27 +281,33 @@ private fun HommaterialTheme(dark: Boolean, accent: String, look: Int, haptics: 
 }
 
 /** The colors, shapes and type of the chosen [look], with the locals its pieces read: also for the panel of the assistant. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun LookTheme(dark: Boolean, accent: String, look: Int, content: @Composable () -> Unit) {
     val accentColors = accentScheme(accent, dark, LocalContext.current)
     val skeuo = look == LOOK_SKEUO
     val metro = look == LOOK_METRO
     val nothing = look == LOOK_NOTHING
+    val dueffe = look == LOOK_DUEFFE
     val colors = when {
         skeuo -> skeuoScheme(accentColors, dark)
         metro -> metroScheme(accentColors, dark)
         nothing -> nothingScheme(dark)
+        dueffe -> dueffeScheme()
         else -> accentColors
     }
     MaterialTheme(
         colorScheme = colors,
-        shapes = if (skeuo) SkeuoShapes else if (metro) MetroShapes else if (nothing) NothingShapes else MaterialTheme.shapes,
-        typography = if (metro) MetroTypography else if (nothing) NothingTypography else MaterialTheme.typography,
+        shapes = if (skeuo) SkeuoShapes else if (metro) MetroShapes else if (nothing) NothingShapes else if (dueffe) DueffeShapes else MaterialTheme.shapes,
+        typography = if (metro) MetroTypography else if (nothing) NothingTypography else if (dueffe) DueffeTypography else MaterialTheme.typography,
     ) {
         CompositionLocalProvider(
             LocalSkeuo provides skeuo,
             LocalMetro provides metro,
             LocalNothing provides nothing,
+            LocalDueffe provides dueffe,
+            // Dueffe presses with a spring, not a ripple.
+            androidx.compose.material3.LocalRippleConfiguration provides if (dueffe) null else androidx.compose.material3.LocalRippleConfiguration.current,
             LocalSkeuoMaterials provides if (skeuo) remember(dark, colors) { SkeuoMaterials(dark, colors) } else null,
             content = content,
         )

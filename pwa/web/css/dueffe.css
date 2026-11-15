@@ -1,0 +1,445 @@
+/*
+ * The Dueffe look, chosen in Settings → Appearance → Style: the design system of Dueffe Home.
+ * Dark only: an almost black ground, warm surfaces, ivory words and one gold accent; Bricolage
+ * Grotesque for titles, Inter for the rest; cards in a vertical gradient with a thin golden line and
+ * no shadow, gold buttons in a 135° gradient, a living aurora of golden nebulae and rising dust under
+ * the screens, a spring press, cascading entrances. It only applies under html[data-look="dueffe"],
+ * set by ui/app.js; app.css stays untouched underneath. html:root wins over the :root rules the
+ * accent writes at run time and over those of the light and dark themes: Dueffe has its own.
+ */
+
+/* ——— Tokens ——— */
+html:root[data-look="dueffe"] {
+  --df-bg: #050505;
+  --df-bg-elevated: #0b0a08;
+  --df-surface: #11100d;
+  --df-surface-high: #1a1711;
+  --df-surface-higher: #242016;
+  --df-container: #12100cf0;
+  --df-text: #fffaf0;
+  --df-muted: #b8aa8d;
+  --df-line: #ffdc8029;
+  --df-line-strong: #ffd84d57;
+  --df-primary: #ffd84d;
+  --df-primary-strong: #ffb800;
+  --df-secondary: #fff0ad;
+  --df-on-primary: #161006;
+  --df-success: #a8f0b0;
+  --df-error: #ff9b85;
+  --df-nav: #080705e6;
+  --df-gold: linear-gradient(135deg, var(--df-primary), color-mix(in srgb, var(--df-primary) 65%, var(--df-primary-strong)));
+  --df-card: linear-gradient(180deg, var(--df-surface-high), var(--df-surface));
+  --ease-reveal: cubic-bezier(.22, .78, .16, 1);
+  --ease-letter: cubic-bezier(.16, .86, .24, 1);
+  --ease-std: cubic-bezier(.4, 0, .2, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --df-display: "Bricolage Grotesque", Inter, system-ui, sans-serif;
+  --df-body: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* The names app.css reads. */
+  --primary: var(--df-primary);
+  --on-primary: var(--df-on-primary);
+  --primary-container: var(--df-surface-higher);
+  --on-primary-container: var(--df-secondary);
+  --secondary-container: var(--df-surface-higher);
+  --on-secondary-container: var(--df-secondary);
+  --tertiary: var(--df-primary-strong);
+  --error: var(--df-error);
+  --error-container: #ff9b8524;
+  --on-error-container: var(--df-error);
+  --background: var(--df-bg);
+  --surface: var(--df-surface);
+  --surface-container-lowest: var(--df-bg);
+  --surface-container-low: var(--df-bg-elevated);
+  --surface-container: var(--df-surface);
+  --surface-container-high: var(--df-surface-high);
+  --surface-container-highest: var(--df-surface-higher);
+  --on-surface: var(--df-text);
+  --on-background: var(--df-text);
+  --on-surface-variant: var(--df-muted);
+  --outline: var(--df-line-strong);
+  --outline-variant: var(--df-line);
+  --inverse-surface: var(--df-text);
+  --inverse-on-surface: var(--df-on-primary);
+  --inverse-primary: var(--df-primary-strong);
+  --spring: var(--ease-spring);
+  color-scheme: dark;
+}
+
+/* ——— The aurora: golden nebulae drifting in 32 s, dust rising and twinkling ——— */
+html[data-look="dueffe"] { background: var(--df-bg); }
+[data-look="dueffe"] body { background: transparent; font-family: var(--df-body); color: var(--df-text); }
+[data-look="dueffe"] #app { position: relative; z-index: 1; }
+[data-look="dueffe"] body::before,
+[data-look="dueffe"] body::after { content: ''; position: fixed; inset: -10%; pointer-events: none; z-index: 0; }
+[data-look="dueffe"] body::before {
+  background:
+    radial-gradient(48% 40% at 20% 4%, #ffb80038, transparent 70%),
+    radial-gradient(40% 36% at 95% 40%, #ffd84d24, transparent 70%),
+    radial-gradient(56% 44% at 35% 94%, #8a5a001f, transparent 70%);
+  animation: df-drift 32s ease-in-out infinite alternate;
+}
+[data-look="dueffe"] body::after {
+  /* Twice the height of the screen, the same 34 grains in each half: rising by one half loops seamlessly. */
+  inset: 0 0 -100% 0;
+  background-image:
+    radial-gradient(circle at 92.2% 5.8%, #fff0ad7f 0 1.1px, transparent 1.8px),
+    radial-gradient(circle at 37.5% 53.9%, #fff0ad9d 0 1.2px, transparent 1.9px),
+    radial-gradient(circle at 16.6% 92.8%, #fff0ad65 0 1.6px, transparent 2.3px),
+    radial-gradient(circle at 97.0% 41.9%, #fff0adb0 0 1.0px, transparent 1.7px),
+    radial-gradient(circle at 99.4% 98.5%, #fff0ad7a 0 0.8px, transparent 1.5px),
+    radial-gradient(circle at 92.8% 92.1%, #fff0ad63 0 1.1px, transparent 1.8px),
+    radial-gradient(circle at 32.4% 69.4%, #fff0ad65 0 0.8px, transparent 1.5px),
+    radial-gradient(circle at 66.1% 11.7%, #fff0ad94 0 1.5px, transparent 2.2px),
+    radial-gradient(circle at 32.9% 30.8%, #fff0ad50 0 1.4px, transparent 2.1px),
+    radial-gradient(circle at 16.1% 7.9%, #fff0ad48 0 0.7px, transparent 1.4px),
+    radial-gradient(circle at 72.4% 17.2%, #fff0ad43 0 1.1px, transparent 1.8px),
+    radial-gradient(circle at 20.2% 4.6%, #fff0ad40 0 0.8px, transparent 1.5px),
+    radial-gradient(circle at 92.1% 48.3%, #fff0ad9d 0 0.7px, transparent 1.4px),
+    radial-gradient(circle at 59.5% 73.9%, #fff0ad9f 0 1.0px, transparent 1.7px),
+    radial-gradient(circle at 21.4% 26.2%, #fff0ad7b 0 0.8px, transparent 1.5px),
+    radial-gradient(circle at 28.4% 57.4%, #fff0ad79 0 0.7px, transparent 1.4px),
+    radial-gradient(circle at 11.6% 49.8%, #fff0ad67 0 0.7px, transparent 1.4px),
+    radial-gradient(circle at 81.2% 76.4%, #fff0ad85 0 1.7px, transparent 2.4px),
+    radial-gradient(circle at 87.1% 93.3%, #fff0ad53 0 1.5px, transparent 2.2px),
+    radial-gradient(circle at 30.8% 81.7%, #fff0ad9d 0 1.2px, transparent 1.9px),
+    radial-gradient(circle at 8.3% 76.9%, #fff0ad94 0 1.2px, transparent 1.9px),
+    radial-gradient(circle at 9.0% 48.2%, #fff0ad66 0 1.7px, transparent 2.4px),
+    radial-gradient(circle at 24.1% 94.9%, #fff0ad67 0 1.2px, transparent 1.9px),
+    radial-gradient(circle at 36.6% 51.6%, #fff0ada2 0 1.8px, transparent 2.5px),
+    radial-gradient(circle at 2.8% 2.2%, #fff0ad5c 0 0.6px, transparent 1.3px),
+    radial-gradient(circle at 15.5% 38.8%, #fff0ad71 0 0.9px, transparent 1.6px),
+    radial-gradient(circle at 4.6% 0.2%, #fff0ad6a 0 1.3px, transparent 2.0px),
+    radial-gradient(circle at 8.9% 17.9%, #fff0ad51 0 0.8px, transparent 1.5px),
+    radial-gradient(circle at 37.5% 16.0%, #fff0ad87 0 0.7px, transparent 1.4px),
+    radial-gradient(circle at 44.3% 63.8%, #fff0ad99 0 1.2px, transparent 1.9px),
+    radial-gradient(circle at 14.3% 81.8%, #fff0ada3 0 1.2px, transparent 1.9px),
+    radial-gradient(circle at 78.2% 36.1%, #fff0ad73 0 1.0px, transparent 1.7px),
+    radial-gradient(circle at 14.6% 7.5%, #fff0ad71 0 0.8px, transparent 1.5px),
+    radial-gradient(circle at 26.2% 39.5%, #fff0ad79 0 1.4px, transparent 2.1px);
+  background-size: 100% 50%;
+  animation: df-dust 64s linear infinite, df-twinkle 3.2s ease-in-out infinite alternate;
+}
+@keyframes df-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(4%, 3%) scale(1.06); }
+  100% { transform: translate(-3%, -2%) scale(1.02); }
+}
+@keyframes df-dust { to { transform: translateY(-50%); } }
+@keyframes df-twinkle { from { opacity: .55; } to { opacity: 1; } }
+/* What covers the whole screen lies on a still aurora of its own. */
+[data-look="dueffe"] .full-dialog,
+[data-look="dueffe"] .music-full {
+  background:
+    radial-gradient(60% 40% at 20% 0%, #ffb8002e, transparent 70%),
+    radial-gradient(50% 40% at 100% 60%, #ffd84d1a, transparent 70%),
+    var(--df-bg);
+}
+
+/* ——— Type: Bricolage Grotesque for titles, Inter for the rest ——— */
+[data-look="dueffe"] .display-large,
+[data-look="dueffe"] .display-medium { font-family: var(--df-display); font-weight: 800; letter-spacing: -.03em; }
+[data-look="dueffe"] .display-small { font-family: var(--df-display); font-weight: 700; letter-spacing: -.02em; }
+[data-look="dueffe"] .headline-large,
+[data-look="dueffe"] .headline-medium,
+[data-look="dueffe"] .headline-small { font-family: var(--df-display); font-weight: 700; letter-spacing: -.015em; }
+[data-look="dueffe"] .title-large,
+[data-look="dueffe"] .title-medium { font-family: var(--df-display); font-weight: 600; }
+[data-look="dueffe"] .title-small,
+[data-look="dueffe"] .label-large,
+[data-look="dueffe"] .label-medium { font-weight: 600; }
+[data-look="dueffe"] .label-small { font-weight: 500; letter-spacing: .04em; }
+[data-look="dueffe"] .top-bar { background: transparent; min-height: 72px; }
+[data-look="dueffe"] .top-bar .title-large { font: 700 24px/30px var(--df-display); letter-spacing: -.02em; }
+/* The headings of the sections and of the groups of settings: a headline, ivory. */
+[data-look="dueffe"] .section-header { height: 48px; margin-top: 10px; color: var(--df-text); }
+[data-look="dueffe"] .section-header .title-small { font: 700 22px/26px var(--df-display); letter-spacing: -.01em; color: var(--df-text); }
+[data-look="dueffe"] .settings-group { font: 700 22px/26px var(--df-display); letter-spacing: -.01em; color: var(--df-text); margin-top: 18px; }
+[data-look="dueffe"] .faint { color: var(--df-muted); }
+
+/* ——— Cards: the vertical gradient and the golden line, no shadow ——— */
+[data-look="dueffe"] .card,
+[data-look="dueffe"] .tile,
+[data-look="dueffe"] .dialog,
+[data-look="dueffe"] .menu,
+[data-look="dueffe"] .sheet,
+[data-look="dueffe"] .snackbar,
+[data-look="dueffe"] .fab,
+[data-look="dueffe"] .cal-event,
+[data-look="dueffe"] .note-card,
+[data-look="dueffe"] .list-picker,
+[data-look="dueffe"] .timer-row,
+[data-look="dueffe"] .team-box,
+[data-look="dueffe"] .cal-home,
+[data-look="dueffe"] .weather-card,
+[data-look="dueffe"] .team-card,
+[data-look="dueffe"] .item-group,
+[data-look="dueffe"] .listen-panel,
+[data-look="dueffe"] .side-panel,
+[data-look="dueffe"] .bottom-bar { box-shadow: none; }
+[data-look="dueffe"] .card,
+[data-look="dueffe"] .note-card,
+[data-look="dueffe"] .list-picker,
+[data-look="dueffe"] .timer-row,
+[data-look="dueffe"] .team-box,
+[data-look="dueffe"] .item-group,
+[data-look="dueffe"] .cal-home {
+  background: var(--df-card);
+  border: 1px solid var(--df-line);
+  border-radius: 26px;
+}
+[data-look="dueffe"] .cal-event { background: var(--df-card); border: 1px solid var(--df-line); border-radius: 20px; }
+[data-look="dueffe"] .weather-card,
+[data-look="dueffe"] .team-card { border: 1px solid var(--df-line); border-radius: 26px; }
+[data-look="dueffe"] .dialog,
+[data-look="dueffe"] .side-panel { background: linear-gradient(180deg, var(--df-surface-high), var(--df-bg-elevated)); border: 1px solid var(--df-line); border-radius: 26px; }
+[data-look="dueffe"] .sheet { background: linear-gradient(180deg, var(--df-surface-high), var(--df-bg-elevated)); border: 1px solid var(--df-line); border-bottom: none; border-radius: 26px 26px 0 0; }
+[data-look="dueffe"] .sheet .handle { background: var(--df-primary); opacity: .5; }
+[data-look="dueffe"] .menu { background: var(--df-surface-higher); border: 1px solid var(--df-line-strong); border-radius: 18px; }
+[data-look="dueffe"] .snackbar {
+  background: var(--df-surface-higher);
+  color: var(--df-text);
+  border: 1px solid var(--df-line-strong);
+  border-radius: 18px;
+  animation: df-toast .5s var(--ease-spring) both;
+}
+@keyframes df-toast { from { opacity: 0; transform: translate(-50%, 40px) scale(.96); } }
+[data-look="dueffe"] .scrim { background: rgba(5, 5, 5, .72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+
+/* ——— Tiles: cards when off, the gold when on, a spring when pressed, a cascade when they come ——— */
+[data-look="dueffe"] .tile {
+  background: var(--df-card);
+  color: var(--df-text);
+  border: 1px solid var(--df-line);
+  border-radius: 22px;
+  transition: transform .45s var(--ease-spring), color .32s var(--ease-std), border-color .32s var(--ease-std);
+}
+[data-look="dueffe"] .tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--df-gold);
+  opacity: 0;
+  transition: opacity .32s var(--ease-std);
+}
+[data-look="dueffe"] .tile { isolation: isolate; }
+[data-look="dueffe"] .tile:hover { border-color: var(--df-line-strong); }
+[data-look="dueffe"] .tile:active { transform: scale(.94); transition: transform .12s var(--ease-std); }
+[data-look="dueffe"] .tile.on { color: var(--df-on-primary); border-color: #ffd84d99; }
+[data-look="dueffe"] .tile.on::before { opacity: 1; }
+[data-look="dueffe"] .tile .name { font-weight: 600; }
+/* backwards, not both: a transform kept after the entrance would trap the fixed dialogs of a tile inside it. */
+[data-look="dueffe"] .grid > * { animation: df-reveal .62s var(--ease-letter) backwards; }
+[data-look="dueffe"] .grid > *:nth-child(2) { animation-delay: 55ms; }
+[data-look="dueffe"] .grid > *:nth-child(3) { animation-delay: 110ms; }
+[data-look="dueffe"] .grid > *:nth-child(4) { animation-delay: 165ms; }
+[data-look="dueffe"] .grid > *:nth-child(5) { animation-delay: 220ms; }
+[data-look="dueffe"] .grid > *:nth-child(6) { animation-delay: 275ms; }
+[data-look="dueffe"] .grid > *:nth-child(7) { animation-delay: 330ms; }
+[data-look="dueffe"] .grid > *:nth-child(8) { animation-delay: 385ms; }
+[data-look="dueffe"] .grid > *:nth-child(9) { animation-delay: 440ms; }
+[data-look="dueffe"] .grid > *:nth-child(n + 10) { animation-delay: 495ms; }
+@keyframes df-reveal { from { opacity: 0; transform: translateY(42px) scale(.94); } }
+/* Pages slide in by 8% from their side. */
+[data-look="dueffe"] .tab-page { animation: df-page .46s var(--ease-reveal) backwards; }
+[data-look="dueffe"] .tab-page.from-left { animation-name: df-page-left; }
+@keyframes df-page { from { opacity: 0; transform: translateX(8%); } }
+@keyframes df-page-left { from { opacity: 0; transform: translateX(-8%); } }
+
+/* ——— Icons of the sections: a squircle on Surface High with a golden line, the icon in gold ——— */
+[data-look="dueffe"] .section-icon,
+[data-look="dueffe"] .note-icon,
+[data-look="dueffe"] .list-picker-icon,
+[data-look="dueffe"] .list-empty-icon,
+[data-look="dueffe"] .cal-badge {
+  background: var(--df-surface-high);
+  color: var(--df-primary);
+  border: 1px solid var(--df-line);
+  border-radius: 27%;
+}
+
+/* ——— Buttons: gold for the main action, Surface with the strong line for the others ——— */
+[data-look="dueffe"] .filled-btn,
+[data-look="dueffe"] .tonal-btn,
+[data-look="dueffe"] .outlined-btn {
+  border-radius: 18px;
+  min-height: 46px;
+  padding: 0 18px;
+  font: 600 15px/18px var(--df-body);
+  transition: transform .45s var(--ease-spring), border-color .25s, opacity .25s;
+}
+[data-look="dueffe"] .filled-btn { background: var(--df-gold); color: var(--df-on-primary); border: none; }
+[data-look="dueffe"] .tonal-btn,
+[data-look="dueffe"] .outlined-btn { background: var(--df-surface); color: var(--df-text); border: 1px solid var(--df-line-strong); }
+[data-look="dueffe"] .tonal-btn:hover,
+[data-look="dueffe"] .outlined-btn:hover { border-color: var(--df-primary); background: var(--df-surface); }
+[data-look="dueffe"] .filled-btn:active,
+[data-look="dueffe"] .tonal-btn:active,
+[data-look="dueffe"] .outlined-btn:active,
+[data-look="dueffe"] .text-btn:active,
+[data-look="dueffe"] .icon-btn:active,
+[data-look="dueffe"] .fab:active { transform: scale(.95); transition: transform .12s var(--ease-std); }
+[data-look="dueffe"] .filled-btn:disabled,
+[data-look="dueffe"] .tonal-btn:disabled { opacity: .4; }
+[data-look="dueffe"] .text-btn { color: var(--df-primary); border-radius: 14px; font-weight: 600; transition: transform .45s var(--ease-spring); }
+[data-look="dueffe"] .text-btn:hover { background: #ffd84d14; }
+[data-look="dueffe"] .text-btn.danger { color: var(--df-error); }
+[data-look="dueffe"] .icon-btn { transition: transform .45s var(--ease-spring), background .2s; }
+[data-look="dueffe"] .icon-btn:hover { background: #ffd84d14; }
+[data-look="dueffe"] .fab,
+[data-look="dueffe"] .fab.extended { background: var(--df-gold); color: var(--df-on-primary); border-radius: 20px; transition: transform .45s var(--ease-spring); }
+[data-look="dueffe"] .icon-btn.filled,
+[data-look="dueffe"] .pad-key.primary,
+[data-look="dueffe"] .add-send { background: var(--df-gold); color: var(--df-on-primary); }
+[data-look="dueffe"] .icon-btn.tonal { background: var(--df-surface); border: 1px solid var(--df-line-strong); color: var(--df-text); }
+[data-look="dueffe"] .key,
+[data-look="dueffe"] .pad-key,
+[data-look="dueffe"] .rocker { background: var(--df-card); border: 1px solid var(--df-line); box-shadow: none; }
+
+/* ——— Chips: pills on Surface with the golden line, full gold when chosen ——— */
+[data-look="dueffe"] .chip {
+  border: 1px solid var(--df-line);
+  border-radius: 999px;
+  background: var(--df-surface);
+  color: var(--df-text);
+  font-weight: 600;
+  transition: background .26s, color .26s, border-color .26s, transform .45s var(--ease-spring);
+}
+[data-look="dueffe"] .chip:hover { border-color: var(--df-line-strong); }
+[data-look="dueffe"] .chip:active { transform: scale(.92); transition: transform .12s var(--ease-std); }
+[data-look="dueffe"] .chip.selected { background: var(--df-primary); border-color: var(--df-primary); color: var(--df-on-primary); }
+
+/* ——— The switch: a pill track, golden when on, a thumb that springs across ——— */
+[data-look="dueffe"] .switch {
+  width: 50px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--df-line-strong);
+  background: var(--df-surface);
+}
+[data-look="dueffe"] .switch::after {
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: var(--df-muted);
+  transition: left .45s var(--ease-spring), background .26s;
+}
+[data-look="dueffe"] .switch.on { background: var(--df-gold); border-color: var(--df-primary); }
+[data-look="dueffe"] .switch.on::after { left: 25px; top: 3px; width: 20px; height: 20px; background: var(--df-on-primary); }
+
+/* ——— Fields: the ground with the strong line, gold when in focus ——— */
+[data-look="dueffe"] .field input,
+[data-look="dueffe"] .field textarea,
+[data-look="dueffe"] .field select {
+  background: var(--df-bg);
+  border: 1px solid var(--df-line-strong);
+  border-radius: 16px;
+  color: var(--df-text);
+  padding: 14px 16px;
+}
+[data-look="dueffe"] .field input:focus,
+[data-look="dueffe"] .field textarea:focus { border: 1px solid var(--df-primary); padding: 14px 16px; }
+[data-look="dueffe"] .field.error input { border-color: var(--df-error); animation: df-shake .4s var(--ease-std); }
+@keyframes df-shake { 25% { transform: translateX(-6px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-3px); } }
+[data-look="dueffe"] .settings-search,
+[data-look="dueffe"] .add-field,
+[data-look="dueffe"] .chat-field {
+  background: var(--df-surface);
+  border: 1px solid var(--df-line-strong);
+  border-radius: 18px;
+}
+[data-look="dueffe"] .settings-search:focus-within,
+[data-look="dueffe"] .add-field:focus-within,
+[data-look="dueffe"] .chat-field:focus { border-color: var(--df-primary); }
+
+/* ——— The slider: a 4 px rail of Surface Higher, filled with the gold ——— */
+[data-look="dueffe"] input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; height: 40px; }
+[data-look="dueffe"] input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--df-primary), var(--df-primary-strong)) 0 / var(--fill, 0%) 100% no-repeat, var(--df-surface-higher);
+}
+[data-look="dueffe"] input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--df-surface-higher); }
+[data-look="dueffe"] input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--df-primary); }
+[data-look="dueffe"] input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -8px; border-radius: 50%; border: 2px solid var(--df-on-primary); background: var(--df-primary); }
+[data-look="dueffe"] input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--df-on-primary); background: var(--df-primary); }
+
+/* ——— The bottom bar: a floating bar of near black, blurred, the gold under the chosen tab ——— */
+[data-look="dueffe"] .bottom-bar {
+  background: var(--df-nav);
+  border: 1px solid var(--df-line);
+  border-radius: 28px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  transition: transform .4s var(--ease-reveal), opacity .3s;
+}
+[data-look="dueffe"] .tab-pill { height: 56px; border-radius: 22px; color: var(--df-muted); position: relative; isolation: isolate; transition: color .25s; }
+[data-look="dueffe"] .tab-pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--df-primary), var(--df-primary-strong));
+  opacity: 0;
+  transform: scaleX(.6);
+  transition: opacity .26s var(--ease-std), transform .62s var(--ease-spring);
+}
+[data-look="dueffe"] .tab-pill:hover { background: transparent; color: var(--df-text); }
+[data-look="dueffe"] .tab-pill .tab-label { font-weight: 600; transition: max-width .62s var(--ease-reveal), opacity .26s, margin .62s var(--ease-reveal); }
+[data-look="dueffe"] .tab-pill.selected { background: transparent; color: var(--df-on-primary); }
+[data-look="dueffe"] .tab-pill.selected::before { opacity: 1; transform: none; }
+[data-look="dueffe"] .tab-pill.selected .icon { animation: df-nav-bounce .7s var(--ease-spring); }
+@keyframes df-nav-bounce { 0% { transform: scale(.6) rotate(-14deg); } 60% { transform: scale(1.12) rotate(4deg); } 100% { transform: none; } }
+
+/* ——— Side bars on wide screens ——— */
+[data-look="dueffe"] .side-item { border-radius: 18px; }
+[data-look="dueffe"] .side-item.selected,
+[data-look="dueffe"] .rail-item.selected .pill { background: var(--df-gold); color: var(--df-on-primary); }
+[data-look="dueffe"] .list-choice.selected,
+[data-look="dueffe"] .team-pick.selected,
+[data-look="dueffe"] .table-line.mine { background: #ffd84d24; color: var(--df-text); box-shadow: inset 3px 0 0 var(--df-primary); }
+
+/* ——— Lists and segments ——— */
+[data-look="dueffe"] .segments { border: 1px solid var(--df-line); background: var(--df-surface); border-radius: 999px; }
+[data-look="dueffe"] .segment { color: var(--df-muted); font-weight: 600; }
+[data-look="dueffe"] .segment-pill { background: linear-gradient(135deg, var(--df-primary), var(--df-primary-strong)); border-radius: 999px; }
+[data-look="dueffe"] .segment.selected { color: var(--df-on-primary); }
+[data-look="dueffe"] .segment.selected .segment-count { color: var(--df-on-primary); background: #16100624; }
+[data-look="dueffe"] .check-circle { border: 1.5px solid var(--df-line-strong); }
+[data-look="dueffe"] .item-row.checked .check-circle { background: var(--df-gold); border-color: var(--df-primary); color: var(--df-on-primary); }
+[data-look="dueffe"] .progress,
+[data-look="dueffe"] .list-progress { border-radius: 2px; background: var(--df-surface-higher); }
+[data-look="dueffe"] .progress span,
+[data-look="dueffe"] .list-progress span { border-radius: 2px; background: linear-gradient(90deg, var(--df-primary), var(--df-primary-strong)); }
+
+/* ——— Home: today and tomorrow ——— */
+[data-look="dueffe"] .cal-home { color: var(--df-text); }
+[data-look="dueffe"] .cal-home-head,
+[data-look="dueffe"] .cal-home .supporting,
+[data-look="dueffe"] .cal-tomorrow,
+[data-look="dueffe"] .cal-home-more { color: var(--df-muted); }
+
+/* ——— The chat: the assistant on a card, what I write in gold ——— */
+[data-look="dueffe"] .chat-bubble { background: var(--df-card); border: 1px solid var(--df-line); border-radius: 22px; }
+[data-look="dueffe"] .chat-bubble.mine { background: var(--df-gold); color: var(--df-on-primary); border-color: var(--df-primary); }
+
+/* ——— Dialogs: the last action in gold ——— */
+[data-look="dueffe"] .dialog .actions .text-btn { min-height: 42px; padding: 0 18px; }
+[data-look="dueffe"] .dialog .actions .text-btn:last-child { background: var(--df-gold); color: var(--df-on-primary); }
+[data-look="dueffe"] .dialog .actions .text-btn:last-child:disabled { opacity: .4; }
+
+[data-look="dueffe"] ::selection { background: #ffd84d55; color: var(--df-text); }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-look="dueffe"] body::before,
+  [data-look="dueffe"] body::after,
+  [data-look="dueffe"] .grid > *,
+  [data-look="dueffe"] .tab-page,
+  [data-look="dueffe"] .snackbar,
+  [data-look="dueffe"] .tab-pill.selected .icon { animation: none; }
+  [data-look="dueffe"] .tile,
+  [data-look="dueffe"] .tab-pill::before,
+  [data-look="dueffe"] .switch::after { transition: none; }
+}
