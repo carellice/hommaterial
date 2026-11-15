@@ -47,6 +47,11 @@ import app.hommaterial.data.ServerSync
 import app.hommaterial.quick.EXTRA_TAB
 import app.hommaterial.ui.accentScheme
 import app.hommaterial.ui.LOOK_METRO
+import app.hommaterial.ui.LOOK_NOTHING
+import app.hommaterial.ui.LocalNothing
+import app.hommaterial.ui.NothingShapes
+import app.hommaterial.ui.NothingTypography
+import app.hommaterial.ui.nothingScheme
 import app.hommaterial.ui.LOOK_SKEUO
 import app.hommaterial.ui.LocalMetro
 import app.hommaterial.ui.MetroShapes
@@ -275,19 +280,22 @@ internal fun LookTheme(dark: Boolean, accent: String, look: Int, content: @Compo
     val accentColors = accentScheme(accent, dark, LocalContext.current)
     val skeuo = look == LOOK_SKEUO
     val metro = look == LOOK_METRO
+    val nothing = look == LOOK_NOTHING
     val colors = when {
         skeuo -> skeuoScheme(accentColors, dark)
         metro -> metroScheme(accentColors, dark)
+        nothing -> nothingScheme(dark)
         else -> accentColors
     }
     MaterialTheme(
         colorScheme = colors,
-        shapes = if (skeuo) SkeuoShapes else if (metro) MetroShapes else MaterialTheme.shapes,
-        typography = if (metro) MetroTypography else MaterialTheme.typography,
+        shapes = if (skeuo) SkeuoShapes else if (metro) MetroShapes else if (nothing) NothingShapes else MaterialTheme.shapes,
+        typography = if (metro) MetroTypography else if (nothing) NothingTypography else MaterialTheme.typography,
     ) {
         CompositionLocalProvider(
             LocalSkeuo provides skeuo,
             LocalMetro provides metro,
+            LocalNothing provides nothing,
             LocalSkeuoMaterials provides if (skeuo) remember(dark, colors) { SkeuoMaterials(dark, colors) } else null,
             content = content,
         )

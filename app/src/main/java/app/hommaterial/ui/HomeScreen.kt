@@ -933,9 +933,11 @@ private fun SectionHeader(name: String, onPower: ((Boolean) -> Unit)? = null) {
     Row(Modifier.padding(top = 4.dp).height(40.dp), verticalAlignment = Alignment.CenterVertically) {
         // In Modern UI, the big light lowercase words that head a hub.
         val metro = LocalMetro.current
+        // In Nothing, the small spaced capitals of an instrument panel.
+        val nothing = LocalNothing.current
         Text(
-            if (metro) name.lowercase() else name,
-            style = if (metro) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleSmall,
+            if (metro) name.lowercase() else if (nothing) name.uppercase() else name,
+            style = if (metro) MaterialTheme.typography.headlineSmall else if (nothing) MaterialTheme.typography.labelMedium else MaterialTheme.typography.titleSmall,
             color = if (metro) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
@@ -1235,8 +1237,9 @@ internal fun TileBody(icon: ImageVector, busy: Boolean, name: String, status: St
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            told,
-            style = if (size == 2) type.bodyLarge.onTile() else type.bodySmall.onTile(),
+            // In Nothing the state is data: Space Mono in capitals.
+            if (LocalNothing.current) told.uppercase() else told,
+            style = if (LocalNothing.current) type.labelSmall else if (size == 2) type.bodyLarge.onTile() else type.bodySmall.onTile(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.alpha(0.75f),

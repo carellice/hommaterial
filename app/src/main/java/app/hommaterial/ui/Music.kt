@@ -734,8 +734,11 @@ private fun Artwork(now: NowPlaying, corner: Dp, modifier: Modifier = Modifier) 
         if (image != null) {
             Image(image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
+            // Nothing has no gradients: a flat raised surface and the dot matrix.
+            val nothing = LocalNothing.current
             Box(
-                Modifier.fillMaxSize().background(
+                if (nothing) Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh).background(nothingDots())
+                else Modifier.fillMaxSize().background(
                     Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.tertiaryContainer)),
                 ),
                 contentAlignment = Alignment.Center,
@@ -743,7 +746,7 @@ private fun Artwork(now: NowPlaying, corner: Dp, modifier: Modifier = Modifier) 
                 Icon(
                     Icons.Outlined.MusicNote,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = if (nothing) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.fillMaxSize(0.4f),
                 )
             }

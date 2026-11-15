@@ -1,0 +1,414 @@
+/*
+ * The Nothing look, chosen in Settings → Appearance → Style: monochrome on OLED black or warm
+ * off-white, Space Grotesk for the words, Space Mono in spaced capitals for labels and data, the dot
+ * matrix of Doto for the titles of the pages, a faint grid of dots under the screens, pill buttons,
+ * hairline borders, no shadows and quick ease-out fades. Red (#D71921) is the one signal.
+ * It only applies under html[data-look="nothing"], set by ui/app.js; app.css stays untouched underneath.
+ * html:root wins over the :root rules the accent writes at run time (shared/accents.js): Nothing
+ * leaves the chosen accent aside.
+ */
+
+/* ——— Colors, light: a printed technical manual ——— */
+html:root[data-look="nothing"] {
+  --nd-red: #D71921;
+  --nd-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --nd-display: #000000;
+  --primary: #000000;
+  --on-primary: #FFFFFF;
+  --primary-container: #F0F0F0;
+  --on-primary-container: #000000;
+  --secondary-container: #E8E8E8;
+  --on-secondary-container: #000000;
+  --tertiary: var(--nd-red);
+  --error: var(--nd-red);
+  --error-container: rgba(215, 25, 33, 0.15);
+  --on-error-container: #A30F15;
+  --background: #F5F5F5;
+  --surface: #F5F5F5;
+  --surface-container-lowest: #FFFFFF;
+  --surface-container-low: #FFFFFF;
+  --surface-container: #FFFFFF;
+  --surface-container-high: #F0F0F0;
+  --surface-container-highest: #E8E8E8;
+  --on-surface: #1A1A1A;
+  --on-background: #1A1A1A;
+  --on-surface-variant: #666666;
+  --nd-disabled: #999999;
+  --outline: #CCCCCC;
+  --outline-variant: #E8E8E8;
+  --inverse-surface: #1A1A1A;
+  --inverse-on-surface: #FFFFFF;
+  --inverse-primary: #FFFFFF;
+  --nd-dot: rgba(0, 0, 0, 0.13);
+  color-scheme: light;
+}
+
+/* ——— Colors, dark: an instrument panel in a dark room ——— */
+html:root[data-look="nothing"][data-theme="dark"] {
+  --nd-display: #FFFFFF;
+  --primary: #FFFFFF;
+  --on-primary: #000000;
+  --primary-container: #1A1A1A;
+  --on-primary-container: #FFFFFF;
+  --secondary-container: #222222;
+  --on-secondary-container: #FFFFFF;
+  --on-error-container: #FF6B70;
+  --background: #000000;
+  --surface: #000000;
+  --surface-container-lowest: #000000;
+  --surface-container-low: #0B0B0B;
+  --surface-container: #111111;
+  --surface-container-high: #1A1A1A;
+  --surface-container-highest: #222222;
+  --on-surface: #E8E8E8;
+  --on-background: #E8E8E8;
+  --on-surface-variant: #999999;
+  --nd-disabled: #666666;
+  --outline: #333333;
+  --outline-variant: #222222;
+  --inverse-surface: #E8E8E8;
+  --inverse-on-surface: #000000;
+  --inverse-primary: #000000;
+  --nd-dot: rgba(255, 255, 255, 0.14);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  html:root[data-look="nothing"]:not([data-theme="light"]) {
+    --nd-display: #FFFFFF;
+    --primary: #FFFFFF;
+    --on-primary: #000000;
+    --primary-container: #1A1A1A;
+    --on-primary-container: #FFFFFF;
+    --secondary-container: #222222;
+    --on-secondary-container: #FFFFFF;
+    --on-error-container: #FF6B70;
+    --background: #000000;
+    --surface: #000000;
+    --surface-container-lowest: #000000;
+    --surface-container-low: #0B0B0B;
+    --surface-container: #111111;
+    --surface-container-high: #1A1A1A;
+    --surface-container-highest: #222222;
+    --on-surface: #E8E8E8;
+    --on-background: #E8E8E8;
+    --on-surface-variant: #999999;
+    --nd-disabled: #666666;
+    --outline: #333333;
+    --outline-variant: #222222;
+    --inverse-surface: #E8E8E8;
+    --inverse-on-surface: #000000;
+    --inverse-primary: #000000;
+    --nd-dot: rgba(255, 255, 255, 0.14);
+    color-scheme: dark;
+  }
+}
+
+/* ——— Type: Space Grotesk for the words, Space Mono for labels and data, Doto for titles ——— */
+[data-look="nothing"] body {
+  font-family: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
+  /* The faint dot matrix of Nothing OS under every screen. */
+  background-image: radial-gradient(circle, var(--nd-dot) 1px, transparent 1.2px);
+  background-size: 16px 16px;
+  background-attachment: fixed;
+}
+/* The bars and the pages let the dots through. */
+[data-look="nothing"] .top-bar { background: transparent; min-height: 72px; }
+[data-look="nothing"] .top-bar .title-large {
+  font-family: 'Doto', 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 21px;
+  line-height: 28px;
+  letter-spacing: -0.03em;
+}
+/* Monoline icons: thin strokes, never filled. */
+[data-look="nothing"] .icon,
+[data-look="nothing"] .icon.filled { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+[data-look="nothing"] .display-small,
+[data-look="nothing"] .headline-medium,
+[data-look="nothing"] .headline-small { font-weight: 300; letter-spacing: -0.01em; }
+[data-look="nothing"] .record-row .display-small { font-family: 'Space Mono', monospace; font-weight: 400; }
+[data-look="nothing"] .label-large,
+[data-look="nothing"] .label-medium,
+[data-look="nothing"] .chip,
+[data-look="nothing"] .filled-btn,
+[data-look="nothing"] .tonal-btn,
+[data-look="nothing"] .outlined-btn,
+[data-look="nothing"] .text-btn,
+[data-look="nothing"] .tab-pill .tab-label,
+[data-look="nothing"] .rail-item .label-medium,
+[data-look="nothing"] .field label,
+[data-look="nothing"] .segment {
+  font-family: 'Space Mono', 'JetBrains Mono', monospace;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+[data-look="nothing"] .filled-btn,
+[data-look="nothing"] .tonal-btn,
+[data-look="nothing"] .outlined-btn,
+[data-look="nothing"] .text-btn { font-size: 13px; }
+[data-look="nothing"] .label-medium,
+[data-look="nothing"] .field label { font-size: 11px; }
+/* The headings of the groups of settings and of the sections: small spaced capitals, an instrument panel. */
+[data-look="nothing"] .section-header .title-small,
+[data-look="nothing"] .settings-group {
+  font-family: 'Space Mono', monospace;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+}
+[data-look="nothing"] .settings-group { margin-top: 16px; }
+[data-look="nothing"] .tile .name { font-weight: 500; }
+[data-look="nothing"] .tile .status { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; }
+[data-look="nothing"] code,
+[data-look="nothing"] .note-text pre { font-family: 'Space Mono', monospace; }
+
+/* ——— No shadows, hairlines instead ——— */
+[data-look="nothing"] .card,
+[data-look="nothing"] .tile,
+[data-look="nothing"] .dialog,
+[data-look="nothing"] .menu,
+[data-look="nothing"] .sheet,
+[data-look="nothing"] .snackbar,
+[data-look="nothing"] .fab,
+[data-look="nothing"] .cal-event,
+[data-look="nothing"] .note-card,
+[data-look="nothing"] .list-picker,
+[data-look="nothing"] .timer-row,
+[data-look="nothing"] .team-box,
+[data-look="nothing"] .cal-home,
+[data-look="nothing"] .weather-card,
+[data-look="nothing"] .team-card,
+[data-look="nothing"] .item-group,
+[data-look="nothing"] .listen-panel,
+[data-look="nothing"] .side-panel { box-shadow: none; }
+[data-look="nothing"] .card,
+[data-look="nothing"] .cal-event,
+[data-look="nothing"] .note-card,
+[data-look="nothing"] .list-picker,
+[data-look="nothing"] .timer-row,
+[data-look="nothing"] .team-box,
+[data-look="nothing"] .item-group {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+}
+[data-look="nothing"] .dialog,
+[data-look="nothing"] .sheet { background: var(--surface-container); border: 1px solid var(--outline); border-radius: 16px; }
+[data-look="nothing"] .sheet { border-bottom: none; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+[data-look="nothing"] .sheet .handle { height: 2px; opacity: 1; }
+[data-look="nothing"] .menu { background: var(--surface-container-high); border: 1px solid var(--outline); border-radius: 8px; }
+[data-look="nothing"] .snackbar { background: var(--surface-container-high); color: var(--on-surface); border: 1px solid var(--outline); border-radius: 8px; font-family: 'Space Mono', monospace; font-size: 12px; }
+[data-look="nothing"] .scrim { background: rgba(0, 0, 0, 0.8); }
+
+/* ——— Tiles: hairline cards, inverted when on; they fade in, they do not slide ——— */
+[data-look="nothing"] .tile {
+  background: var(--surface-container);
+  color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+  transition: background 200ms var(--nd-ease), color 200ms var(--nd-ease), border-color 200ms var(--nd-ease);
+}
+[data-look="nothing"] .tile:hover { border-color: var(--outline); }
+[data-look="nothing"] .tile:active { transform: none; border-color: var(--on-surface-variant); }
+[data-look="nothing"] .tile.on { background: var(--nd-display); color: var(--on-primary); border-color: var(--nd-display); }
+/* backwards, not both: a transform kept after the entrance would trap the fixed dialogs of a tile inside it. */
+[data-look="nothing"] .grid > * { animation: nd-fade 300ms var(--nd-ease) backwards; }
+[data-look="nothing"] .grid > *:nth-child(2) { animation-delay: 25ms; }
+[data-look="nothing"] .grid > *:nth-child(3) { animation-delay: 50ms; }
+[data-look="nothing"] .grid > *:nth-child(4) { animation-delay: 75ms; }
+[data-look="nothing"] .grid > *:nth-child(5) { animation-delay: 100ms; }
+[data-look="nothing"] .grid > *:nth-child(6) { animation-delay: 125ms; }
+[data-look="nothing"] .grid > *:nth-child(n + 7) { animation-delay: 150ms; }
+[data-look="nothing"] .tab-page,
+[data-look="nothing"] .tab-page.from-left { animation: nd-fade 250ms var(--nd-ease) backwards; }
+@keyframes nd-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ——— Icons of the sections: a thin ring, never a filled badge ——— */
+[data-look="nothing"] .section-icon,
+[data-look="nothing"] .note-icon,
+[data-look="nothing"] .list-picker-icon,
+[data-look="nothing"] .list-empty-icon,
+[data-look="nothing"] .cal-badge {
+  background: transparent;
+  color: var(--on-surface);
+  border: 1px solid var(--outline);
+  border-radius: 50%;
+}
+
+/* ——— Buttons: pills. Primary inverted, secondary with a hairline, ghost bare ——— */
+[data-look="nothing"] .filled-btn,
+[data-look="nothing"] .tonal-btn,
+[data-look="nothing"] .outlined-btn {
+  border-radius: 999px;
+  min-height: 44px;
+  padding: 0 24px;
+  transition: background 150ms var(--nd-ease), color 150ms var(--nd-ease), border-color 150ms var(--nd-ease);
+}
+[data-look="nothing"] .filled-btn { background: var(--nd-display); color: var(--on-primary); border: none; }
+[data-look="nothing"] .tonal-btn,
+[data-look="nothing"] .outlined-btn { background: transparent; color: var(--on-surface); border: 1px solid var(--outline); }
+[data-look="nothing"] .tonal-btn:hover,
+[data-look="nothing"] .outlined-btn:hover { border-color: var(--on-surface-variant); background: transparent; }
+[data-look="nothing"] .filled-btn:disabled,
+[data-look="nothing"] .tonal-btn:disabled { opacity: 0.4; }
+[data-look="nothing"] .text-btn { color: var(--on-surface-variant); border-radius: 999px; }
+[data-look="nothing"] .text-btn:hover { color: var(--on-surface); background: transparent; }
+[data-look="nothing"] .text-btn.danger { color: var(--nd-red); }
+[data-look="nothing"] .fab,
+[data-look="nothing"] .fab.extended { background: var(--nd-display); color: var(--on-primary); border-radius: 999px; }
+[data-look="nothing"] .icon-btn.filled,
+[data-look="nothing"] .pad-key.primary,
+[data-look="nothing"] .add-send { background: var(--nd-display); color: var(--on-primary); }
+[data-look="nothing"] .icon-btn.tonal { background: transparent; border: 1px solid var(--outline); color: var(--on-surface); }
+[data-look="nothing"] .key,
+[data-look="nothing"] .pad-key,
+[data-look="nothing"] .rocker { background: var(--surface-container); border: 1px solid var(--outline-variant); box-shadow: none; }
+
+/* ——— Chips: pills with a hairline, inverted when chosen ——— */
+[data-look="nothing"] .chip {
+  border: 1px solid var(--outline);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--on-surface-variant);
+  font-size: 11px;
+  transition: background 200ms var(--nd-ease), color 200ms var(--nd-ease), border-color 200ms var(--nd-ease);
+}
+[data-look="nothing"] .chip:hover { border-color: var(--on-surface-variant); color: var(--on-surface); }
+[data-look="nothing"] .chip.selected { background: var(--nd-display); border-color: var(--nd-display); color: var(--on-primary); }
+
+/* ——— The switch: a pill track and a round thumb, the track lit when on ——— */
+[data-look="nothing"] .switch {
+  width: 48px;
+  height: 28px;
+  border-radius: 999px;
+  border: none;
+  background: var(--outline);
+}
+[data-look="nothing"] .switch::after {
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  background: var(--on-surface-variant);
+  transition: left 200ms var(--nd-ease), background 200ms var(--nd-ease);
+}
+[data-look="nothing"] .switch.on { background: var(--nd-display); }
+[data-look="nothing"] .switch.on::after { left: 24px; top: 4px; width: 20px; height: 20px; background: var(--on-primary); }
+
+/* ——— Fields: an underline, Space Mono for what is typed ——— */
+[data-look="nothing"] .field input,
+[data-look="nothing"] .field textarea,
+[data-look="nothing"] .field select {
+  border: none;
+  border-bottom: 1px solid var(--outline);
+  border-radius: 0;
+  background: transparent;
+  padding: 14px 4px;
+  font-family: 'Space Mono', monospace;
+}
+[data-look="nothing"] .field input:focus,
+[data-look="nothing"] .field textarea:focus { border: none; border-bottom: 1px solid var(--on-surface); padding: 14px 4px; }
+[data-look="nothing"] .field.error input { border-bottom-color: var(--nd-red); }
+[data-look="nothing"] .settings-search,
+[data-look="nothing"] .add-field,
+[data-look="nothing"] .chat-field {
+  background: var(--surface-container);
+  border: 1px solid var(--outline);
+  border-radius: 999px;
+}
+[data-look="nothing"] .settings-search:focus-within,
+[data-look="nothing"] .add-field:focus-within,
+[data-look="nothing"] .chat-field:focus { border-color: var(--on-surface); }
+
+/* ——— The slider: a thin bar of white on gray, a round thumb ——— */
+[data-look="nothing"] input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; height: 40px; }
+[data-look="nothing"] input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 0;
+  background: linear-gradient(var(--nd-display), var(--nd-display)) 0 / var(--fill, 0%) 100% no-repeat, var(--outline);
+}
+[data-look="nothing"] input[type="range"]::-moz-range-track { height: 4px; border-radius: 0; background: var(--outline); }
+[data-look="nothing"] input[type="range"]::-moz-range-progress { height: 4px; background: var(--nd-display); }
+[data-look="nothing"] input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7px; border-radius: 50%; border: none; background: var(--nd-display); }
+[data-look="nothing"] input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; border: none; background: var(--nd-display); }
+
+/* ——— The bottom bar: a flat pill with a hairline; the chosen tab names itself after the red dot ——— */
+[data-look="nothing"] .bottom-bar {
+  background: var(--surface-container);
+  border: 1px solid var(--outline);
+  box-shadow: none;
+  transition: transform 300ms var(--nd-ease), opacity 200ms var(--nd-ease);
+}
+[data-look="nothing"] .tab-pill { color: var(--nd-disabled); transition: color 200ms var(--nd-ease); }
+[data-look="nothing"] .tab-pill:hover { background: transparent; color: var(--on-surface); }
+[data-look="nothing"] .tab-pill .icon,
+[data-look="nothing"] .tab-pill.selected .icon { transform: none; transition: none; }
+[data-look="nothing"] .tab-pill .tab-label { font-size: 11px; transition: max-width 250ms var(--nd-ease), opacity 200ms var(--nd-ease), margin 250ms var(--nd-ease); }
+[data-look="nothing"] .tab-pill.selected { background: transparent; color: var(--nd-display); }
+[data-look="nothing"] .tab-pill.selected .tab-label::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin: 0 6px 1px 0;
+  border-radius: 50%;
+  background: var(--nd-red);
+  vertical-align: middle;
+}
+
+/* ——— Side bars on wide screens: no fills, the chosen one bright with a red bar ——— */
+[data-look="nothing"] .side-item.selected,
+[data-look="nothing"] .rail-item.selected .pill { background: var(--surface-container-high); color: var(--nd-display); }
+[data-look="nothing"] .side-item.selected { box-shadow: inset 2px 0 0 var(--nd-red); }
+[data-look="nothing"] .list-choice.selected,
+[data-look="nothing"] .team-pick.selected,
+[data-look="nothing"] .table-line.mine { background: var(--surface-container-high); color: var(--nd-display); box-shadow: inset 2px 0 0 var(--nd-red); }
+
+/* ——— Lists and segments ——— */
+[data-look="nothing"] .segments { border: 1px solid var(--outline); background: transparent; border-radius: 999px; }
+[data-look="nothing"] .segment { font-size: 11px; color: var(--on-surface-variant); }
+[data-look="nothing"] .segment-pill { background: var(--nd-display); border-radius: 999px; }
+[data-look="nothing"] .segment.selected { color: var(--on-primary); }
+[data-look="nothing"] .segment.selected .segment-count { color: var(--on-primary); background: transparent; }
+[data-look="nothing"] .check-circle { border: 1px solid var(--outline); }
+[data-look="nothing"] .item-row.checked .check-circle { background: var(--nd-display); border-color: var(--nd-display); color: var(--on-primary); }
+[data-look="nothing"] .progress,
+[data-look="nothing"] .list-progress { border-radius: 0; background: var(--outline-variant); }
+[data-look="nothing"] .progress span,
+[data-look="nothing"] .list-progress span { border-radius: 0; background: var(--nd-display); }
+
+/* ——— Home: today and tomorrow, the sky and the team as monochrome widgets ——— */
+[data-look="nothing"] .cal-home,
+[data-look="nothing"] .weather-card,
+[data-look="nothing"] .team-card {
+  background: var(--surface-container);
+  color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+}
+[data-look="nothing"] .cal-home-head,
+[data-look="nothing"] .cal-home .supporting,
+[data-look="nothing"] .cal-tomorrow,
+[data-look="nothing"] .cal-home-more { color: var(--on-surface-variant); }
+[data-look="nothing"] .cal-home-time { font-size: 12px; letter-spacing: 0.04em; white-space: nowrap; }
+[data-look="nothing"] .cal-home-time.wide { font-size: 10.5px; letter-spacing: 0; }
+[data-look="nothing"] .weather-card *,
+[data-look="nothing"] .team-card * { color: inherit; text-shadow: none; }
+
+/* ——— The chat: what the assistant says with a hairline, what I write inverted ——— */
+[data-look="nothing"] .chat-bubble { background: var(--surface-container); border: 1px solid var(--outline-variant); border-radius: 16px; }
+[data-look="nothing"] .chat-bubble.mine { background: var(--nd-display); color: var(--on-primary); border-color: var(--nd-display); }
+[data-look="nothing"] .chat-suggestions .chip { background: transparent; }
+
+/* ——— Dialogs: Cancel and Save as pills ——— */
+[data-look="nothing"] .dialog .actions .text-btn { min-height: 40px; padding: 0 20px; }
+[data-look="nothing"] .dialog .actions .text-btn:last-child { background: var(--nd-display); color: var(--on-primary); }
+[data-look="nothing"] .dialog .actions .text-btn:last-child:disabled { opacity: 0.4; }
+
+[data-look="nothing"] .swatch { border-radius: 50%; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-look="nothing"] .grid > *, [data-look="nothing"] .tab-page { animation: none; }
+}

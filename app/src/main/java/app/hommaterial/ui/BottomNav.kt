@@ -136,6 +136,13 @@ internal fun FloatingBottomBar(
             ) {
                 Box(Modifier.padding(bottom = inset), contentAlignment = Alignment.Center) { tabs() }
             }
+        } else if (LocalNothing.current) {
+            // Nothing: a flat pill with a hairline, no shadow.
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            ) { tabs() }
         } else {
             Surface(
                 shape = CircleShape,
@@ -152,10 +159,11 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
     val colors = MaterialTheme.colorScheme
     val skeuo = LocalSkeuo.current
     val metro = LocalMetro.current
+    val nothing = LocalNothing.current
     // In the black bar of the skeuomorphic look the chosen tab sits on glass, its icon lit.
     val background by animateColorAsState(
         when {
-            skeuo || metro -> Color.Transparent
+            skeuo || metro || nothing -> Color.Transparent
             selected -> colors.secondaryContainer
             else -> colors.secondaryContainer.copy(alpha = 0f)
         },
@@ -165,6 +173,7 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
         when {
             skeuo -> if (selected) Color.White else Color(0xFF9C9C9C)
             metro -> if (selected) colors.onSurface else colors.onSurfaceVariant
+            nothing -> if (selected) colors.primary else colors.onSurfaceVariant.copy(alpha = 0.7f)
             selected -> colors.onSecondaryContainer
             else -> colors.onSurfaceVariant
         },
@@ -173,7 +182,7 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
     val shape = if (skeuo) corners(15.dp) else CircleShape
     // The icon of the tab just chosen gives a little bounce.
     val scale by animateFloatAsState(
-        if (selected || metro) 1f else 0.92f,
+        if (selected || metro || nothing) 1f else 0.92f,
         spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "tab icon",
     )
@@ -215,6 +224,26 @@ private fun TabPill(tab: Tab, selected: Boolean, padding: androidx.compose.ui.un
             return@Row
         }
         icon()
+        if (nothing) {
+            // Nothing: the chosen tab names itself in spaced capitals after the red signal dot; no bounce, a fade.
+            AnimatedVisibility(
+                visible = selected,
+                enter = expandHorizontally(androidx.compose.animation.core.tween(220, easing = NothingEase)) + fadeIn(androidx.compose.animation.core.tween(220, easing = NothingEase)),
+                exit = shrinkHorizontally(androidx.compose.animation.core.tween(180, easing = NothingEase)) + fadeOut(androidx.compose.animation.core.tween(120)),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.padding(start = 10.dp).size(5.dp).clip(CircleShape).background(NothingRed))
+                    Text(
+                        str(tab.label).uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = content,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+            }
+            return@Row
+        }
         AnimatedVisibility(
             visible = selected,
             enter = expandHorizontally(spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(),

@@ -176,9 +176,9 @@ export function SettingsScreen({ onBack }) {
         ${section('appearance', 's_appearance', null, html`
           <${Chips} title=${str('theme')} choices=${[[0, str('theme_auto')], [1, str('theme_light')], [2, str('theme_dark')]]}
             selected=${s.theme} onSelect=${store.setTheme} />
-          <${Chips} title=${str('look')} choices=${[[0, str('look_material')], [1, str('look_skeuo')], [2, str('look_metro')]]}
+          <${Chips} title=${str('look')} choices=${[[0, str('look_material')], [1, str('look_skeuo')], [2, str('look_metro')], [3, str('look_nothing')]]}
             selected=${s.look} onSelect=${store.setLook} />
-          <${AccentPicker} selected=${s.accent} onSelect=${store.setAccent} />
+          ${s.look !== 3 && html`<${AccentPicker} selected=${s.accent} onSelect=${store.setAccent} />`}
           <${Chips} title=${str('layout')} choices=${[[LAYOUT_GRID, str('layout_grid')], [LAYOUT_LIST, str('layout_list')]]}
             selected=${s.layout} onSelect=${store.setLayout} />
           <${Chips} title=${str('language_choose')} choices=${[['auto', str('pwa_language_auto')], ['it', 'Italiano'], ['en', 'English']]}

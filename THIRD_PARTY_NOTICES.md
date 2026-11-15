@@ -18,6 +18,8 @@ questa app non esisterebbe.
 | [Kotlin](https://kotlinlang.org) e [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines) | Apache 2.0 |
 | [AndroidX e Jetpack Compose](https://developer.android.com/jetpack/androidx) (incluse Material 3 e Material Icons) | Apache 2.0 |
 | [OkHttp](https://square.github.io/okhttp/) | Apache 2.0 |
+| Caratteri [Space Grotesk](https://github.com/floriankarsten/space-grotesk), [Space Mono](https://github.com/googlefonts/spacemono) e [Doto](https://github.com/oliverlalan/Doto) (stile Nothing) | SIL Open Font License 1.1 |
 
 Il testo della licenza Apache 2.0 è disponibile su
-<https://www.apache.org/licenses/LICENSE-2.0>.
+<https://www.apache.org/licenses/LICENSE-2.0>, quello della SIL Open Font License su
+<https://openfontlicense.org>.
