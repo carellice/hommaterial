@@ -1,7 +1,7 @@
 // The music of the home server, a page of the bottom bar (ui/Music.kt): songs, albums, artists and
 // folders of the folder of the account, a player that keeps playing from page to page, and the upload.
 import { html, useState, useEffect, useRef } from '../lib.js';
-import { Icon, IconButton, Spinner, Dialog, useBack } from './common.js';
+import { Icon, IconButton, Spinner, Dialog, Menu, useBack } from './common.js';
 import * as store from '../store.js';
 import { get } from '../net.js';
 import { str, plural } from '/shared/i18n.js';
@@ -91,6 +91,24 @@ export function previous() {
   else load(model.index - 1);
 }
 export const seek = (seconds) => { audio.currentTime = seconds; };
+
+/**
+ * Puts [track] in the queue: right after the one that plays when [next], at its end otherwise.
+ * With nothing in the queue it plays at once. In shuffle the queue is already in its mixed order.
+ */
+export function enqueue(track, next) {
+  if (!current()) {
+    play([track]);
+    return;
+  }
+  const queue = [...model.queue];
+  queue.splice(next ? model.index + 1 : queue.length, 0, track);
+  set({ queue });
+}
+/** Jumps to the song at [index] of the queue. */
+export const playAt = (index) => load(index);
+/** Takes the song at [index], one after the one that plays, out of the queue. */
+export const removeAt = (index) => set({ queue: model.queue.filter((_, i) => i !== index) });
 export function stop() {
   audio.pause();
   audio.removeAttribute('src');
@@ -292,13 +310,43 @@ function Cover({ track, big }) {
     : html`<img class=${`music-cover ${big ? 'big' : ''}`} src=${coverUrl(track)} alt="" loading="lazy" onError=${() => setFailed(true)} />`;
 }
 
+// A div with the role of a button: the menu at its end is a button of its own.
 function TrackRow({ track, playing, onPlay }) {
+  const [anchor, setAnchor] = useState(null);
   return html`
-    <button class=${`list-item ${playing ? 'music-current' : ''}`} onClick=${onPlay}>
+    <div class=${`list-item clickable ${playing ? 'music-current' : ''}`} role="button" tabindex="0" onClick=${onPlay}
+      onKeyDown=${(e) => e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onPlay())}>
       <${Cover} track=${track} />
       <span class="texts"><span class="body-large">${track.title}</span><span class="supporting">${track.artist || str('music_unknown_artist')}${track.album ? ' · ' + track.album : ''}</span></span>
       <span class="supporting faint">${time(track.duration / 1000)}</span>
-    </button>`;
+      <span class="trail" onClick=${(e) => e.stopPropagation()}>
+        <${IconButton} icon="more_vert" label=${str('music_more')} onClick=${(e) => setAnchor(e.currentTarget.getBoundingClientRect())} />
+      </span>
+    </div>
+    ${anchor && html`<${Menu} anchor=${anchor} onDismiss=${() => setAnchor(null)} items=${[
+      [str('music_play_next'), () => { enqueue(track, true); store.say(str('music_queued_next', track.title)); }],
+      [str('music_add_queue'), () => { enqueue(track, false); store.say(str('music_queued', track.title)); }],
+    ]} />`}`;
+}
+
+/** The songs after the one that plays: a touch plays one, the cross takes it out. */
+function QueueDialog({ onDismiss }) {
+  const m = useModel();
+  const upcoming = m.queue.map((track, index) => ({ track, index })).slice(m.index + 1);
+  return html`
+    <${Dialog} title=${str('music_queue')} flush onDismiss=${onDismiss} actions=${html`
+      <button class="text-btn" onClick=${onDismiss}>${str('music_close')}</button>`}>
+      ${upcoming.length ? upcoming.map(({ track, index }) => html`
+        <div key=${index + track.path} class="list-item clickable" role="button" tabindex="0" onClick=${() => playAt(index)}
+          onKeyDown=${(e) => e.target === e.currentTarget && e.key === 'Enter' && playAt(index)}>
+          <${Cover} track=${track} />
+          <span class="texts"><span class="body-large">${track.title}</span><span class="supporting">${track.artist || str('music_unknown_artist')}</span></span>
+          <span class="trail" onClick=${(e) => e.stopPropagation()}>
+            <${IconButton} icon="close" label=${str('music_remove')} onClick=${() => removeAt(index)} />
+          </span>
+        </div>`)
+      : html`<div class="body-large faint" style="padding:24px 16px">${str('music_queue_empty')}</div>`}
+    <//>`;
 }
 
 /** The song that plays, above the bottom bar; a touch opens the whole player. */
@@ -323,6 +371,7 @@ export function PlayerBar() {
 function FullPlayer({ onClose }) {
   const m = useModel();
   const track = current();
+  const [queueOpen, setQueueOpen] = useState(false);
   useBack(onClose);
   useEffect(() => {
     if (!track) onClose();
@@ -333,6 +382,7 @@ function FullPlayer({ onClose }) {
       <div class="music-full-top">
         <${IconButton} icon="expand_more" label=${str('music_close')} onClick=${onClose} />
         <span class="grow label-large" style="text-align:center">${str('music_now_playing')}</span>
+        <${IconButton} icon="queue_music" label=${str('music_queue')} onClick=${() => setQueueOpen(true)} />
         <${IconButton} icon="stop" label=${str('music_stop')} onClick=${stop} />
       </div>
       <${Cover} track=${track} big />
@@ -347,5 +397,6 @@ function FullPlayer({ onClose }) {
         <${IconButton} icon="skip_next" label=${str('music_next')} onClick=${next} />
         <${IconButton} icon="repeat" label=${str('music_repeat')} cls=${m.repeat ? 'music-on' : ''} onClick=${() => set({ repeat: !m.repeat })} />
       </div>
+      ${queueOpen && html`<${QueueDialog} onDismiss=${() => setQueueOpen(false)} />`}
     </div>`;
 }
