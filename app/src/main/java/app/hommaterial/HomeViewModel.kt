@@ -239,6 +239,8 @@ data class UiState(
     val navigateAtOnce: Boolean = true,
     /** Whether what the assistant leaves to others goes to Alexa; off, the assistant answers everything itself. */
     val askAlexa: Boolean = true,
+    /** Whether the panel of the digital assistant opens over the lock screen, without unlocking. */
+    val assistOnLock: Boolean = false,
     /** Whether a key for searching the web is set. */
     val webSearch: Boolean = false,
     /** Whom to call or where to drive to, when more than one would do: the user picks. */
@@ -487,6 +489,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             readAloud = settings.getBoolean("readAloud", false),
             navigateAtOnce = settings.getBoolean("navigateAtOnce", true),
             askAlexa = settings.getBoolean("askAlexa", true),
+            assistOnLock = settings.getBoolean(ASSIST_ON_LOCK, false),
             webSearch = webSearchOn(),
             hapticLevel = settings.getInt("hapticLevel", HAPTIC_LEVEL_DEFAULT),
             theme = settings.getInt("theme", 0),
@@ -1980,6 +1983,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun setAskAlexa(on: Boolean) {
         settings.edit().putBoolean("askAlexa", on).apply()
         _state.update { it.copy(askAlexa = on) }
+    }
+
+    fun setAssistOnLock(on: Boolean) {
+        settings.edit().putBoolean(ASSIST_ON_LOCK, on).apply()
+        _state.update { it.copy(assistOnLock = on) }
     }
 
     fun setNavigateAtOnce(on: Boolean) {

@@ -624,6 +624,7 @@ fun SettingsScreen(state: UiState, vm: HomeViewModel, onBack: () -> Unit) {
                 )
                 Toggle(R.string.ask_alexa, R.string.ask_alexa_text, state.askAlexa, vm::setAskAlexa)
                 Toggle(R.string.read_aloud, R.string.read_aloud_text, state.readAloud, vm::setReadAloud)
+                Toggle(R.string.assist_on_lock, R.string.assist_on_lock_text, state.assistOnLock, vm::setAssistOnLock)
                 Toggle(R.string.navigate_at_once, R.string.navigate_at_once_text, state.navigateAtOnce, vm::setNavigateAtOnce)
             }
 

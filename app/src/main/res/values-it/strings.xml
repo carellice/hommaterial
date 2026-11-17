@@ -856,6 +856,8 @@
     <string name="read_aloud">Leggi sempre le risposte ad alta voce</string>
     <string name="navigate_at_once">Avvia subito la navigazione</string>
     <string name="navigate_at_once_text">Con «portami a…» Google Maps parte già in navigazione. Spenta, apre il percorso verso la destinazione e la navigazione parte quando tocchi Avvia. Vale solo per questo dispositivo.</string>
+    <string name="assist_on_lock">Assistente nella schermata di blocco</string>
+    <string name="assist_on_lock_text">Il gesto dell’assistente digitale apre il pannello anche con il telefono bloccato, senza sbloccarlo. Chiunque abbia in mano il telefono può così comandare i tuoi dispositivi a voce. Vale solo per questo dispositivo.</string>
     <string name="read_aloud_text">Le risposte di Alexa e dell\'assistente AI vengono lette appena arrivano, con la voce italiana più naturale del dispositivo. Vale solo per questo dispositivo.</string>
     <string name="ai_title">Assistente AI</string>
     <string name="ai_thinking">Ci penso…</string>

@@ -2,6 +2,9 @@ package app.hommaterial
 
 import android.Manifest
 import android.app.Activity
+import android.app.KeyguardManager
+import android.os.Build
+import android.view.WindowManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -118,6 +121,9 @@ private const val THINKING_MS = 20_000L
 
 private enum class Phase { LISTENING, THINKING, DONE, FAILED }
 
+/** The setting that lets the panel open over the lock screen. */
+const val ASSIST_ON_LOCK = "assistOnLock"
+
 /**
  * The digital assistant of the phone: its gesture opens a panel at the bottom of whatever is on
  * screen, already listening. The words appear as they are said, the colors below follow the voice,
@@ -126,6 +132,14 @@ private enum class Phase { LISTENING, THINKING, DONE, FAILED }
 class AssistActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Read here, before the panel: the lock screen decides whether the window shows at all.
+        val onLock = getSharedPreferences("settings", Context.MODE_PRIVATE).getBoolean(ASSIST_ON_LOCK, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(onLock)
+        } else if (onLock) {
+            @Suppress("DEPRECATION")
+            window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
+        }
         val clear = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
         enableEdgeToEdge(statusBarStyle = clear, navigationBarStyle = clear)
         setContent {
@@ -152,8 +166,16 @@ class AssistActivity : ComponentActivity() {
     }
 
     private fun openApp() {
-        startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        finish()
+        val open = {
+            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            finish()
+        }
+        // Over the lock screen the app itself waits for the phone to be unlocked.
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        if (keyguard?.isKeyguardLocked != true) return open()
+        keyguard.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
+            override fun onDismissSucceeded() = open()
+        })
     }
 
     // A panel left behind would come back listening to nothing: it goes away with the screen.
